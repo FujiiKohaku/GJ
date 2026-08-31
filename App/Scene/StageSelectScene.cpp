@@ -58,7 +58,8 @@ void SetArchiveMaterial(Object3d* object, int mode, float u = 0.0f, float width 
 
 void StageSelectScene::Initialize()
 {
-    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
+    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
+    SceneManager::GetInstance()->SetArchiveApproach(0.0f);
 
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
@@ -329,6 +330,7 @@ void StageSelectScene::UpdateCameraApproach(float deltaTime)
     // Quintic easing starts and ends at rest without a sudden camera stop.
     const float eased = progress * progress * progress *
         (progress * (progress * 6.0f - 15.0f) + 10.0f);
+    SceneManager::GetInstance()->SetArchiveApproach(eased);
     camera_->LookAt(
         kCameraStartEye + (kCameraEndEye - kCameraStartEye) * eased,
         kCameraStartTarget + (kCameraEndTarget - kCameraStartTarget) * eased);
