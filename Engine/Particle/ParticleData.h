@@ -1,0 +1,34 @@
+#pragma once
+#include "Engine/math/MathStruct.h"
+
+#include <cstdint>
+
+struct Particle {
+    EulerTransform transform;
+    Vector3 velocity;
+    Vector4 color;
+    float lifeTime;
+    float currentTime;
+};
+
+struct ParticleForGPU {
+    Matrix4x4 WVP;
+    Matrix4x4 World;
+    Vector4 color;
+};
+struct EmitterSphere {
+    Vector3 translate;
+    float radius;
+    Vector3 prevTranslate;
+    float padding1;
+    uint32_t count;
+    float frequency;
+    float frequencyTime;
+    uint32_t emit;
+    uint32_t maxParticles;
+    uint32_t padding2[3];
+};
+struct PerFrame {
+    float time;
+    float deltaTime;
+};

@@ -1,0 +1,72 @@
+{
+  "enemies": [
+    {
+      "type": "MoveEnemy",
+      "position": [-14.0, -3.0, 384.0],
+      "movePattern": "LeftRight",
+      "moveSpeed": 2.0,
+      "amplitude": 8.0,
+      "frequency": 2.0
+    },
+    {
+      "type": "NormalEnemy",
+      "position": [10.0, 5.0, 512.0]
+    },
+    {
+      "type": "MoveEnemy",
+      "position": [18.0, -6.0, 672.0],
+      "movePattern": "UpDown",
+      "moveSpeed": 2.0,
+      "amplitude": 6.0,
+      "frequency": 2.0
+    },
+    {
+      "type": "NormalEnemy",
+      "position": [-7.0, 7.0, 832.0]
+    },
+    {
+      "type": "MoveEnemy",
+      "position": [14.0, 0.0, 992.0],
+      "movePattern": "ZigZag",
+      "moveSpeed": 2.5,
+      "amplitude": 8.0,
+      "frequency": 2.0
+    },
+    {
+      "type": "NormalEnemy",
+      "position": [-18.0, 4.0, 1152.0]
+    },
+    {
+      "type": "MoveEnemy",
+      "position": [4.0, -7.0, 1312.0],
+      "movePattern": "SineWave",
+      "moveSpeed": 1.5,
+      "amplitude": 5.0,
+      "frequency": 3.0
+    },
+    {
+      "type": "NormalEnemy",
+      "position": [17.0, 6.0, 1472.0]
+    },
+    {
+      "type": "MoveEnemy",
+      "position": [-12.0, 1.0, 1632.0],
+      "movePattern": "LeftRight",
+      "moveSpeed": 2.0,
+      "amplitude": 8.0,
+      "frequency": 2.0
+    },
+    {
+      "type": "NormalEnemy",
+      "position": [7.0, -5.0, 1792.0]
+    },
+    {
+      "type": "MoveEnemy",
+      "position": [-19.0, 0.0, 1440.0],
+      "movePattern": "ZigZag",
+      "moveSpeed": 2.5,
+      "amplitude": 8.0,
+      "frequency": 2.0
+    }
+  ]
+}

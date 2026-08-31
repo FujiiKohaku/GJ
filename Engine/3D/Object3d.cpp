@@ -1,0 +1,370 @@
+#include "Object3d.h"
+#include "Engine/math/MatrixMath.h"
+#include "Model.h"
+#include "ModelManager.h"
+#include "Object3dManager.h"
+#include "Engine/Time/TimeManager.h"
+#include <cassert>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#pragma region
+void Object3d::Initialize(Object3dManager* object3DManager)
+{
+    // Object3dManagerを保持
+    object3dManager_ = object3DManager;
+
+    camera_ = object3dManager_->GetDefaultCamera();
+    // ================================
+    // Transformバッファ初化
+    // ================================
+    transformationMatrixResource = object3dManager_->GetDxCommon()->CreateBufferResource(sizeof(TransformationMatrix));
+    transformationMatrixResource->SetName(L"Object3d::TransformCB");
+    transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));
+    transformationMatrixData->WVP = MatrixMath::MakeIdentity4x4();
+    transformationMatrixData->World = MatrixMath::MakeIdentity4x4();
+
+
+    materialResource = object3dManager_->GetDxCommon()->CreateBufferResource(sizeof(Material));
+    materialResource->SetName(L"Object3d::MaterialCB");
+
+    // マテリアル初期化
+    // 書き込み用アドレス取得
+    materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
+
+
+    materialData_->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+    materialData_->enableLighting = false;
+    materialData_->uvTransform = MatrixMath::MakeIdentity4x4();
+    materialData_->shininess = 32.0f;
+    materialData_->enableEnvironmentMap = false;
+    materialData_->environmentCoefficient = 0.0f;
+    // ================================
+    // Transform初期値設定
+    // ================================
+    transform = { { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };
+    cameraTransform = { { 1.0f, 1.0f, 1.0f }, { 0.3f, 0.0f, 0.0f }, { 0.0f, 4.0f, -10.0f } };
+   // environmentTextureHandle_ = TextureManager::GetInstance()->GetSrvHandleGPU("resources/Textures/skybox.dds");
+}
+#pragma endregion
+#pragma region
+
+void Object3d::Update()
+{
+    // ギミックの更新
+    if (gimmick_.exists) {
+        float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
+        if (gimmick_.type == "ROTATION") {
+            transform.rotate.x += gimmick_.axis.x * gimmick_.speed * deltaTime;
+            transform.rotate.y += gimmick_.axis.y * gimmick_.speed * deltaTime;
+            transform.rotate.z += gimmick_.axis.z * gimmick_.speed * deltaTime;
+        }
+        else if (gimmick_.type == "MOVE") {
+            gimmickTime_ += gimmick_.speed * deltaTime;
+            float factor = std::sin(gimmickTime_);
+            transform.translate.x = baseTranslate_.x + gimmick_.range.x * factor;
+            transform.translate.y = baseTranslate_.y + gimmick_.range.y * factor;
+            transform.translate.z = baseTranslate_.z + gimmick_.range.z * factor;
+        }
+    }
+
+    if (collider_ != nullptr) {
+        collider_->SetCenter(transform.translate + colliderOffset_);
+        collider_->SetRotation(transform.rotate);
+    }
+
+    Matrix4x4 localMatrix = MatrixMath::MakeIdentity4x4();
+
+    if (model_) {
+        localMatrix = model_->GetModelData().rootNode.localMatrix;
+    }
+
+    if (animation_ && model_) {
+        localMatrix = animation_->GetLocalMatrix(model_->GetModelData().rootNode.name);
+    }
+
+    if (useCustomWorldMatrix_) {
+        worldMatrix_ = customWorldMatrix_;
+    } else if (useQuaternionRotation_) {
+        worldMatrix_ = MatrixMath::Multiply(localMatrix, MatrixMath::MakeAffineMatrix(transform.scale, quaternionRotation_, transform.translate));
+    } else {
+        worldMatrix_ = MatrixMath::Multiply(localMatrix, MatrixMath::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate));
+    }
+
+    Matrix4x4 worldViewProjectionMatrix;
+
+    if (camera_) {
+        worldViewProjectionMatrix = MatrixMath::Multiply(worldMatrix_, camera_->GetViewProjectionMatrix());
+    } else {
+        worldViewProjectionMatrix = worldMatrix_;
+    }
+
+    transformationMatrixData->WVP = worldViewProjectionMatrix;
+    transformationMatrixData->World = worldMatrix_;
+
+    /*  Matrix4x4 inv = MatrixMath::Inverse(worldViewProjectionMatrix);
+      transformationMatrixData->WorldInverseTranspose = MatrixMath::Transpose(inv);*/
+
+    Matrix4x4 invWorld = MatrixMath::Inverse(worldMatrix_);
+    transformationMatrixData->WorldInverseTranspose = MatrixMath::Transpose(invWorld);
+}
+#pragma endregion
+#pragma region
+void Object3d::Draw()
+{
+    ID3D12GraphicsCommandList* commandList = object3dManager_->GetDxCommon()->GetCommandList();
+    
+    commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+
+    commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
+
+    commandList->SetGraphicsRootConstantBufferView(4, camera_->GetGPUAddress());
+
+    commandList->SetGraphicsRootDescriptorTable(8,Object3dManager::GetInstance()->GetEnvironmentTexture());
+
+    if (model_) {
+        model_->Draw();
+    }
+}
+#pragma endregion
+#pragma region
+// ===============================================
+// OBJファイルの読み込み
+// ===============================================
+ModelData Object3d::LoadModeFile(const std::string& directoryPath,
+    const std::string filename)
+{
+    ModelData modelData;
+
+    Assimp::Importer importer;
+    std::string filePath = directoryPath + "/" + filename;
+    std::filesystem::path modelFilePath(filePath);
+    std::filesystem::path modelDirectory = modelFilePath.parent_path(); // Model Path
+
+    std::filesystem::path p(filePath);
+    if (!std::filesystem::exists(p)) {
+        OutputDebugStringA("FILE NOT FOUND: ");
+        OutputDebugStringA(filePath.c_str());
+        OutputDebugStringA("\n");
+        assert(false);
+    }
+    char cwd[MAX_PATH];
+    GetCurrentDirectoryA(MAX_PATH, cwd);
+    OutputDebugStringA("CWD: ");
+    OutputDebugStringA(cwd);
+    OutputDebugStringA("\n");
+
+    const aiScene* scene = importer.ReadFile(
+        filePath.c_str(),
+        aiProcess_Triangulate | aiProcess_FlipWindingOrder | aiProcess_FlipUVs);
+
+    assert(scene);
+    assert(scene->HasMeshes());
+
+    // -------------------------
+    // Mesh -> MeshPrimitive
+    // -------------------------
+    uint32_t globalVertexOffset = 0;
+    for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex) {
+        aiMesh* mesh = scene->mMeshes[meshIndex];
+
+        MeshPrimitive primitive;
+        primitive.materialIndex = mesh->mMaterialIndex;
+        primitive.mode = PrimitiveMode::Triangles; // 今E固定でOK
+
+        // ---- vertices ----
+        for (uint32_t v = 0; v < mesh->mNumVertices; ++v) {
+            VertexData vertex {};
+
+            aiVector3D pos = mesh->mVertices[v];
+            aiVector3D nrm = mesh->HasNormals()
+                ? mesh->mNormals[v]
+                : aiVector3D(0, 1, 0);
+
+            aiVector3D uv = mesh->HasTextureCoords(0)
+                ? mesh->mTextureCoords[0][v]
+                : aiVector3D(0, 0, 0);
+
+            // 右扁EↁE左手！E反転EE
+            vertex.position = { -pos.x, pos.y, pos.z, 1.0f };
+            vertex.normal = { -nrm.x, nrm.y, nrm.z };
+            vertex.texcoord = { uv.x, uv.y };
+
+            primitive.vertices.push_back(vertex);
+        }
+
+        // ---- indices ----
+        if (mesh->HasFaces()) {
+            for (uint32_t f = 0; f < mesh->mNumFaces; ++f) {
+                aiFace& face = mesh->mFaces[f];
+                // Triangulate してるEで 3 のはぁE
+                for (uint32_t i = 0; i < face.mNumIndices; ++i) {
+                    primitive.indices.push_back(face.mIndices[i]);
+                }
+            }
+        }
+        // indices が空なめEdrawArrays 扱ぁEOK
+
+        for (uint32_t boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex) {
+            aiBone* bone = mesh->mBones[boneIndex];
+
+            std::string jointName = bone->mName.C_Str();
+            JointWeightData& jointWeightData = modelData.skinClusterData[jointName];
+
+            aiMatrix4x4 bindPoseMatrixAssimp = bone->mOffsetMatrix.Inverse();
+            aiVector3D scale, translate;
+            aiQuaternion rotate;
+            bindPoseMatrixAssimp.Decompose(scale, rotate, translate);
+
+            Matrix4x4 bindPoseMatrix = MatrixMath::MakeAffineMatrix(
+                { scale.x, scale.y, scale.z },
+                { rotate.x, -rotate.y, -rotate.z, rotate.w },
+                { -translate.x, translate.y, translate.z });
+
+            jointWeightData.inverseBindPoseMatrix = MatrixMath::Inverse(bindPoseMatrix);
+
+            for (uint32_t weightIndex = 0;
+                weightIndex < bone->mNumWeights;
+                ++weightIndex) {
+
+                jointWeightData.vertexWeights.push_back({ bone->mWeights[weightIndex].mWeight,
+                    globalVertexOffset + bone->mWeights[weightIndex].mVertexId });
+            }
+        }
+
+        globalVertexOffset += mesh->mNumVertices;
+        modelData.primitives.push_back(primitive);
+    }
+    modelData.materials.resize(scene->mNumMaterials);
+    if (modelData.materials.empty()) {
+        modelData.materials.push_back(MaterialData {});
+    }
+
+    for (uint32_t materialIndex = 0; materialIndex < scene->mNumMaterials; ++materialIndex) {
+        aiMaterial* material = scene->mMaterials[materialIndex];
+        MaterialData& materialData = modelData.materials[materialIndex];
+        materialData.textureFilePath = "resources/Textures/BaseColor_Cube.png";
+
+        aiTextureType textureType = aiTextureType_BASE_COLOR;
+        if (material->GetTextureCount(textureType) == 0) {
+            textureType = aiTextureType_DIFFUSE;
+        }
+
+        if (material->GetTextureCount(textureType) > 0) {
+            aiString textureFilePath;
+            material->GetTexture(textureType, 0, &textureFilePath);
+
+            std::string tex = textureFilePath.C_Str();
+            const aiTexture* embeddedTexture = scene->GetEmbeddedTexture(textureFilePath.C_Str());
+            if (embeddedTexture != nullptr) {
+                std::string embeddedTextureKey = "embedded://";
+                embeddedTextureKey += modelFilePath.lexically_normal().generic_string();
+                embeddedTextureKey += "/";
+                embeddedTextureKey += tex;
+
+                if (embeddedTexture->mHeight == 0) {
+                    TextureManager::GetInstance()->LoadTextureFromMemory(
+                        embeddedTextureKey,
+                        reinterpret_cast<const uint8_t*>(embeddedTexture->pcData),
+                        embeddedTexture->mWidth);
+                } else {
+                    TextureManager::GetInstance()->LoadTextureFromBGRA(
+                        embeddedTextureKey,
+                        reinterpret_cast<const uint8_t*>(embeddedTexture->pcData),
+                        embeddedTexture->mWidth,
+                        embeddedTexture->mHeight);
+                }
+                materialData.textureFilePath = embeddedTextureKey;
+            }
+
+
+            else if (!tex.empty()) {
+
+                std::filesystem::path fullPath = modelDirectory / tex; // Model Path
+
+                if (std::filesystem::exists(fullPath)) {
+                    materialData.textureFilePath = fullPath.lexically_normal().string();
+                }
+            }
+        }
+    }
+
+
+    // -------------------------
+
+    // -------------------------
+    modelData.rootNode = ReadNode(scene->mRootNode);
+
+    return modelData;
+}
+#pragma endregion
+
+void Object3d::SetModel(const std::string& filePath)
+{
+
+    model_ = ModelManager::GetInstance()->FindModel(filePath);
+    modelFilePath_ = filePath;
+}
+Node Object3d::ReadNode(aiNode* node)
+{
+    Node result;
+
+    aiVector3D scale, translate;
+    aiQuaternion rotate;
+
+    node->mTransformation.Decompose(scale, rotate, translate);
+
+
+    result.transform.scale = { scale.x, scale.y, scale.z };
+
+
+    result.transform.rotate = {
+        rotate.x,
+        -rotate.y,
+        -rotate.z,
+        rotate.w
+    };
+
+    // 平行移動：X反転
+    result.transform.translate = {
+        -translate.x,
+        translate.y,
+        translate.z
+    };
+
+
+    result.localMatrix = MatrixMath::MakeAffineMatrix(
+        result.transform.scale,
+        result.transform.rotate,
+        result.transform.translate);
+
+    result.name = node->mName.C_Str();
+
+    result.children.resize(node->mNumChildren);
+    for (uint32_t i = 0; i < node->mNumChildren; ++i) {
+        result.children[i] = ReadNode(node->mChildren[i]);
+    }
+
+    return result;
+}
+const Node& Object3d::GetRootNode() const
+{
+    assert(model_);
+    return model_->GetModelData().rootNode;
+}
+
+void Object3d::SetAnimation(PlayAnimation* anim)
+{
+    animation_ = anim;
+}
+
+Object3d::~Object3d()
+{
+    if (transformationMatrixResource) {
+        transformationMatrixResource->Unmap(0, nullptr);
+    }
+
+    if (materialResource) {
+        materialResource->Unmap(0, nullptr);
+    }
+}

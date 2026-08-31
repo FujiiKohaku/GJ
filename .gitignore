@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local AI provider credentials
+Tools/UIAnimationEditor/ai_settings.json

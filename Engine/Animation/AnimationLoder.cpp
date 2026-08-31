@@ -1,0 +1,90 @@
+#include "AnimationLoder.h"
+#include "Event/AnimationEventLoader.h"
+
+#include <filesystem>
+
+namespace {
+constexpr double kDefaultTicksPerSecond = 25.0;
+}
+
+Animation AnimationLoder::LoadAnimationFile(
+    const std::string& directoryPath,
+    const std::string& filename,
+    uint32_t animationIndex) {
+    Animation animation;
+    Assimp::Importer importer;
+
+    std::string filePath = directoryPath + "/" + filename;
+
+    const aiScene* scene = importer.ReadFile(filePath.c_str(), 0);
+    assert(scene);
+
+    // Animation が無いモデル対応
+    if (scene->mNumAnimations == 0 || animationIndex >= scene->mNumAnimations) {
+        animation.duration = 0.0f;
+        return animation;
+    }
+
+    aiAnimation* animAssimp = scene->mAnimations[animationIndex];
+    animation.name = animAssimp->mName.C_Str();
+    if (animation.name.empty()) {
+        animation.name = "Animation_" + std::to_string(animationIndex);
+    }
+
+    double ticksPerSecond = animAssimp->mTicksPerSecond;
+    if (ticksPerSecond <= 0.0) {
+        ticksPerSecond = kDefaultTicksPerSecond;
+    }
+
+    animation.duration =
+        static_cast<float>(animAssimp->mDuration / ticksPerSecond);
+
+    for (uint32_t channelIndex = 0;
+        channelIndex < animAssimp->mNumChannels;
+        ++channelIndex) {
+
+        aiNodeAnim* nodeAnimAssimp = animAssimp->mChannels[channelIndex];
+        NodeAnimation& nodeAnim =
+            animation.nodeAnimations[nodeAnimAssimp->mNodeName.C_Str()];
+
+        // Translate
+        for (uint32_t i = 0; i < nodeAnimAssimp->mNumPositionKeys; ++i) {
+            aiVectorKey& key = nodeAnimAssimp->mPositionKeys[i];
+            KeyframeVector3 kf;
+            kf.time = static_cast<float>(key.mTime / ticksPerSecond);
+            kf.value = { -key.mValue.x, key.mValue.y, key.mValue.z };
+            nodeAnim.translate.push_back(kf);
+        }
+
+        // Rotate
+        for (uint32_t i = 0; i < nodeAnimAssimp->mNumRotationKeys; ++i) {
+            aiQuatKey& key = nodeAnimAssimp->mRotationKeys[i];
+            KeyframeQuaternion kf;
+            kf.time = static_cast<float>(key.mTime / ticksPerSecond);
+            kf.value = {
+                -key.mValue.x,
+                key.mValue.y,
+                key.mValue.z,
+                -key.mValue.w
+            };
+            nodeAnim.rotation.push_back(kf);
+        }
+
+        // Scale
+        for (uint32_t i = 0; i < nodeAnimAssimp->mNumScalingKeys; ++i) {
+            aiVectorKey& key = nodeAnimAssimp->mScalingKeys[i];
+            KeyframeVector3 kf;
+            kf.time = static_cast<float>(key.mTime / ticksPerSecond);
+            kf.value = { key.mValue.x, key.mValue.y, key.mValue.z };
+            nodeAnim.scale.push_back(kf);
+        }
+    }
+
+    animation.events = AnimationEventLoader::LoadEvents(
+        std::filesystem::path(filePath),
+        animation.name,
+        animation.duration);
+
+    return animation;
+}
+
