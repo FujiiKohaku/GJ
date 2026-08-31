@@ -5,6 +5,7 @@
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/Input/Input.h"
 #include "Engine/PostEffect/PostEffectType.h"
+#include "GamePlayScene.h"
 #include "SceneManager.h"
 #include "TestScene.h"
 #include "TitleScene.h"
@@ -42,7 +43,8 @@ void StageSelectScene::Initialize()
 
     instructionText_ = std::make_unique<Text>();
     instructionText_->Initialize(kDefaultFont);
-    instructionText_->SetText("ENTER / SPACE : SELECT   BACKSPACE : TITLE");
+    instructionText_->SetText(
+        "ENTER / SPACE : GAME PLAY   T : TEST   BACKSPACE : TITLE");
     instructionText_->SetPosition({ 640.0f, 560.0f });
     instructionText_->SetAnchorPoint({ 0.5f, 0.5f });
     instructionText_->SetFontSize(24.0f);
@@ -56,6 +58,11 @@ void StageSelectScene::Update()
 {
     Input* input = Input::GetInstance();
     if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE)) {
+        SceneManager::GetInstance()->SetNextScene(
+            std::make_unique<GamePlayScene>());
+        return;
+    }
+    if (input->IsKeyTrigger(DIK_T)) {
         SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());
         return;
     }

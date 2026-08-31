@@ -112,6 +112,21 @@ void Game::Initialize()
     GetBootProfilerForGame()->End("Model");
     CheckInitializeTime("ModelManager", prevTime);
 
+    DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+    Object3dManager::GetInstance()->Initialize(dxCommon);
+    SkinningObject3dManager::GetInstance()->Initialize(dxCommon);
+    SkyBoxManager::GetInstance()->Initialize(dxCommon);
+    LightManager::GetInstance()->Initialize(dxCommon);
+    DebugRenderer::GetInstance()->Initialize();
+
+    EffectManager* effectManager = EffectManager::GetInstance();
+    if (!effectManager->IsInitialized()) {
+        effectManager->Initialize(
+            dxCommon,
+            SrvManager::GetInstance(),
+            nullptr);
+    }
+
     // Shader初期化ダミー計測 (DirectXCommon等に含まれるが要件定義のため)
     GetBootProfilerForGame()->Begin("Shader");
     modelCommon_.Initialize(DirectXCommon::GetInstance());
