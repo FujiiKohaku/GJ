@@ -56,7 +56,6 @@
 #include "Engine/audio/SoundManager.h"
 
 #include "App/Scene/BaseScene.h"
-#include "App/Scene/GamePlayScene.h"
 #include "App/Scene/SceneManager.h"
 #include "App/Scene/TitleScene.h"
 
@@ -105,9 +104,6 @@ private:
     // ------------------------------
     ModelCommon modelCommon_;
 
-    // game
-    // GamePlayScene* scene_;
-    TitleScene* scene_;
     // ------------------------------
     // ゲーム状態
     // ------------------------------

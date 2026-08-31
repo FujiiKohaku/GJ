@@ -5,7 +5,7 @@
 #include "Engine/2D/Text/Text.h"
 #include <memory>
 
-class ClearScene : public BaseScene {
+class TestScene : public BaseScene {
 public:
     void Initialize() override;
     void Finalize() override;

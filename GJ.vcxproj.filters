@@ -19,7 +19,21 @@
     <None Include="resources\Shaders\PostEffect\LensDirt.PS.hlsl" />
     <None Include="resources\Shaders\PostEffect\LensDistortion.PS.hlsl" />
     <None Include="resources\Shaders\PostEffect\MotionBlur.PS.hlsl" />
-    <ClCompile Include="App\Scene\LoadingScene.cpp" />
+    <ClCompile Include="App\Scene\TitleScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Scene\StageSelectScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Scene\TestScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Scene\ClearScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Scene\GameOverScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <Filter Include="ソース ファイル">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
@@ -166,27 +180,6 @@
     <ClCompile Include="Engine\blend\BlendUtil.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="App\Scene\GamePlayScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Scene\StageSelectScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Stage\StageCatalog.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Scene\TitleScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Scene\SpriteTestScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Scene\TextTestScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Scene\TestScene1.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="App\Scene\BaseScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -210,9 +203,6 @@
     </ClCompile>
     <ClCompile Include="Engine\Debug\DebugRenderer.cpp">
       <Filter>Debug</Filter>
-    </ClCompile>
-    <ClCompile Include="Engine\Rail\Rail.cpp">
-      <Filter>Rail</Filter>
     </ClCompile>
     <ClCompile Include="Engine\math\Light.cpp">
       <Filter>ソース ファイル</Filter>
@@ -271,12 +261,6 @@
     <ClCompile Include="Engine\Particle\ParticleData.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="App\Game\Player\Player.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Boss\BaseBoss.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="Engine\PostEffect\OffscreenRenderer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -322,9 +306,6 @@
     <ClCompile Include="Engine\PostEffect\PostEffectType.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="App\Game\Player\Bullet\MissileBullet.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="Engine\LevelEditor\LevelData.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -351,9 +332,6 @@
     </ClCompile>
     <ClCompile Include="Engine\Debug\DebugRenderer.cpp">
       <Filter>Debug</Filter>
-    </ClCompile>
-    <ClCompile Include="Engine\Rail\Rail.cpp">
-      <Filter>Rail</Filter>
     </ClCompile>
     <ClCompile Include="Engine\math\Light.cpp">
       <Filter>ソース ファイル</Filter>
@@ -415,12 +393,6 @@
     <ClCompile Include="Engine\Particle\ParticleData.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="App\Game\Player\Player.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Boss\BaseBoss.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="Engine\PostEffect\OffscreenRenderer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -466,9 +438,6 @@
     <ClCompile Include="Engine\PostEffect\PostEffectType.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="App\Game\Player\Bullet\MissileBullet.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="Engine\LevelEditor\LevelData.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -493,67 +462,12 @@
     <ClCompile Include="Engine\SceneObjectManager\SceneObjectManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="App\Scene\ClearScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Scene\GameOverScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Enemy\BaseEnemy.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Enemy\Bullet\EnemyBullet.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Enemy\Bullet\NormalEnemyBullet.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Enemy\Bullet\SwarmPulseBullet.cpp" />
-    <ClCompile Include="App\Game\Enemy\Bullet\TrackingEnemyBullet.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Enemy\Bullet\PaintBullet.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Enemy\Types\NormalEnemy.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Enemy\Types\ArmoredEnemy.cpp" />
-    <ClCompile Include="App\Game\Enemy\SwarmEnemy\SwarmEnemy.cpp" />
-    <ClCompile Include="App\Game\Enemy\PaintEnemy\PaintShooterEnemy.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Boss\FearWormEnemy\FearWormEnemy.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Boss\AngerBlockBoss\AngerBlockBoss.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Boss\BossEncounterController.cpp" />
-    <ClCompile Include="App\Game\Common\Bullet\BaseBullet.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Player\Bullet\PlayerBullet.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Player\Bullet\NormalBullet.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Game\Player\Bullet\HomingMissileBullet.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="resources\Shaders\Object3D\Object3d.VS.hlsl" />
     <FxCompile Include="resources\Shaders\Object3D\Object3d.PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="App\Game\Enemy\PaintEnemy\PaintShooterEnemy.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Enemy\Bullet\PaintBullet.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="Engine\D3DResourceLeakChecker\D3DResourceLeakChecker.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -617,26 +531,19 @@
     <ClInclude Include="Engine\blend\BlendUtil.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="App\Scene\GamePlayScene.h">
+    <ClInclude Include="App\Scene\TitleScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="App\Scene\StageSelectScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="App\Game\Stage\StageCatalog.h">
+    <ClInclude Include="App\Scene\TestScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="App\Scene\LoadingScene.h" />
-    <ClInclude Include="App\Scene\TitleScene.h">
+    <ClInclude Include="App\Scene\ClearScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="App\Scene\SpriteTestScene.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Scene\TextTestScene.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Scene\TestScene1.h">
+    <ClInclude Include="App\Scene\GameOverScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="App\Scene\BaseScene.h">
@@ -662,9 +569,6 @@
     </ClInclude>
     <ClInclude Include="Engine\Debug\DebugRenderer.h">
       <Filter>Debug</Filter>
-    </ClInclude>
-    <ClInclude Include="Engine\Rail\Rail.h">
-      <Filter>Rail</Filter>
     </ClInclude>
     <ClInclude Include="Engine\math\Light.h">
       <Filter>ヘッダー ファイル</Filter>
@@ -729,12 +633,6 @@
     <ClInclude Include="Engine\Particle\ParticleData.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="App\Game\Player\Player.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Boss\BaseBoss.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="Engine\PostEffect\OffscreenRenderer.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -783,9 +681,6 @@
     <ClInclude Include="Engine\PostEffect\PostEffectType.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="App\Game\Player\Bullet\MissileBullet.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="Engine\LevelEditor\LevelData.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -808,50 +703,6 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Engine\SceneObjectManager\SceneObjectManager.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Scene\ClearScene.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Scene\GameOverScene.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Enemy\BaseEnemy.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Enemy\Bullet\EnemyBullet.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Enemy\Bullet\NormalEnemyBullet.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Enemy\Bullet\SwarmPulseBullet.h" />
-    <ClInclude Include="App\Game\Enemy\Bullet\TrackingEnemyBullet.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Enemy\Types\NormalEnemy.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Enemy\Types\ArmoredEnemy.h" />
-    <ClInclude Include="App\Game\Enemy\SwarmEnemy\SwarmEnemy.h" />
-    <ClInclude Include="App\Game\Boss\FearWormEnemy\FearWormEnemy.h" />
-    <ClInclude Include="App\Game\Boss\StageBoss.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Boss\AngerBlockBoss\AngerBlockBoss.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Boss\BossEncounterController.h" />
-    <ClInclude Include="App\Game\Common\Bullet\BaseBullet.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Player\Bullet\PlayerBullet.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Player\Bullet\NormalBullet.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Game\Player\Bullet\HomingMissileBullet.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

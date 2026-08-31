@@ -1,60 +1,73 @@
 #include "ClearScene.h"
-#include "Engine/Light/LightManager.h"
-#include "Engine/input/Input.h"
-#include "GamePlayScene.h"
 
+#include "Engine/2D/SpriteManager.h"
+#include "Engine/2D/Text/TextRenderer.h"
+#include "Engine/3D/Object3dManager.h"
+#include "Engine/Input/Input.h"
+#include "Engine/PostEffect/PostEffectType.h"
+#include "SceneManager.h"
 #include "TitleScene.h"
+
+namespace {
+constexpr const char* kWhiteTexture = "resources/Textures/white.png";
+constexpr const char* kDefaultFont =
+    "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
+}
+
 void ClearScene::Initialize()
 {
-    camera_ = std::make_unique<Camera>();
-    camera_->Initialize();
-    camera_->SetTranslate({ 0.0f, 0.0f, -10.0f });
-    camera_->SetRotate({ 0.0f, 0.0f, 0.0f });
-    camera_->Update();
-    Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
-    // Model Path
-    const char* axisModelPath = "Debug/Axis/axis.obj";
-    ModelManager::GetInstance()->Load(axisModelPath);
-    LightManager::GetInstance()->SetDirectional({ 1, 1, 1, 1 }, { 0, -1, 0 }, 1.0f);
-    TextureManager::GetInstance()->LoadTexture("resources/Textures/skybox.dds");
-    Object3dManager::GetInstance()->SetEnvironmentTexture(TextureManager::GetInstance()->GetSrvHandleGPU("resources/Textures/skybox.dds"));
-    titleObj_ = std::make_unique<Object3d>();
-    titleObj_->Initialize(Object3dManager::GetInstance());
-    titleObj_->SetModel(ModelManager::GetInstance()->FindModel(axisModelPath));
-    titleObj_->SetTranslate({ 0.0f, 0.0f, 0.0f });
-    titleObj_->SetRotate({ 0.0f, std::numbers::pi_v<float>, 0.0f });
-    titleObj_->SetScale({ 1.0f, 1.0f, 1.0f });
-    titleObj_->SetEnableEnvironmentMap(false);
-    titleObj_->SetEnvironmentMapStrength(0.0f);
+    Object3dManager::GetInstance()->SetDefaultCamera(nullptr);
+    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
 
-    TextureManager::GetInstance()->LoadTexture("resources/Textures/Clear.png");
-    // sprite
-    titleSprite_ = std::make_unique<Sprite>();
-    titleSprite_->Initialize(SpriteManager::GetInstance(), "resources/Textures/Clear.png");
-    titleSprite_->SetSize({ 1280.0f, 720.0f });
+    backgroundSprite_ = std::make_unique<Sprite>();
+    backgroundSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+    backgroundSprite_->SetSize({ 1280.0f, 720.0f });
+    backgroundSprite_->SetColor({ 0.02f, 0.10f, 0.07f, 1.0f });
+
+    titleText_ = std::make_unique<Text>();
+    titleText_->Initialize(kDefaultFont);
+    titleText_->SetText("CLEAR");
+    titleText_->SetPosition({ 640.0f, 260.0f });
+    titleText_->SetAnchorPoint({ 0.5f, 0.5f });
+    titleText_->SetFontSize(96.0f);
+    titleText_->SetColor({ 0.45f, 1.0f, 0.65f, 1.0f });
+
+    instructionText_ = std::make_unique<Text>();
+    instructionText_->Initialize(kDefaultFont);
+    instructionText_->SetText("ENTER / SPACE : TITLE");
+    instructionText_->SetPosition({ 640.0f, 500.0f });
+    instructionText_->SetAnchorPoint({ 0.5f, 0.5f });
+    instructionText_->SetFontSize(28.0f);
+}
+
+void ClearScene::Finalize()
+{
 }
 
 void ClearScene::Update()
 {
-    if (Input::GetInstance()->IsKeyPressed(DIK_SPACE)) {
+    Input* input = Input::GetInstance();
+    if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE)) {
         SceneManager::GetInstance()->SetNextScene(std::make_unique<TitleScene>());
+        return;
     }
-    titleObj_->Update();
-    titleSprite_->Update();
+
+    backgroundSprite_->Update();
+    titleText_->Update();
+    instructionText_->Update();
 }
 
 void ClearScene::Draw2D()
 {
     SpriteManager::GetInstance()->PreDraw();
-    titleSprite_->Draw();
-    ;
+    backgroundSprite_->Draw();
+    TextRenderer::GetInstance()->PreDraw();
+    titleText_->Draw();
+    instructionText_->Draw();
 }
 
 void ClearScene::Draw3D()
 {
-    Object3dManager::GetInstance()->PreDraw();
-    LightManager::GetInstance()->Bind(DirectXCommon::GetInstance()->GetCommandList());
-    // titleObj_->Draw();
 }
 
 void ClearScene::DrawParticle()
@@ -62,9 +75,5 @@ void ClearScene::DrawParticle()
 }
 
 void ClearScene::DrawImGui()
-{
-}
-
-void ClearScene::Finalize()
 {
 }

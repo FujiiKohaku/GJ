@@ -164,18 +164,11 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Engine\CollisionManager\CollisionLayer.h" />
-    <ClCompile Include="App\Game\Collision\GameplayCollisionSystem.cpp" />
-    <ClCompile Include="App\Scene\LoadingScene.cpp" />
+    <ClCompile Include="App\Scene\TitleScene.cpp" />
     <ClCompile Include="App\Scene\StageSelectScene.cpp" />
-    <ClCompile Include="App\Game\Stage\StageCatalog.cpp" />
-    <ClCompile Include="App\Game\Player\Bullet\MissileBullet.cpp" />
+    <ClCompile Include="App\Scene\TestScene.cpp" />
     <ClCompile Include="App\Scene\ClearScene.cpp" />
-    <ClCompile Include="App\Game\Enemy\BaseEnemy.cpp" />
-    <ClCompile Include="App\Game\Enemy\Bullet\EnemyBullet.cpp" />
-    <ClCompile Include="App\Game\Enemy\Bullet\NormalEnemyBullet.cpp" />
-    <ClCompile Include="App\Game\Enemy\Bullet\SwarmPulseBullet.cpp" />
-    <ClCompile Include="App\Game\Enemy\Bullet\TrackingEnemyBullet.cpp" />
-    <ClCompile Include="App\Game\Common\Bullet\BaseBullet.cpp" />
+    <ClCompile Include="App\Scene\GameOverScene.cpp" />
     <ClCompile Include="Engine\math\Collision.cpp" />
     <ClCompile Include="Engine\CollisionManager\CollisionManager.cpp" />
     <ClCompile Include="Engine\Time\TimeManager.cpp" />
@@ -201,7 +194,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\math\Light.cpp" />
     <ClCompile Include="Engine\Light\LightManager.cpp" />
     <ClCompile Include="Engine\Debug\DebugRenderer.cpp" />
-    <ClCompile Include="Engine\Rail\Rail.cpp" />
     <ClCompile Include="Engine\math\MathStruct.cpp" />
     <ClCompile Include="Engine\math\Object3DStruct.cpp" />
     <ClCompile Include="Engine\Animation\NodeAnimation.cpp" />
@@ -215,7 +207,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\Camera\Camera.cpp" />
     <ClCompile Include="Engine\D3DResourceLeakChecker\D3DResourceLeakChecker.cpp" />
     <ClCompile Include="Engine\DirectXCommon\DirectXCommon.cpp" />
-    <ClCompile Include="App\Scene\GamePlayScene.cpp" />
     <ClCompile Include="Engine\ImGuiManager\ImGuiManager.cpp" />
     <ClCompile Include="App\Scene\Game.cpp" />
     <ClCompile Include="Engine\Debug\Profiler\Profiler.cpp" />
@@ -263,10 +254,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\SrvManager\SrvManager.cpp" />
     <ClCompile Include="Engine\StringUtility\StringUtility.cpp" />
     <ClCompile Include="Engine\TextureManager\TextureManager.cpp" />
-    <ClCompile Include="App\Scene\TitleScene.cpp" />
-    <ClCompile Include="App\Scene\SpriteTestScene.cpp" />
-    <ClCompile Include="App\Scene\TextTestScene.cpp" />
-    <ClCompile Include="App\Scene\TestScene1.cpp" />
     <ClCompile Include="Engine\Winapp\Utility.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
@@ -276,10 +263,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
     </ClCompile>
     <ClCompile Include="Engine\Winapp\WinApp.cpp" />
-    <ClCompile Include="App\Game\Player\Player.cpp" />
-    <ClCompile Include="App\Game\Hazard\WaterPillarHazard.cpp" />
-    <ClCompile Include="App\Game\Enemy\PirateShipMidBoss\PirateShipMidBoss.cpp" />
-    <ClCompile Include="App\Game\Boss\BaseBoss.cpp" />
     <ClCompile Include="Engine\PostEffect\OffscreenRenderer.cpp" />
     <ClCompile Include="Engine\Particle\MeshManager\ParticleBoardMesh.cpp" />
     <ClCompile Include="Engine\Particle\MeshManager\ParticleBoxMesh.cpp" />
@@ -296,19 +279,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\math\Ray.cpp" />
     <ClCompile Include="Engine\math\Sphere.cpp" />
     <ClCompile Include="Engine\SceneObjectManager\SceneObjectManager.cpp" />
-    <ClCompile Include="App\Scene\GameOverScene.cpp" />
-    <ClCompile Include="App\Game\Enemy\Types\NormalEnemy.cpp" />
-    <ClCompile Include="App\Game\Enemy\Types\ArmoredEnemy.cpp" />
-    <ClCompile Include="App\Game\Enemy\SwarmEnemy\SwarmEnemy.cpp" />
-    <ClCompile Include="App\Game\Enemy\MoveEnemy\MoveEnemy.cpp" />
-    <ClCompile Include="App\Game\Enemy\PaintEnemy\PaintShooterEnemy.cpp" />
-    <ClCompile Include="App\Game\Boss\FearWormEnemy\FearWormEnemy.cpp" />
-    <ClCompile Include="App\Game\Boss\AngerBlockBoss\AngerBlockBoss.cpp" />
-    <ClCompile Include="App\Game\Boss\BossEncounterController.cpp" />
-    <ClCompile Include="App\Game\Enemy\Bullet\PaintBullet.cpp" />
-    <ClCompile Include="App\Game\Player\Bullet\PlayerBullet.cpp" />
-    <ClCompile Include="App\Game\Player\Bullet\NormalBullet.cpp" />
-    <ClCompile Include="App\Game\Player\Bullet\HomingMissileBullet.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="resources\Shaders\Object3D\Object3d.PS.hlsl">
@@ -329,19 +299,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="App\Game\Collision\GameplayCollisionSystem.h" />
-    <ClInclude Include="App\Game\Player\Bullet\MissileBullet.h" />
-    <ClInclude Include="App\Game\Hazard\WaterPillarHazard.h" />
-    <ClInclude Include="App\Game\Enemy\PirateShipMidBoss\PirateShipMidBoss.h" />
-    <ClInclude Include="App\Scene\ClearScene.h" />
-    <ClInclude Include="App\Game\Enemy\BaseEnemy.h" />
-    <ClInclude Include="App\Game\Enemy\Bullet\EnemyBullet.h" />
-    <ClInclude Include="App\Game\Enemy\PaintEnemy\PaintShooterEnemy.h" />
-    <ClInclude Include="App\Game\Enemy\Bullet\PaintBullet.h" />
-    <ClInclude Include="App\Game\Enemy\Bullet\NormalEnemyBullet.h" />
-    <ClInclude Include="App\Game\Enemy\Bullet\SwarmPulseBullet.h" />
-    <ClInclude Include="App\Game\Enemy\Bullet\TrackingEnemyBullet.h" />
-    <ClInclude Include="App\Game\Common\Bullet\BaseBullet.h" />
     <ClInclude Include="Engine\math\Collision.h" />
     <ClInclude Include="Engine\CollisionManager\CollisionManager.h" />
     <ClInclude Include="Engine\EditorManager\EditorManager.h" />
@@ -368,7 +325,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\math\Light.h" />
     <ClInclude Include="Engine\Light\LightManager.h" />
     <ClInclude Include="Engine\Debug\DebugRenderer.h" />
-    <ClInclude Include="Engine\Rail\Rail.h" />
     <ClInclude Include="Engine\math\MathStruct.h" />
     <ClInclude Include="Engine\math\Object3DStruct.h" />
     <ClInclude Include="Engine\Animation\NodeAnimation.h" />
@@ -382,9 +338,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\Camera\Camera.h" />
     <ClInclude Include="Engine\D3DResourceLeakChecker\D3DResourceLeakChecker.h" />
     <ClInclude Include="Engine\DirectXCommon\DirectXCommon.h" />
-    <ClInclude Include="App\Scene\GamePlayScene.h" />
-    <ClInclude Include="App\Scene\StageSelectScene.h" />
-    <ClInclude Include="App\Game\Stage\StageCatalog.h" />
     <ClInclude Include="Engine\ImGuiManager\ImGuiManager.h" />
     <ClInclude Include="App\Scene\Game.h" />
     <ClInclude Include="Engine\Debug\Profiler\Profiler.h" />
@@ -424,16 +377,14 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\StringUtility\StringUtility.h" />
     <ClInclude Include="Engine\TextureManager\TextureManager.h" />
     <ClInclude Include="App\Scene\TitleScene.h" />
-    <ClInclude Include="App\Scene\SpriteTestScene.h" />
-    <ClInclude Include="App\Scene\TextTestScene.h" />
-    <ClInclude Include="App\Scene\TestScene1.h" />
-    <ClInclude Include="App\Scene\LoadingScene.h" />
+    <ClInclude Include="App\Scene\StageSelectScene.h" />
+    <ClInclude Include="App\Scene\TestScene.h" />
+    <ClInclude Include="App\Scene\ClearScene.h" />
+    <ClInclude Include="App\Scene\GameOverScene.h" />
     <ClInclude Include="Engine\Winapp\Utility.h" />
     <ClInclude Include="Engine\math\MatrixMath.h" />
     <ClInclude Include="Engine\Winapp\WinApp.h" />
     <ClInclude Include="Engine\Time\TimeManager.h" />
-    <ClInclude Include="App\Game\Player\Player.h" />
-    <ClInclude Include="App\Game\Boss\BaseBoss.h" />
     <ClInclude Include="Engine\PostEffect\OffscreenRenderer.h" />
     <ClInclude Include="Engine\Particle\MeshManager\ParticleBoardMesh.h" />
     <ClInclude Include="Engine\Particle\MeshManager\ParticleBoxMesh.h" />
@@ -450,18 +401,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\math\Ray.h" />
     <ClInclude Include="Engine\math\Sphere.h" />
     <ClInclude Include="Engine\SceneObjectManager\SceneObjectManager.h" />
-    <ClInclude Include="App\Scene\GameOverScene.h" />
-    <ClInclude Include="App\Game\Enemy\Types\NormalEnemy.h" />
-    <ClInclude Include="App\Game\Enemy\Types\ArmoredEnemy.h" />
-    <ClInclude Include="App\Game\Enemy\SwarmEnemy\SwarmEnemy.h" />
-    <ClInclude Include="App\Game\Enemy\MoveEnemy\MoveEnemy.h" />
-    <ClInclude Include="App\Game\Boss\FearWormEnemy\FearWormEnemy.h" />
-    <ClInclude Include="App\Game\Boss\StageBoss.h" />
-    <ClInclude Include="App\Game\Boss\AngerBlockBoss\AngerBlockBoss.h" />
-    <ClInclude Include="App\Game\Boss\BossEncounterController.h" />
-    <ClInclude Include="App\Game\Player\Bullet\PlayerBullet.h" />
-    <ClInclude Include="App\Game\Player\Bullet\NormalBullet.h" />
-    <ClInclude Include="App\Game\Player\Bullet\HomingMissileBullet.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\imgui\imgui.vcxproj">
