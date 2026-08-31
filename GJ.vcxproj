@@ -166,6 +166,12 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\CollisionManager\CollisionLayer.h" />
     <ClCompile Include="App\Scene\TitleScene.cpp" />
     <ClCompile Include="App\Scene\StageSelectScene.cpp" />
+    <ClCompile Include="App\Scene\GamePlayScene.cpp" />
+    <ClCompile Include="App\Game\Map\MapChipField.cpp" />
+    <ClCompile Include="App\Game\Map\MapChipStage.cpp" />
+    <ClCompile Include="App\Game\Gimmick\MapChipGimmickFactory.cpp" />
+    <ClCompile Include="App\Game\Gimmick\MovingBlockGimmick.cpp" />
+    <ClCompile Include="App\Game\Player\MapChipPlayer.cpp" />
     <ClCompile Include="App\Scene\TestScene.cpp" />
     <ClCompile Include="App\Scene\ClearScene.cpp" />
     <ClCompile Include="App\Scene\GameOverScene.cpp" />
@@ -378,6 +384,13 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\TextureManager\TextureManager.h" />
     <ClInclude Include="App\Scene\TitleScene.h" />
     <ClInclude Include="App\Scene\StageSelectScene.h" />
+    <ClInclude Include="App\Scene\GamePlayScene.h" />
+    <ClInclude Include="App\Game\Map\MapChipField.h" />
+    <ClInclude Include="App\Game\Map\MapChipStage.h" />
+    <ClInclude Include="App\Game\Gimmick\BaseMapChipGimmick.h" />
+    <ClInclude Include="App\Game\Gimmick\MapChipGimmickFactory.h" />
+    <ClInclude Include="App\Game\Gimmick\MovingBlockGimmick.h" />
+    <ClInclude Include="App\Game\Player\MapChipPlayer.h" />
     <ClInclude Include="App\Scene\TestScene.h" />
     <ClInclude Include="App\Scene\ClearScene.h" />
     <ClInclude Include="App\Scene\GameOverScene.h" />

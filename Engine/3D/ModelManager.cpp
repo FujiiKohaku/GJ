@@ -60,6 +60,57 @@ ModelData CreatePlaneModelData(const std::string& texturePath, float tilingX, fl
     return modelData;
 }
 
+ModelData CreateCubeModelData(const std::string& texturePath)
+{
+    ModelData modelData {};
+    MeshPrimitive primitive {};
+    primitive.mode = PrimitiveMode::Triangles;
+    primitive.vertices = {
+        { { -0.5f,  0.5f, -0.5f, 1.0f }, { 0.0f, 0.0f }, {  0.0f,  0.0f, -1.0f } },
+        { {  0.5f,  0.5f, -0.5f, 1.0f }, { 1.0f, 0.0f }, {  0.0f,  0.0f, -1.0f } },
+        { {  0.5f, -0.5f, -0.5f, 1.0f }, { 1.0f, 1.0f }, {  0.0f,  0.0f, -1.0f } },
+        { { -0.5f, -0.5f, -0.5f, 1.0f }, { 0.0f, 1.0f }, {  0.0f,  0.0f, -1.0f } },
+
+        { {  0.5f,  0.5f,  0.5f, 1.0f }, { 0.0f, 0.0f }, {  0.0f,  0.0f,  1.0f } },
+        { { -0.5f,  0.5f,  0.5f, 1.0f }, { 1.0f, 0.0f }, {  0.0f,  0.0f,  1.0f } },
+        { { -0.5f, -0.5f,  0.5f, 1.0f }, { 1.0f, 1.0f }, {  0.0f,  0.0f,  1.0f } },
+        { {  0.5f, -0.5f,  0.5f, 1.0f }, { 0.0f, 1.0f }, {  0.0f,  0.0f,  1.0f } },
+
+        { { -0.5f,  0.5f,  0.5f, 1.0f }, { 0.0f, 0.0f }, { -1.0f,  0.0f,  0.0f } },
+        { { -0.5f,  0.5f, -0.5f, 1.0f }, { 1.0f, 0.0f }, { -1.0f,  0.0f,  0.0f } },
+        { { -0.5f, -0.5f, -0.5f, 1.0f }, { 1.0f, 1.0f }, { -1.0f,  0.0f,  0.0f } },
+        { { -0.5f, -0.5f,  0.5f, 1.0f }, { 0.0f, 1.0f }, { -1.0f,  0.0f,  0.0f } },
+
+        { {  0.5f,  0.5f, -0.5f, 1.0f }, { 0.0f, 0.0f }, {  1.0f,  0.0f,  0.0f } },
+        { {  0.5f,  0.5f,  0.5f, 1.0f }, { 1.0f, 0.0f }, {  1.0f,  0.0f,  0.0f } },
+        { {  0.5f, -0.5f,  0.5f, 1.0f }, { 1.0f, 1.0f }, {  1.0f,  0.0f,  0.0f } },
+        { {  0.5f, -0.5f, -0.5f, 1.0f }, { 0.0f, 1.0f }, {  1.0f,  0.0f,  0.0f } },
+
+        { { -0.5f,  0.5f,  0.5f, 1.0f }, { 0.0f, 0.0f }, {  0.0f,  1.0f,  0.0f } },
+        { {  0.5f,  0.5f,  0.5f, 1.0f }, { 1.0f, 0.0f }, {  0.0f,  1.0f,  0.0f } },
+        { {  0.5f,  0.5f, -0.5f, 1.0f }, { 1.0f, 1.0f }, {  0.0f,  1.0f,  0.0f } },
+        { { -0.5f,  0.5f, -0.5f, 1.0f }, { 0.0f, 1.0f }, {  0.0f,  1.0f,  0.0f } },
+
+        { { -0.5f, -0.5f, -0.5f, 1.0f }, { 0.0f, 0.0f }, {  0.0f, -1.0f,  0.0f } },
+        { {  0.5f, -0.5f, -0.5f, 1.0f }, { 1.0f, 0.0f }, {  0.0f, -1.0f,  0.0f } },
+        { {  0.5f, -0.5f,  0.5f, 1.0f }, { 1.0f, 1.0f }, {  0.0f, -1.0f,  0.0f } },
+        { { -0.5f, -0.5f,  0.5f, 1.0f }, { 0.0f, 1.0f }, {  0.0f, -1.0f,  0.0f } }
+    };
+    primitive.indices = {
+        0, 1, 2, 0, 2, 3,
+        4, 5, 6, 4, 6, 7,
+        8, 9, 10, 8, 10, 11,
+        12, 13, 14, 12, 14, 15,
+        16, 17, 18, 16, 18, 19,
+        20, 21, 22, 20, 22, 23
+    };
+
+    modelData.primitives.push_back(std::move(primitive));
+    modelData.materials.push_back({ texturePath });
+    SetupDefaultRootNode(modelData, "Cube");
+    return modelData;
+}
+
 ModelData CreateCylinderModelData(const std::string& texturePath, uint32_t divisions)
 {
     if (divisions < 3u) {
@@ -157,6 +208,29 @@ Model* ModelManager::CreatePlane(const std::string& texturePath, float tilingX, 
     ModelData modelData = CreatePlaneModelData(actualTexturePath, tilingX, tilingY);
     auto model = std::make_unique<Model>();
     model->Initialize(modelCommon_.get(), modelData);
+
+    Model* raw = model.get();
+    models_.emplace(key, std::move(model));
+    return raw;
+}
+
+Model* ModelManager::CreateCube(const std::string& texturePath)
+{
+    std::string actualTexturePath = texturePath;
+    if (actualTexturePath.empty()) {
+        actualTexturePath = kDefaultPlaneTexture;
+    }
+
+    const std::string key = "Primitive/Cube/" + actualTexturePath;
+    const auto it = models_.find(key);
+    if (it != models_.end()) {
+        return it->second.get();
+    }
+
+    auto model = std::make_unique<Model>();
+    model->Initialize(
+        modelCommon_.get(),
+        CreateCubeModelData(actualTexturePath));
 
     Model* raw = model.get();
     models_.emplace(key, std::move(model));

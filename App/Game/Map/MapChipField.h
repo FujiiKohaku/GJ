@@ -1,0 +1,34 @@
+#pragma once
+
+#include "Engine/Math/MathStruct.h"
+#include <cstdint>
+#include <string>
+#include <vector>
+
+enum class MapChipType {
+    Blank = 0,
+    Block = 1,
+    MovingBlock = 2,
+};
+
+class MapChipField {
+public:
+    bool LoadMapChipCsv(const std::string& filePath);
+    void ResetMapChipData();
+
+    MapChipType GetMapChipTypeByIndex(
+        uint32_t xIndex,
+        uint32_t yIndex) const;
+    Vector3 GetMapChipPositionByIndex(
+        uint32_t xIndex,
+        uint32_t yIndex) const;
+
+    uint32_t GetBlockWidth() const;
+    uint32_t GetBlockHeight() const;
+
+private:
+    static constexpr float kChipWidth = 1.0f;
+    static constexpr float kChipHeight = 1.0f;
+
+    std::vector<std::vector<MapChipType>> mapChipData_;
+};
