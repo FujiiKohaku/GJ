@@ -1,4 +1,5 @@
 #include "Object3dManager.h"
+#include "Engine/Light/LightManager.h"
 
 std::unique_ptr<Object3dManager> Object3dManager::instance_ = nullptr;
 
@@ -41,10 +42,13 @@ void Object3dManager::PreDraw()
 
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    // RootSignature 設宁E
+    // RootSignature 設定
     commandList->SetGraphicsRootSignature(rootSignature.Get());
 
-    //  ブレンドモードに応じぁEPSO を適用
+    // ライトのバインド
+    LightManager::GetInstance()->Bind(commandList);
+
+    //  ブレンドモードに応じたPSO を適用
     commandList->SetPipelineState(pipelineStates[currentBlendMode].Get());
 }
 #pragma endregion

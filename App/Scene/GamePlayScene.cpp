@@ -109,6 +109,7 @@ void GamePlayScene::Draw3D()
     Object3dManager::GetInstance()->PreDraw();
     mapChipStage_.Draw();
     player_->Draw();
+
 }
 
 void GamePlayScene::DrawParticle()
