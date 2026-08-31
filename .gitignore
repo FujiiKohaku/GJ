@@ -374,3 +374,11 @@ Tools/UIAnimationEditor/ai_settings.json
 !/externals/assimp/lib/Release/
 /externals/assimp/lib/Release/*
 !/externals/assimp/lib/Release/assimp-vc143-mt.lib
+
+# Keep DebugLine shader sources and compiled shaders shared with the project.
+!/resources/Shaders/Debug/
+/resources/Shaders/Debug/*
+!/resources/Shaders/Debug/DebugLine.*.hlsl
+!/resources/CompiledShaders/Shaders/Debug/
+/resources/CompiledShaders/Shaders/Debug/*
+!/resources/CompiledShaders/Shaders/Debug/DebugLine.*.dxil
