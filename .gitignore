@@ -366,3 +366,11 @@ FodyWeavers.xsd
 
 # Local AI provider credentials
 Tools/UIAnimationEditor/ai_settings.json
+
+# Keep the prebuilt Assimp libraries required by GJ.vcxproj.
+!/externals/assimp/lib/Debug/
+/externals/assimp/lib/Debug/*
+!/externals/assimp/lib/Debug/assimp-vc143-mtd.lib
+!/externals/assimp/lib/Release/
+/externals/assimp/lib/Release/*
+!/externals/assimp/lib/Release/assimp-vc143-mt.lib
