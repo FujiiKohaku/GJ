@@ -162,8 +162,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
-  <ItemGroup>
+    <ItemGroup>
     <ClInclude Include="Engine\CollisionManager\CollisionLayer.h" />
+    <ClCompile Include="App\SlimePlayer.cpp" />
     <ClCompile Include="App\Scene\TitleScene.cpp" />
     <ClCompile Include="App\Scene\StageSelectScene.cpp" />
     <ClCompile Include="App\Scene\TestScene.cpp" />
@@ -175,6 +176,11 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\EditorManager\EditorManager.cpp" />
     <ClCompile Include="Engine\math\EngineStruct.cpp" />
     <ClCompile Include="Engine\Effect\EffectManager.cpp" />
+    <ClCompile Include="Engine\Fluid\GpuSphFluid.cpp" />
+    <ClCompile Include="Engine\Fluid\FluidForceRenderer.cpp" />
+    <ClCompile Include="Engine\Fluid\GpuSphFluidRenderer.cpp" />
+    <ClCompile Include="Engine\Fluid\SlimeCharacterRenderer.cpp" />
+    <ClCompile Include="Engine\Fluid\ScreenSpaceFluidRenderer.cpp" />
     <ClCompile Include="Engine\PostEffect\Bloom\BloomRenderer.cpp" />
     <ClCompile Include="Engine\PostEffect\Fog\FogManager.cpp" />
     <ClCompile Include="Engine\PostEffect\Fog\FogRenderer.cpp" />
@@ -300,10 +306,16 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\math\Collision.h" />
+    <ClInclude Include="App\SlimePlayer.h" />
     <ClInclude Include="Engine\CollisionManager\CollisionManager.h" />
     <ClInclude Include="Engine\EditorManager\EditorManager.h" />
     <ClInclude Include="Engine\math\EngineStruct.h" />
     <ClInclude Include="Engine\Effect\EffectManager.h" />
+    <ClInclude Include="Engine\Fluid\GpuSphFluid.h" />
+    <ClInclude Include="Engine\Fluid\FluidForceRenderer.h" />
+    <ClInclude Include="Engine\Fluid\GpuSphFluidRenderer.h" />
+    <ClInclude Include="Engine\Fluid\SlimeCharacterRenderer.h" />
+    <ClInclude Include="Engine\Fluid\ScreenSpaceFluidRenderer.h" />
     <ClInclude Include="Engine\PostEffect\Bloom\BloomRenderer.h" />
     <ClInclude Include="Engine\PostEffect\Fog\FogData.h" />
     <ClInclude Include="Engine\PostEffect\Fog\FogManager.h" />
@@ -412,6 +424,19 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\Shaders\PostEffect\BokehShape.PS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidBilateralBlur.PS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeCharacter.hlsli" />
+    <None Include="resources\Shaders\Fluid\SlimeCharacter.PS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeCharacter.VS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidCommon.hlsli" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidComposite.PS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidDensityPressure.CS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidDepth.PS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidDepth.VS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidForce.CS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidInitialize.CS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidIntegrate.CS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidRenderCommon.hlsli" />
     <None Include="resources\Shaders\PostEffect\LensFlare.PS.hlsl" />
     <None Include="resources\Shaders\PostEffect\Glare.PS.hlsl" />
     <None Include="resources\Shaders\PostEffect\LightShafts.PS.hlsl" />
@@ -580,10 +605,18 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
     </None>
+    <None Include="resources\Shaders\Fluid\SlimeFluidSphere.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="resources\Shaders\Fluid\SlimeFluidSphere.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
-
-

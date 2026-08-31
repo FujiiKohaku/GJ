@@ -8,6 +8,7 @@
 #include <wrl.h>
 
 class Camera;
+class ScreenSpaceFluidRenderer;
 class BloomRenderer;
 class FogManager;
 class FogRenderer;
@@ -78,10 +79,12 @@ private:
 
     DirectXCommon* dxCommon_ = nullptr;
     std::unique_ptr<CopyImageRenderer> copyImageRenderer_;
+    std::unique_ptr<ScreenSpaceFluidRenderer> screenSpaceFluidRenderer_;
     std::unique_ptr<BloomRenderer> bloomRenderer_;
     std::unique_ptr<FogManager> fogManager_;
     std::unique_ptr<FogRenderer> fogRenderer_;
     std::array<RenderTarget, kPingPongRenderTargetCount> pingPongRenderTargets_;
     uint32_t particleCompositionTargetIndex_ = 0;
+    Camera* camera_ = nullptr;
     bool isAnimationEnabled_ = true;
 };

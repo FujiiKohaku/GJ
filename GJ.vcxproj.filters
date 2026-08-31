@@ -96,6 +96,9 @@
     <ClCompile Include="App\main.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="App\SlimePlayer.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="Engine\Winapp\Utility.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -519,6 +522,9 @@
     <ClInclude Include="App\Scene\Game.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="App\SlimePlayer.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="Engine\Camera\Camera.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -741,5 +747,28 @@
     <ClInclude Include="Engine\PostEffect\Bloom\BloomRenderer.h" />
     <ClCompile Include="Engine\PostEffect\PostEffectManager.cpp" />
     <ClInclude Include="Engine\PostEffect\PostEffectManager.h" />
+    <ClCompile Include="Engine\Fluid\GpuSphFluid.cpp" />
+    <ClCompile Include="Engine\Fluid\GpuSphFluidRenderer.cpp" />
+    <ClCompile Include="Engine\Fluid\SlimeCharacterRenderer.cpp" />
+    <ClCompile Include="Engine\Fluid\ScreenSpaceFluidRenderer.cpp" />
+    <ClInclude Include="Engine\Fluid\GpuSphFluid.h" />
+    <ClInclude Include="Engine\Fluid\GpuSphFluidRenderer.h" />
+    <ClInclude Include="Engine\Fluid\SlimeCharacterRenderer.h" />
+    <ClInclude Include="Engine\Fluid\ScreenSpaceFluidRenderer.h" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidBilateralBlur.PS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeCharacter.hlsli" />
+    <None Include="resources\Shaders\Fluid\SlimeCharacter.PS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeCharacter.VS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidCommon.hlsli" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidComposite.PS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidDensityPressure.CS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidDepth.PS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidDepth.VS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidForce.CS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidInitialize.CS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidIntegrate.CS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidRenderCommon.hlsli" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidSphere.VS.hlsl" />
+    <None Include="resources\Shaders\Fluid\SlimeFluidSphere.PS.hlsl" />
   </ItemGroup>
 </Project>

@@ -6,6 +6,8 @@
 
 #include "Engine/PostEffect/PostEffectType.h"
 
+class GpuSphFluid;
+
 struct PostEffectInfo {
     PostEffectType type = PostEffectType::Copy;
     PostEffectStage stage = PostEffectStage::BeforeParticle;
@@ -84,6 +86,8 @@ public:
     float GetBlackHoleStrength() const { return blackHoleStrength_; }
     void SetWaterEffectIntensity(float intensity) { waterEffectIntensity_ = intensity; }
     float GetWaterEffectIntensity() const { return waterEffectIntensity_; }
+    void SetScreenSpaceFluid(GpuSphFluid* fluid) { screenSpaceFluid_ = fluid; }
+    GpuSphFluid* GetScreenSpaceFluid() const { return screenSpaceFluid_; }
 
 private:
     SceneManager() = default;
@@ -108,6 +112,7 @@ private:
     float paintSeed_ = 0.0f;
     int paintPatternType_ = 0;
     Vector3 paintColor_ = { 0.95f, 0.10f, 0.58f };
+    GpuSphFluid* screenSpaceFluid_ = nullptr;
 
 private:
     std::unique_ptr<BaseScene> scene_;
