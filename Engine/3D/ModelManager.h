@@ -21,6 +21,9 @@ public:
     Model* CreatePlane(const std::string& texturePath = "", float tilingX = 1.0f, float tilingY = 1.0f);
 
     Model* CreateCube(const std::string& texturePath = "");
+    // Thin book geometry with independent recto/verso atlas UVs, including curved strips.
+    Model* CreateBookLeaf(const std::string& texturePath, uint32_t frontPage, uint32_t backPage,
+        uint32_t stripIndex = 0, uint32_t stripCount = 1, uint32_t pageCount = 8);
 
     Model* CreateCylinder(const std::string& texturePath = "", uint32_t divisions = 32);
 

@@ -21,6 +21,7 @@ public:
 
 private:
     enum class BookSelectState {
+        CameraApproach,
         CardOpening,
         Idle,
         CardClosing,
@@ -37,8 +38,13 @@ private:
     void InitializeStageData();
     void InitializeBookObjects();
     void InitializeTurningPage();
+    void InitializeOpeningPages();
     void InitializeInterface();
+    void UpdateCameraApproach(float deltaTime);
+    void UpdateBookOpening(float progress);
+    void UpdateOpeningPages(float cameraProgress, float bookProgress);
     void StartPageTurn(int32_t direction);
+    void SetPrintedPage(Object3d* object, uint32_t page);
     void UpdateCardOpening(float deltaTime);
     void UpdateCardIdle();
     void UpdateCardClosing(float deltaTime);
@@ -56,11 +62,15 @@ private:
 private:
     std::unique_ptr<Camera> camera_;
     std::unique_ptr<Object3d> backdrop_;
-    std::unique_ptr<Object3d> bookCover_;
+    std::unique_ptr<Object3d> leftBookCover_;
+    std::unique_ptr<Object3d> rightBookCover_;
+    std::vector<std::unique_ptr<Object3d>> bookFittings_;
     std::unique_ptr<Object3d> bookSpine_;
     std::unique_ptr<Object3d> leftPageBlock_;
     std::unique_ptr<Object3d> rightPageBlock_;
     std::vector<std::unique_ptr<Object3d>> turningPageStrips_;
+    std::vector<std::unique_ptr<Object3d>> openingPageStrips_;
+    std::vector<bool> openingPageVisible_;
     std::unique_ptr<Object3d> stageCardShadow_;
     std::unique_ptr<Object3d> stageCard_;
 
@@ -71,9 +81,11 @@ private:
     std::unique_ptr<Text> instructionText_;
 
     std::vector<StageData> stages_;
-    BookSelectState state_ = BookSelectState::CardOpening;
+    BookSelectState state_ = BookSelectState::CameraApproach;
     int32_t currentStageIndex_ = 0;
     int32_t pageTurnDirection_ = 1;
+    int32_t printSpreadIndex_ = 0;
+    int32_t nextPrintSpreadIndex_ = 0;
     float animationTime_ = 0.0f;
     float pageTurnProgress_ = 0.0f;
     bool stageIndexChanged_ = false;
