@@ -1,5 +1,5 @@
 #include "SkinningObject3dManager.h"
-
+#include "../Light/LightManager.h"
 // cpp
 std::unique_ptr<SkinningObject3dManager> SkinningObject3dManager::instance_ = nullptr;
 
@@ -34,6 +34,9 @@ void SkinningObject3dManager::PreDraw()
 
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->SetGraphicsRootSignature(rootSignature.Get());
+
+    // ライティングの定数バッファをバインド
+    LightManager::GetInstance()->Bind(commandList);
 
     ID3D12DescriptorHeap* descriptorHeaps[] = {
         SrvManager::GetInstance()->GetDescriptorHeap()

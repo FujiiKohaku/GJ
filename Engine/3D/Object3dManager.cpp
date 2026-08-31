@@ -1,4 +1,5 @@
 #include "Object3dManager.h"
+#include "../Light/LightManager.h"
 
 std::unique_ptr<Object3dManager> Object3dManager::instance_ = nullptr;
 
@@ -43,6 +44,9 @@ void Object3dManager::PreDraw()
 
     // RootSignature 設宁E
     commandList->SetGraphicsRootSignature(rootSignature.Get());
+
+    // ライティングの定数バッファをバインド
+    LightManager::GetInstance()->Bind(commandList);
 
     //  ブレンドモードに応じぁEPSO を適用
     commandList->SetPipelineState(pipelineStates[currentBlendMode].Get());
