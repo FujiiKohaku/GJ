@@ -367,6 +367,9 @@ FodyWeavers.xsd
 # Local AI provider credentials
 Tools/UIAnimationEditor/ai_settings.json
 
+# Keep the Wavefront OBJ assets used by the book stage selector.
+!/resources/Models/StageSelectBook/*.obj
+
 # Keep the prebuilt Assimp libraries required by GJ.vcxproj.
 !/externals/assimp/lib/Debug/
 /externals/assimp/lib/Debug/*
