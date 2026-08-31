@@ -2,6 +2,8 @@
 
 #include "App/Scene/SceneManager.h"
 #include "Engine/Camera/Camera.h"
+#include "Engine/Fluid/GpuSphFluid.h"
+#include "Engine/Fluid/ScreenSpaceFluidRenderer.h"
 #include "Engine/PostEffect/Bloom/BloomRenderer.h"
 #include "Engine/PostEffect/Fog/FogManager.h"
 #include "Engine/PostEffect/Fog/FogRenderer.h"
@@ -28,6 +30,9 @@ void PostEffectManager::Initialize(DirectXCommon* dxCommon)
     copyImageRenderer_ = std::make_unique<CopyImageRenderer>();
     copyImageRenderer_->Initialize(dxCommon_);
 
+    screenSpaceFluidRenderer_ = std::make_unique<ScreenSpaceFluidRenderer>();
+    screenSpaceFluidRenderer_->Initialize(dxCommon_, SrvManager::GetInstance());
+
     bloomRenderer_ = std::make_unique<BloomRenderer>();
     bloomRenderer_->Initialize(dxCommon_);
 
@@ -44,6 +49,8 @@ void PostEffectManager::Initialize(DirectXCommon* dxCommon)
 
 void PostEffectManager::Update(Camera* camera)
 {
+    camera_ = camera;
+
     if (camera != nullptr) {
         auto& parameter = copyImageRenderer_->GetPostEffectParameter();
         parameter.outlineNearClip = camera->GetNearClip();
@@ -372,6 +379,24 @@ void PostEffectManager::ApplyAfterParticleDraw(
             PostEffectType::Copy,
             inputHandle);
         return;
+    }
+
+    GpuSphFluid* screenSpaceFluid = sceneManager->GetScreenSpaceFluid();
+    if (screenSpaceFluid != nullptr && camera_ != nullptr) {
+        uint32_t fluidCompositionTargetIndex =
+            GetNextPingPongIndex(particleCompositionTargetIndex_);
+        RenderTarget& fluidCompositionTarget =
+            pingPongRenderTargets_[fluidCompositionTargetIndex];
+
+        screenSpaceFluidRenderer_->RenderDepth(*screenSpaceFluid, *camera_);
+        screenSpaceFluidRenderer_->SmoothDepth();
+
+        fluidCompositionTarget.BeginRender();
+        screenSpaceFluidRenderer_->Composite(inputHandle);
+        fluidCompositionTarget.EndRender();
+
+        inputHandle = fluidCompositionTarget.GetSrvHandleGPU();
+        particleCompositionTargetIndex_ = fluidCompositionTargetIndex;
     }
 
     const std::vector<PostEffectInfo>& postEffects =

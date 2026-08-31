@@ -29,6 +29,10 @@ void SceneManager::Update()
         retiredScene_.reset();
     }
 
+    if (nextScene_) {
+        screenSpaceFluid_ = nullptr;
+    }
+
     ChangeScene(scene_, nextScene_, retiredScene_);
 
     if (scene_) {
