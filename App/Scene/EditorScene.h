@@ -5,6 +5,8 @@
 #include "Engine/Camera/Camera.h"
 #include "Engine/Network/UdpServer.h"
 #include "Engine/3D/SkyBox/SkyBox.h"
+#include "Engine/3D/Model.h"
+#include "Engine/3D/Object3d.h"
 #include <memory>
 #include <string>
 
@@ -33,4 +35,14 @@ private:
     
     // カメラの操作パラメータ
     float cameraSpeed_ = 0.5f;
+    
+    // JSONのロード情報を保持する
+    LevelData currentLevelData_;
+    
+    // プレビュー表示用
+    Model* playerModel_ = nullptr;
+    std::unique_ptr<Object3d> playerPreview_;
+    
+    // 操作状態
+    bool isDraggingPlayer_ = false;
 };

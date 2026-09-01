@@ -8,9 +8,12 @@
 #include "Engine/3D/SkyBox/SkyBoxManager.h"
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/LevelEditor/LevelDataLoader.h"
+#include "Engine/Logger/Logger.h"
+#include "Engine/3D/ModelManager.h"
 #include "SceneManager.h"
 #include "StageSelectScene.h"
 #include <iostream>
+#include <Windows.h> // ShellExecute用
 #include <thread>
 #include <cstdlib>
 #include <cmath>
@@ -108,12 +111,27 @@ void EditorScene::Initialize()
 
     // 初期マップロード
     LevelDataLoader loader;
-    LevelData levelData = loader.Load(kStage1Json);
+    currentLevelData_ = loader.Load(kStage1Json);
     LevelData::TileMapData mapData{};
-    if (!levelData.tileMaps.empty()) {
-        mapData = ExpandTileMapData(levelData.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
+    if (!currentLevelData_.tileMaps.empty()) {
+        mapData = ExpandTileMapData(currentLevelData_.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
     }
     mapChipStage_.Initialize(mapData);
+
+    // プレイヤーのプレビュー用モデルの初期化
+    playerModel_ = ModelManager::GetInstance()->CreatePlane("resources/Textures/checkerboard.png");
+    playerPreview_ = std::make_unique<Object3d>();
+    playerPreview_->Initialize(Object3dManager::GetInstance());
+    playerPreview_->SetModel(playerModel_);
+    playerPreview_->SetScale({ 1.0f, 1.0f, 1.0f });
+    playerPreview_->SetColor({ 0.1f, 0.65f, 1.0f, 1.0f });
+    playerPreview_->SetEnableLighting(false);
+    
+    // ロードされた初期位置にセット
+    if (!currentLevelData_.playerSpawns.empty()) {
+        playerPreview_->SetTranslate(currentLevelData_.playerSpawns[0].translation);
+    }
+    playerPreview_->Update();
 
     // 背景(SkyBox)の初期化: これがないとポストエフェクト合成時に空中が透明扱いになりデバッグ線が消える
     TextureManager::GetInstance()->LoadTexture(kSkyBoxTexture);
@@ -175,6 +193,10 @@ void EditorScene::Update()
     camera_->Update();
     mapChipStage_.Update();
     
+    if (playerPreview_ && !currentLevelData_.playerSpawns.empty()) {
+        playerPreview_->Update();
+    }
+    
     if (skyBox_) {
         skyBox_->Update(camera_.get());
     }
@@ -221,6 +243,11 @@ void EditorScene::Draw3D()
     }
     Object3dManager::GetInstance()->PreDraw();
     mapChipStage_.Draw();
+    
+    // 自機のプレビュー描画
+    if (playerPreview_ && !currentLevelData_.playerSpawns.empty()) {
+        playerPreview_->Draw();
+    }
 }
 
 void EditorScene::DrawParticle()
@@ -242,11 +269,17 @@ void EditorScene::ProcessUdpCommand(const std::string& command)
     else if (command.find("LOAD:") == 0) {
         std::string filename = command.substr(5);
         LevelDataLoader loader;
-        LevelData levelData = loader.Load(filename);
-        if (!levelData.tileMaps.empty()) {
-            LevelData::TileMapData expandedData = ExpandTileMapData(levelData.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
+        currentLevelData_ = loader.Load(filename);
+        if (!currentLevelData_.tileMaps.empty()) {
+            LevelData::TileMapData expandedData = ExpandTileMapData(currentLevelData_.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
             mapChipStage_.Initialize(expandedData);
             Logger::Log("Loaded map: " + filename + "\n");
+        }
+        
+        // 自機プレビューの位置も更新
+        if (playerPreview_ && !currentLevelData_.playerSpawns.empty()) {
+            playerPreview_->SetTranslate(currentLevelData_.playerSpawns[0].translation);
+            playerPreview_->Update();
         }
     }
     else if (command.find("SAVE:") == 0) {
@@ -254,13 +287,12 @@ void EditorScene::ProcessUdpCommand(const std::string& command)
         LevelData::TileMapData rawData = mapChipStage_.GetField().GetTileMapData();
         LevelData::TileMapData trimmedData = TrimTileMapData(rawData);
         
-        LevelData levelData;
-        levelData.tileMaps.push_back(trimmedData);
-        // ※ PlayerSpawn等のオブジェクト情報は現在ロード・保存に対応していないため一旦空とする。
-        // 将来的にはロード時に保持しておき、ここで再合成する必要がある。
+        // 既存の playerSpawns や objects 情報を保持したまま、tileMaps だけを上書きする
+        currentLevelData_.tileMaps.clear();
+        currentLevelData_.tileMaps.push_back(trimmedData);
         
         LevelDataLoader loader;
-        loader.Save(filename, levelData);
+        loader.Save(filename, currentLevelData_);
         Logger::Log("Saved map to: " + filename + "\n");
     }
 }
@@ -297,9 +329,14 @@ void EditorScene::UpdateRaycastEdit()
 {
     auto input = Input::GetInstance();
     
-    // Shiftを押していない時の左クリックで配置、右クリックで削除とする
+    // Shiftを押していない時の左クリックで配置・ドラッグ、右クリックで削除とする
     bool isLeftClick = !input->IsKeyPressed(DIK_LSHIFT) && input->IsMousePressed(0);
     bool isRightClick = input->IsMousePressed(1);
+    
+    // 左クリックを離したらドラッグ解除
+    if (!input->IsMousePressed(0)) {
+        isDraggingPlayer_ = false;
+    }
 
     if (isLeftClick || isRightClick) {
         Vector2 mousePos = input->GetMousePosition();
@@ -325,16 +362,64 @@ void EditorScene::UpdateRaycastEdit()
                                 ") Index(" + std::to_string(xIndex) + ", " + std::to_string(yIndex) + ")\n");
                     
                     if (xIndex >= 0 && yIndex >= 0 && xIndex < static_cast<int>(width) && yIndex < static_cast<int>(height)) {
-                        MapChipType type = isLeftClick ? static_cast<MapChipType>(currentPalette_) : MapChipType::Blank;
-                        MapChipType currentType = mapChipStage_.GetField().GetMapChipTypeByIndex(xIndex, yIndex);
-                        
-                        if (currentType != type) {
-                            mapChipStage_.GetField().SetMapChipTypeByIndex(static_cast<uint32_t>(xIndex), static_cast<uint32_t>(yIndex), type);
+                        float snapX = xIndex * kChipWidth;
+                        float snapY = (static_cast<int>(height) - 1 - yIndex) * kChipHeight;
+                        Vector3 newPos = { snapX, snapY, 0.0f };
+
+                        // ドラッグ開始判定 (新しくクリックしたマスに自機がいればドラッグ開始)
+                        if (isLeftClick && !isDraggingPlayer_ && !currentLevelData_.playerSpawns.empty()) {
+                            const Vector3& ppos = currentLevelData_.playerSpawns[0].translation;
+                            if (std::abs(ppos.x - snapX) < 0.1f && std::abs(ppos.y - snapY) < 0.1f) {
+                                isDraggingPlayer_ = true;
+                            }
+                        }
+
+                        // ドラッグ中、またはパレットがプレイヤー配置(99)の場合
+                        if (isDraggingPlayer_ || (currentPalette_ == 99 && isLeftClick)) {
+                            if (currentLevelData_.playerSpawns.empty()) {
+                                LevelData::PlayerSpawnData sd;
+                                sd.translation = newPos;
+                                sd.rotation = {0,0,0};
+                                currentLevelData_.playerSpawns.push_back(sd);
+                            } else {
+                                currentLevelData_.playerSpawns[0].translation = newPos;
+                            }
                             
-                            // 配列を変更したあとに 3D モデルを再構築して画面に反映する
-                            // Object3d の作り直しによる GPU リソース解放エラー（アクセス違反）を防ぐため、GPU の実行完了を待つ
-                            DirectXCommon::GetInstance()->WaitForGPU();
-                            mapChipStage_.Initialize(mapChipStage_.GetField().GetTileMapData());
+                            // 自機を置いたマスのブロックは強制的に消す（Airにする）
+                            MapChipType currentType = mapChipStage_.GetField().GetMapChipTypeByIndex(xIndex, yIndex);
+                            if (currentType != MapChipType::Blank) {
+                                mapChipStage_.GetField().SetMapChipTypeByIndex(static_cast<uint32_t>(xIndex), static_cast<uint32_t>(yIndex), MapChipType::Blank);
+                                DirectXCommon::GetInstance()->WaitForGPU();
+                                mapChipStage_.Initialize(mapChipStage_.GetField().GetTileMapData());
+                            }
+                            
+                            if (playerPreview_) {
+                                playerPreview_->SetTranslate(newPos);
+                                playerPreview_->Update();
+                            }
+                        } 
+                        // 通常のブロック配置・削除（ドラッグ中でない場合のみ）
+                        else if (!isDraggingPlayer_) {
+                            MapChipType type = isLeftClick ? static_cast<MapChipType>(currentPalette_) : MapChipType::Blank;
+                            MapChipType currentType = mapChipStage_.GetField().GetMapChipTypeByIndex(xIndex, yIndex);
+                            
+                            if (currentType != type) {
+                                // ブロックを置こうとしているマスに自機がいれば無視する
+                                bool isPlayerSpawnHere = false;
+                                if (type != MapChipType::Blank && !currentLevelData_.playerSpawns.empty()) {
+                                    const Vector3& ppos = currentLevelData_.playerSpawns[0].translation;
+                                    if (std::abs(ppos.x - snapX) < 0.1f && std::abs(ppos.y - snapY) < 0.1f) {
+                                        isPlayerSpawnHere = true;
+                                    }
+                                }
+                                
+                                if (!isPlayerSpawnHere) {
+                                    mapChipStage_.GetField().SetMapChipTypeByIndex(static_cast<uint32_t>(xIndex), static_cast<uint32_t>(yIndex), type);
+                                    
+                                    DirectXCommon::GetInstance()->WaitForGPU();
+                                    mapChipStage_.Initialize(mapChipStage_.GetField().GetTileMapData());
+                                }
+                            }
                         }
                     }
                 }

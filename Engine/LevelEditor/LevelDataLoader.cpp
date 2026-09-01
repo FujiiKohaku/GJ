@@ -331,10 +331,48 @@ void LevelDataLoader::Save(const std::string& filePath, const LevelData& levelDa
         root["tileMaps"] = tileMapsArray;
     }
 
-    // 今後 objects やその他のデータも保存できるように拡張する
+    if (!levelData.playerSpawns.empty()) {
+        nlohmann::json spawnsArray = nlohmann::json::array();
+        for (const auto& spawn : levelData.playerSpawns) {
+            nlohmann::json spawnJson;
+            spawnJson["type"] = "PlayerSpawn";
+            nlohmann::json transform;
+            // ロード時の仕様 (x=[0], y=[2], z=[1]) に合わせて保存
+            transform["translation"] = { spawn.translation.x, spawn.translation.z, spawn.translation.y };
+            spawnJson["transform"] = transform;
+            spawnsArray.push_back(spawnJson);
+        }
+        root["objects"] = spawnsArray;
+    }
+
+    // objects等の動的オブジェクトも拡張する場合はここに追記
+    if (!levelData.objects.empty()) {
+        if (!root.contains("objects")) {
+            root["objects"] = nlohmann::json::array();
+        }
+        for (const auto& obj : levelData.objects) {
+            nlohmann::json objJson;
+            objJson["type"] = obj.type;
+            nlohmann::json transform;
+            // ロード時の仕様に合わせて保存
+            transform["translation"] = { obj.translation.x, obj.translation.z, obj.translation.y };
+            objJson["transform"] = transform;
+            
+            if (obj.gimmick.exists) {
+                nlohmann::json gimmickJson;
+                gimmickJson["axis"] = { obj.gimmick.axis.x, obj.gimmick.axis.y, obj.gimmick.axis.z };
+                gimmickJson["range"] = { obj.gimmick.range.x, obj.gimmick.range.y, obj.gimmick.range.z };
+                gimmickJson["speed"] = obj.gimmick.speed;
+                objJson["gimmick"] = gimmickJson;
+            }
+            // 他のプロパティが必要な場合は追加
+            root["objects"].push_back(objJson);
+        }
+    }
+
     std::ofstream file(filePath);
     if (file.is_open()) {
-        file << root.dump(4);
+        file << root.dump(2);
         file.close();
     }
 }
