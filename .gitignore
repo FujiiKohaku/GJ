@@ -385,3 +385,6 @@ Tools/UIAnimationEditor/ai_settings.json
 !/resources/CompiledShaders/Shaders/Debug/
 /resources/CompiledShaders/Shaders/Debug/*
 !/resources/CompiledShaders/Shaders/Debug/DebugLine.*.dxil
+
+# Ignore other compiled shaders
+/resources/CompiledShaders/Shaders/**/*.dxil
