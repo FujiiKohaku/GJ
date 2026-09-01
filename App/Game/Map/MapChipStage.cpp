@@ -8,12 +8,14 @@
 MapChipStage::~MapChipStage() = default;
 
 void MapChipStage::Initialize(
-    const LevelData::TileMapData& tileMapData,
+    const LevelData& levelData,
     const std::string& texturePath)
 {
     // ギミックは数が少ないので毎回作り直す
     gimmicks_.clear();
-    field_.Initialize(tileMapData);
+    
+    if (levelData.tileMaps.empty()) return;
+    field_.Initialize(levelData.tileMaps[0]);
 
     Model* blockModel =
         ModelManager::GetInstance()->CreateCube(texturePath);
@@ -34,11 +36,22 @@ void MapChipStage::Initialize(
                 field_.GetMapChipPositionByIndex(xIndex, yIndex);
 
             if (type != MapChipType::Block) {
+                // 同じ座標の ObjectData を探す
+                const LevelData::ObjectData::GimmickData* gimmickData = nullptr;
+                for (const auto& obj : levelData.objects) {
+                    if (std::abs(obj.translation.x - position.x) < 0.1f &&
+                        std::abs(obj.translation.y - position.y) < 0.1f) {
+                        gimmickData = &obj.gimmick;
+                        break;
+                    }
+                }
+                
                 std::unique_ptr<BaseMapChipGimmick> gimmick =
                     MapChipGimmickFactory::Create(
                         type,
                         position,
-                        texturePath);
+                        texturePath,
+                        gimmickData);
                 if (gimmick) {
                     gimmicks_.push_back(std::move(gimmick));
                 }
@@ -74,7 +87,9 @@ void MapChipStage::Update()
     for (std::unique_ptr<Object3d>& block : blockObjects_) {
         block->Update();
     }
+    
     for (std::unique_ptr<BaseMapChipGimmick>& gimmick : gimmicks_) {
+        gimmick->SetEditorMode(isEditorMode_);
         gimmick->Update();
     }
 }

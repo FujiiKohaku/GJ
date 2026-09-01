@@ -5,16 +5,18 @@
 #include "Engine/Time/TimeManager.h"
 #include <cmath>
 
-namespace {
-constexpr float kMoveRange = 1.5f;
-constexpr float kMoveSpeed = 2.0f;
-}
-
 bool MovingBlockGimmick::Initialize(
     const Vector3& position,
-    const std::string& texturePath)
+    const std::string& texturePath,
+    const LevelData::ObjectData::GimmickData* gimmickData)
 {
     basePosition_ = position;
+    
+    if (gimmickData) {
+        speed_ = gimmickData->speed;
+        range_ = gimmickData->range;
+        axis_ = gimmickData->axis;
+    }
     Model* model =
         ModelManager::GetInstance()->CreateCube(texturePath);
     if (model == nullptr) {
@@ -37,9 +39,21 @@ void MovingBlockGimmick::Update()
         return;
     }
 
-    elapsedTime_ += TimeManager::GetInstance()->GetDeltaTime();
+    if (!isEditorMode_) {
+        elapsedTime_ += TimeManager::GetInstance()->GetDeltaTime();
+    }
     Vector3 position = basePosition_;
-    position.y += std::sin(elapsedTime_ * kMoveSpeed) * kMoveRange;
+    
+    float wave = (1.0f - std::cos(elapsedTime_ * speed_)) * 0.5f;
+    // 1ブロックの実際のワールドサイズ（現状は1.0f）
+    float kBlockSize = 1.0f;
+    // UI上はマス数で設定し、実際の距離に変換する
+    float distance = range_.x * kBlockSize;
+    
+    position.x += axis_.x * wave * distance;
+    position.y += axis_.y * wave * distance;
+    position.z += axis_.z * wave * distance;
+    
     object_->SetTranslate(position);
     object_->Update();
 }

@@ -41,7 +41,8 @@ void GamePlayScene::Initialize()
     if (!levelData.tileMaps.empty()) {
         mapData = levelData.tileMaps[0];
     }
-    mapChipStage_.Initialize(mapData);
+    // levelData 自体を渡して初期化する
+    mapChipStage_.Initialize(levelData);
 
     Vector3 playerStartPos = { 0.0f, 0.0f, 0.0f };
     if (!levelData.playerSpawns.empty()) {

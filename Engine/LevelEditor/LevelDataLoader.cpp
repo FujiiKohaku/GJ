@@ -228,13 +228,13 @@ void LevelDataLoader::LoadObject(const nlohmann::json& objectJson, LevelData& le
         }
         if (gimmick.contains("range")) {
             objectData.gimmick.range.x = gimmick["range"][0].get<float>();
-            objectData.gimmick.range.y = gimmick["range"][2].get<float>();
-            objectData.gimmick.range.z = gimmick["range"][1].get<float>();
+            objectData.gimmick.range.y = gimmick["range"][1].get<float>();
+            objectData.gimmick.range.z = gimmick["range"][2].get<float>();
         }
         if (gimmick.contains("axis")) {
             objectData.gimmick.axis.x = gimmick["axis"][0].get<float>();
-            objectData.gimmick.axis.y = gimmick["axis"][2].get<float>();
-            objectData.gimmick.axis.z = gimmick["axis"][1].get<float>();
+            objectData.gimmick.axis.y = gimmick["axis"][1].get<float>();
+            objectData.gimmick.axis.z = gimmick["axis"][2].get<float>();
         }
     }
 

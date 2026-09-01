@@ -11,6 +11,7 @@
 #include "Engine/Logger/Logger.h"
 #include "Engine/ImGuiManager/ImGuiManager.h"
 #include "Engine/3D/ModelManager.h"
+#include "Engine/Debug/DebugRenderer.h"
 #include "SceneManager.h"
 
 #include "ArchiveScene.h"
@@ -115,11 +116,12 @@ void EditorScene::Initialize()
     // 初期マップロード
     LevelDataLoader loader;
     currentLevelData_ = loader.Load(kStage1Json);
-    LevelData::TileMapData mapData{};
     if (!currentLevelData_.tileMaps.empty()) {
-        mapData = ExpandTileMapData(currentLevelData_.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
+        LevelData::TileMapData expandedData = ExpandTileMapData(currentLevelData_.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
+        currentLevelData_.tileMaps[0] = expandedData;
     }
-    mapChipStage_.Initialize(mapData);
+    mapChipStage_.SetEditorMode(true);
+    mapChipStage_.Initialize(currentLevelData_);
 
     // プレイヤーのプレビュー用モデルの初期化
     playerModel_ = ModelManager::GetInstance()->CreatePlane("resources/Textures/checkerboard.png");
@@ -206,6 +208,21 @@ void EditorScene::Update()
     }
 }
 
+LevelData::ObjectData* EditorScene::GetSelectedGimmick() {
+    if (selectedX_ < 0 || selectedY_ < 0) return nullptr;
+    uint32_t height = mapChipStage_.GetField().GetBlockHeight();
+    float kChipWidth = 1.0f;
+    float kChipHeight = 1.0f;
+    float snapX = selectedX_ * kChipWidth;
+    float snapY = (static_cast<int>(height) - 1 - selectedY_) * kChipHeight;
+    for (auto& obj : currentLevelData_.objects) {
+        if (std::abs(obj.translation.x - snapX) < 0.1f && std::abs(obj.translation.y - snapY) < 0.1f) {
+            return &obj;
+        }
+    }
+    return nullptr;
+}
+
 void EditorScene::Draw2D()
 {
 }
@@ -248,6 +265,29 @@ void EditorScene::Draw3D()
     Object3dManager::GetInstance()->PreDraw();
     mapChipStage_.Draw();
     
+    LevelData::ObjectData* selectedGimmick = GetSelectedGimmick();
+    
+    // Debug線の描画 (選択中のギミックがある場合)
+    if (selectedGimmick && selectedGimmick->type == "MovingBlock") {
+        Vector3 basePos = selectedGimmick->translation;
+        // ギミックの移動幅(range)はUI上ではマス数で持つが、実際の距離に変換する
+        float distance = selectedGimmick->gimmick.range.x; // RangeのX成分をスライダーとして使う
+        
+        Vector3 endPos = {
+            basePos.x + selectedGimmick->gimmick.axis.x * distance,
+            basePos.y + selectedGimmick->gimmick.axis.y * distance,
+            basePos.z + selectedGimmick->gimmick.axis.z * distance
+        };
+        
+        DebugRenderer::GetInstance()->AddLine(basePos, endPos, { 0.0f, 1.0f, 0.0f, 1.0f }, 2.0f);
+        
+        // 分かりやすくするために少し大きめのキューブを端点に描画
+        DebugRenderer::GetInstance()->AddWireOBB(
+            endPos, {0.5f, 0.5f, 0.5f}, 
+            {1,0,0}, {0,1,0}, {0,0,1}, 
+            {1.0f, 1.0f, 0.0f, 1.0f}, 1.0f);
+    }
+    
     // 自機のプレビュー描画
     if (playerPreview_ && !currentLevelData_.playerSpawns.empty()) {
         playerPreview_->Draw();
@@ -260,6 +300,39 @@ void EditorScene::DrawParticle()
 
 void EditorScene::DrawImGui()
 {
+#ifdef USE_IMGUI
+    LevelData::ObjectData* selectedGimmick = GetSelectedGimmick();
+    if (selectedGimmick) {
+        ImGui::Begin("Gimmick Properties");
+        
+        ImGui::Text("Selected Block: (%d, %d)", selectedX_, selectedY_);
+        ImGui::Separator();
+        
+        if (selectedGimmick->type == "MovingBlock") {
+            ImGui::Text("Type: MovingBlock");
+            ImGui::DragFloat("Speed", &selectedGimmick->gimmick.speed, 0.1f, 0.0f, 20.0f);
+            
+            // UI上はRangeを整数（マス数）として1つだけ表示する
+            int moveDistanceInt = static_cast<int>(std::round(selectedGimmick->gimmick.range.x));
+            if (ImGui::DragInt("Move Range (Blocks)", &moveDistanceInt, 1.0f, 0, 20)) {
+                selectedGimmick->gimmick.range.x = static_cast<float>(moveDistanceInt);
+            }
+            
+            // 移動方向(Axis)
+            ImGui::DragFloat3("Move Axis (X,Y,Z)", &selectedGimmick->gimmick.axis.x, 0.1f, -1.0f, 1.0f);
+        } else {
+            ImGui::Text("Type: %s", selectedGimmick->type.c_str());
+            ImGui::Text("No editable gimmick properties.");
+        }
+        
+        if (ImGui::Button("Deselect")) {
+            selectedX_ = -1;
+            selectedY_ = -1;
+        }
+        
+        ImGui::End();
+    }
+#endif
 }
 
 void EditorScene::ProcessUdpCommand(const std::string& command)
@@ -276,7 +349,8 @@ void EditorScene::ProcessUdpCommand(const std::string& command)
         currentLevelData_ = loader.Load(filename);
         if (!currentLevelData_.tileMaps.empty()) {
             LevelData::TileMapData expandedData = ExpandTileMapData(currentLevelData_.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
-            mapChipStage_.Initialize(expandedData);
+            currentLevelData_.tileMaps[0] = expandedData;
+            mapChipStage_.Initialize(currentLevelData_);
             Logger::Log("Loaded map: " + filename + "\n");
         }
         
@@ -331,18 +405,28 @@ void EditorScene::UpdateCamera()
 
 void EditorScene::UpdateRaycastEdit()
 {
+#ifdef USE_IMGUI
+    if (ImGui::GetIO().WantCaptureMouse) {
+        return; // ImGuiのUI（ウィンドウやスライダー等）を操作中の場合はエディタのクリック処理を行わない
+    }
+#endif
+
     auto input = Input::GetInstance();
     
+    // Ctrl+左クリックでギミック選択
+    bool isCtrlClick = input->IsKeyPressed(DIK_LCONTROL) && input->IsMouseTrigger(0);
+    
     // Shiftを押していない時の左クリックで配置・ドラッグ、右クリックで削除とする
-    bool isLeftClick = !input->IsKeyPressed(DIK_LSHIFT) && input->IsMousePressed(0);
-    bool isRightClick = input->IsMousePressed(1);
+    // ただしCtrlが押されている時は配置/削除を無視
+    bool isLeftClick = !input->IsKeyPressed(DIK_LSHIFT) && !input->IsKeyPressed(DIK_LCONTROL) && input->IsMousePressed(0);
+    bool isRightClick = !input->IsKeyPressed(DIK_LCONTROL) && input->IsMousePressed(1);
     
     // 左クリックを離したらドラッグ解除
     if (!input->IsMousePressed(0)) {
         isDraggingPlayer_ = false;
     }
 
-    if (isLeftClick || isRightClick) {
+    if (isLeftClick || isRightClick || isCtrlClick) {
         Vector2 mousePos = input->GetMousePosition();
         Ray ray = camera_->ScreenToRay(mousePos);
 
@@ -369,6 +453,13 @@ void EditorScene::UpdateRaycastEdit()
                         float snapX = xIndex * kChipWidth;
                         float snapY = (static_cast<int>(height) - 1 - yIndex) * kChipHeight;
                         Vector3 newPos = { snapX, snapY, 0.0f };
+                        
+                        // Ctrlクリックで選択
+                        if (isCtrlClick) {
+                            selectedX_ = xIndex;
+                            selectedY_ = yIndex;
+                            return; // 選択したら配置処理へは行かない
+                        }
 
                         // ドラッグ開始判定 (新しくクリックしたマスに自機がいればドラッグ開始)
                         if (isLeftClick && !isDraggingPlayer_ && !currentLevelData_.playerSpawns.empty()) {
@@ -394,7 +485,8 @@ void EditorScene::UpdateRaycastEdit()
                             if (currentType != MapChipType::Blank) {
                                 mapChipStage_.GetField().SetMapChipTypeByIndex(static_cast<uint32_t>(xIndex), static_cast<uint32_t>(yIndex), MapChipType::Blank);
                                 DirectXCommon::GetInstance()->WaitForGPU();
-                                mapChipStage_.Initialize(mapChipStage_.GetField().GetTileMapData());
+                                currentLevelData_.tileMaps[0] = mapChipStage_.GetField().GetTileMapData();
+                                mapChipStage_.Initialize(currentLevelData_);
                             }
                             
                             if (playerPreview_) {
@@ -420,8 +512,44 @@ void EditorScene::UpdateRaycastEdit()
                                 if (!isPlayerSpawnHere) {
                                     mapChipStage_.GetField().SetMapChipTypeByIndex(static_cast<uint32_t>(xIndex), static_cast<uint32_t>(yIndex), type);
                                     
+                                    // ギミック（ObjectData）の同期処理
+                                    // まず古いデータを消す
+                                    auto it = std::remove_if(currentLevelData_.objects.begin(), currentLevelData_.objects.end(),
+                                        [snapX, snapY](const LevelData::ObjectData& obj) {
+                                            return std::abs(obj.translation.x - snapX) < 0.1f && 
+                                                   std::abs(obj.translation.y - snapY) < 0.1f;
+                                        });
+                                    if (it != currentLevelData_.objects.end()) {
+                                        currentLevelData_.objects.erase(it, currentLevelData_.objects.end());
+                                    }
+                                    
+                                    // 新しく置くブロックが移動ブロックならデータを追加する
+                                    if (type == MapChipType::MovingBlock) {
+                                        LevelData::ObjectData newData;
+                                        newData.name = "MovingBlock";
+                                        newData.type = "MovingBlock";
+                                        newData.fileName = "cube";
+                                        newData.translation = newPos;
+                                        newData.rotation = {0,0,0};
+                                        newData.scale = {1,1,1};
+                                        
+                                        newData.gimmick.exists = true;
+                                        newData.gimmick.type = "MovingBlock";
+                                        newData.gimmick.speed = 2.0f;     // デフォルト
+                                        newData.gimmick.range = {1.5f, 0.0f, 0.0f}; // Range.x を幅として使用
+                                        newData.gimmick.axis = {0.0f, 1.0f, 0.0f};  // Y軸移動
+                                        
+                                        currentLevelData_.objects.push_back(newData);
+                                    }
+                                    
+                                    // 選択対象が消えたら選択解除
+                                    if (selectedX_ == xIndex && selectedY_ == yIndex) {
+                                        selectedX_ = -1;
+                                        selectedY_ = -1;
+                                    }
                                     DirectXCommon::GetInstance()->WaitForGPU();
-                                    mapChipStage_.Initialize(mapChipStage_.GetField().GetTileMapData());
+                                    currentLevelData_.tileMaps[0] = mapChipStage_.GetField().GetTileMapData();
+                                    mapChipStage_.Initialize(currentLevelData_);
                                 }
                             }
                         }

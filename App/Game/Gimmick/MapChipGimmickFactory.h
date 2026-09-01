@@ -12,5 +12,6 @@ public:
     static std::unique_ptr<BaseMapChipGimmick> Create(
         MapChipType type,
         const Vector3& position,
-        const std::string& texturePath);
+        const std::string& texturePath,
+        const LevelData::ObjectData::GimmickData* gimmickData = nullptr);
 };

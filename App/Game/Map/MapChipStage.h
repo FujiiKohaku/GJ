@@ -12,7 +12,7 @@ public:
     ~MapChipStage();
 
     void Initialize(
-        const LevelData::TileMapData& tileMapData,
+        const LevelData& levelData,
         const std::string& texturePath =
             "resources/Textures/checkerboard.png");
     void Update();
@@ -20,9 +20,12 @@ public:
 
     const MapChipField& GetField() const;
     MapChipField& GetField();
+    
+    void SetEditorMode(bool isEditor) { isEditorMode_ = isEditor; }
 
 private:
     MapChipField field_;
     std::vector<std::unique_ptr<Object3d>> blockObjects_;
     std::vector<std::unique_ptr<BaseMapChipGimmick>> gimmicks_;
+    bool isEditorMode_ = false;
 };

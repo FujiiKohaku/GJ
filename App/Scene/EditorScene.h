@@ -45,4 +45,10 @@ private:
     
     // 操作状態
     bool isDraggingPlayer_ = false;
+
+    // 選択中のギミック
+    int32_t selectedX_ = -1;
+    int32_t selectedY_ = -1;
+    
+    LevelData::ObjectData* GetSelectedGimmick();
 };
