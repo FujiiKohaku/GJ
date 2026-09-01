@@ -1,12 +1,15 @@
 #pragma once
 
 #include "BaseScene.h"
-#include "Engine/2D/Sprite.h"
-#include "Engine/2D/Text/Text.h"
 #include <memory>
 
+class StageSelectScene;
+
+// タイトルとステージ選択を同じ資料庫空間で連続表示する入口シーン。
 class TitleScene : public BaseScene {
 public:
+    TitleScene();
+    ~TitleScene() override;
     void Initialize() override;
     void Finalize() override;
     void Update() override;
@@ -16,7 +19,5 @@ public:
     void DrawImGui() override;
 
 private:
-    std::unique_ptr<Sprite> backgroundSprite_;
-    std::unique_ptr<Text> titleText_;
-    std::unique_ptr<Text> instructionText_;
+    std::unique_ptr<StageSelectScene> archiveScene_;
 };

@@ -21,12 +21,14 @@ public:
 
 private:
     enum class BookSelectState {
+        TitleIdle,
         CameraApproach,
         CardOpening,
         Idle,
         CardClosing,
         PageTurning,
-        StageConfirmed
+        StageConfirmed,
+        ReturningToTitle
     };
 
     struct StageData {
@@ -35,11 +37,25 @@ private:
         bool opensTestScene = false;
     };
 
+    struct DustMote {
+        std::unique_ptr<Object3d> object;
+        Vector3 basePosition;
+        float phase = 0.0f;
+        float speed = 0.0f;
+        float drift = 0.0f;
+    };
+
     void InitializeStageData();
     void InitializeBookObjects();
     void InitializeTurningPage();
     void InitializeOpeningPages();
     void InitializeInterface();
+    void InitializeDustMotes();
+    void UpdateDustMotes(float deltaTime);
+    void EnterTitleMode();
+    void StartArchiveApproach();
+    void StartTitleReturn();
+    void UpdateTitleReturn(float deltaTime);
     void UpdateCameraApproach(float deltaTime);
     void UpdateBookOpening(float progress);
     void UpdateOpeningPages(float cameraProgress, float bookProgress);
@@ -73,6 +89,7 @@ private:
     std::vector<bool> openingPageVisible_;
     std::unique_ptr<Object3d> stageCardShadow_;
     std::unique_ptr<Object3d> stageCard_;
+    std::vector<DustMote> dustMotes_;
 
     std::unique_ptr<Text> titleText_;
     std::unique_ptr<Text> stageText_;

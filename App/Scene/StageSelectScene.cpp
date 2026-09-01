@@ -11,7 +11,6 @@
 #include "GamePlayScene.h"
 #include "SceneManager.h"
 #include "TestScene.h"
-#include "TitleScene.h"
 #include <cmath>
 #include <algorithm>
 #include <numbers>
@@ -36,7 +35,8 @@ constexpr const char* kBackSoundPath = "resources/Audio/StageSelect/back.wav";
 
 constexpr const char* kArchiveRoomModel = "StageSelectBook/ArchiveRoom.obj";
 constexpr float kCameraApproachDuration = 2.4f;
-const Vector3 kCameraStartEye = { -2.5f, 3.8f, -35.0f };
+constexpr float kTitleReturnDuration = 2.0f;
+const Vector3 kCameraStartEye = { 0.0f, 3.8f, -35.0f };
 const Vector3 kCameraEndEye = { 0.75f, 1.65f, -16.5f };
 const Vector3 kCameraStartTarget = { 0.0f, -1.0f, 1.0f };
 const Vector3 kCameraEndTarget = { 0.0f, -0.20f, 0.0f };
@@ -50,10 +50,13 @@ constexpr uint32_t kTurningPageStripCount = 24;
 constexpr uint32_t kOpeningPageCount = 24;
 constexpr uint32_t kOpeningPageStripCount = 16;
 constexpr uint32_t kPrintPageCount = 8;
+constexpr uint32_t kDustMoteCount = 42;
 constexpr int32_t kPrintSpreadCount = kPrintPageCount / 2;
 constexpr float kBookPageWidth = 4.45f;
 constexpr float kBookPageHeight = 5.05f;
 constexpr float kTurningPageBaseZ = -0.19f;
+constexpr float kClosedBookYaw = -std::numbers::pi_v<float> * 0.5f;
+constexpr float kClosedBookHingeOffset = 0.18f;
 
 // Archive-only shader modes: paper=3, leather=4, brass=5.
 void SetArchiveMaterial(Object3d* object, int mode, float u = 0.0f, float width = 1.0f)
@@ -83,6 +86,7 @@ void StageSelectScene::Initialize()
     InitializeTurningPage();
     InitializeOpeningPages();
     InitializeInterface();
+    InitializeDustMotes();
 
     SoundManager* audio = SoundManager::GetInstance();
     audio->Load(kPageTurnSoundName, kPageTurnSoundPath, AudioCategory::SE);
@@ -91,14 +95,8 @@ void StageSelectScene::Initialize()
     audio->Load(kConfirmSoundName, kConfirmSoundPath, AudioCategory::SE);
     audio->Load(kBackSoundName, kBackSoundPath, AudioCategory::SE);
 
-    state_ = BookSelectState::CameraApproach;
-    animationTime_ = 0.0f;
-    pageTurnProgress_ = 0.0f;
-    stageIndexChanged_ = false;
-    openingRifflePlayed_ = false;
     RefreshStageText();
-    UpdateCardTransform(0.0f, 0.0f);
-    UpdateCameraApproach(0.0f);
+    EnterTitleMode();
 }
 
 void StageSelectScene::Finalize()
@@ -239,11 +237,12 @@ void StageSelectScene::InitializeInterface()
 {
     titleText_ = std::make_unique<Text>();
     titleText_->Initialize(kDefaultFont);
-    titleText_->SetText("THE STAGE ARCHIVE");
+    titleText_->SetText("GJ");
+    titleText_->SetPosition({ 640.0f, 150.0f });
     titleText_->SetPosition({ 640.0f, 68.0f });
     titleText_->SetAnchorPoint({ 0.5f, 0.5f });
-    titleText_->SetFontSize(48.0f);
-    titleText_->SetColor({ 0.84f, 0.72f, 0.38f, 1.0f });
+    titleText_->SetFontSize(112.0f);
+    titleText_->SetColor({ 0.35f, 0.85f, 1.0f, 1.0f });
     titleText_->SetOutlineColor({ 0.02f, 0.03f, 0.06f, 1.0f });
     titleText_->SetOutlineWidth(2.0f);
 
@@ -272,22 +271,154 @@ void StageSelectScene::InitializeInterface()
 
     instructionText_ = std::make_unique<Text>();
     instructionText_->Initialize(kDefaultFont);
-    instructionText_->SetText(
-        "A / D OR LEFT / RIGHT : TURN PAGE    ENTER : SELECT    BACKSPACE : TITLE");
+    instructionText_->SetText("ENTER / SPACE : START");
     instructionText_->SetPosition({ 640.0f, 660.0f });
     instructionText_->SetAnchorPoint({ 0.5f, 0.5f });
     instructionText_->SetFontSize(20.0f);
     instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, 1.0f });
 }
 
+void StageSelectScene::InitializeDustMotes()
+{
+    dustMotes_.reserve(kDustMoteCount);
+    Model* dustModel = ModelManager::GetInstance()->CreateCube("resources/Textures/white.png");
+
+    for (uint32_t index = 0; index < kDustMoteCount; ++index) {
+        const float seed = static_cast<float>(index);
+        DustMote mote;
+        mote.object = std::make_unique<Object3d>();
+        mote.object->Initialize(Object3dManager::GetInstance());
+        mote.object->SetModel(dustModel);
+
+        // 決まった数列を使い、起動するたびに配置が変わらないようにする。
+        mote.basePosition = {
+            std::sin(seed * 2.17f) * 8.5f,
+            -3.2f + std::fmod(seed * 1.73f, 8.4f),
+            -7.0f + std::fmod(seed * 2.91f, 13.0f)
+        };
+        mote.phase = seed * 0.83f;
+        mote.speed = 0.10f + std::fmod(seed * 0.037f, 0.13f);
+        mote.drift = 0.12f + std::fmod(seed * 0.071f, 0.28f);
+
+        const float size = 0.018f + std::fmod(seed * 0.013f, 0.035f);
+        mote.object->SetScale({ size, size, size });
+        mote.object->SetTranslate(mote.basePosition);
+        const float brightness = 0.72f + std::fmod(seed * 0.041f, 0.22f);
+        mote.object->SetColor({ brightness, brightness * 0.88f, brightness * 0.58f, 0.34f });
+        mote.object->SetEnableLighting(false);
+        mote.object->Update();
+        dustMotes_.push_back(std::move(mote));
+    }
+}
+
+void StageSelectScene::UpdateDustMotes(float deltaTime)
+{
+    const float totalTime = static_cast<float>(TimeManager::GetInstance()->GetTotalTime());
+    for (DustMote& mote : dustMotes_) {
+        mote.basePosition.y += mote.speed * deltaTime;
+        if (mote.basePosition.y > 5.2f) {
+            mote.basePosition.y = -3.2f;
+        }
+
+        const Vector3 position = {
+            mote.basePosition.x + std::sin(totalTime * 0.31f + mote.phase) * mote.drift,
+            mote.basePosition.y + std::sin(totalTime * 0.47f + mote.phase * 1.7f) * 0.10f,
+            mote.basePosition.z + std::cos(totalTime * 0.23f + mote.phase) * mote.drift * 0.45f
+        };
+        mote.object->SetTranslate(position);
+        mote.object->Update();
+    }
+}
+
+void StageSelectScene::EnterTitleMode()
+{
+    state_ = BookSelectState::TitleIdle;
+    animationTime_ = 0.0f;
+    pageTurnProgress_ = 0.0f;
+    stageIndexChanged_ = false;
+    openingRifflePlayed_ = false;
+    SceneManager::GetInstance()->SetArchiveApproach(0.0f);
+
+    camera_->LookAt(kCameraStartEye, kCameraStartTarget);
+    UpdateBookOpening(0.0f);
+    std::fill(openingPageVisible_.begin(), openingPageVisible_.end(), false);
+    UpdateCardTransform(0.0f, 0.0f);
+
+    titleText_->SetText("GJ");
+    titleText_->SetFontSize(112.0f);
+    titleText_->SetColor({ 0.35f, 0.85f, 1.0f, 1.0f });
+    instructionText_->SetText("ENTER / SPACE : START");
+    instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, 1.0f });
+}
+
+void StageSelectScene::StartArchiveApproach()
+{
+    SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.65f);
+    state_ = BookSelectState::CameraApproach;
+    animationTime_ = 0.0f;
+    openingRifflePlayed_ = false;
+    titleText_->SetText("THE STAGE ARCHIVE");
+    titleText_->SetPosition({ 640.0f, 68.0f });
+    titleText_->SetFontSize(48.0f);
+    titleText_->SetColor({ 0.84f, 0.72f, 0.38f, 0.0f });
+    instructionText_->SetText(
+        "A / D OR LEFT / RIGHT : TURN PAGE    ENTER : SELECT    BACKSPACE : TITLE");
+    instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, 0.0f });
+}
+
+void StageSelectScene::StartTitleReturn()
+{
+    state_ = BookSelectState::ReturningToTitle;
+    animationTime_ = 0.0f;
+    SoundManager::GetInstance()->PlaySE(kBackSoundName, 0.55f);
+    SoundManager::GetInstance()->PlaySE(kPageRiffleSoundName, 0.42f);
+    titleText_->SetText("THE STAGE ARCHIVE");
+    titleText_->SetPosition({ 640.0f, 68.0f });
+    titleText_->SetFontSize(48.0f);
+    instructionText_->SetText(
+        "A / D OR LEFT / RIGHT : TURN PAGE    ENTER : SELECT    BACKSPACE : TITLE");
+    std::fill(openingPageVisible_.begin(), openingPageVisible_.end(), false);
+}
+
+void StageSelectScene::UpdateTitleReturn(float deltaTime)
+{
+    animationTime_ += deltaTime;
+    const float progress = Clamp01(animationTime_ / kTitleReturnDuration);
+    const float eased = progress * progress * progress *
+        (progress * (progress * 6.0f - 15.0f) + 10.0f);
+
+    camera_->LookAt(
+        kCameraEndEye + (kCameraStartEye - kCameraEndEye) * eased,
+        kCameraEndTarget + (kCameraStartTarget - kCameraEndTarget) * eased);
+    SceneManager::GetInstance()->SetArchiveApproach(1.0f - eased);
+
+    // カードを先に本へ収納してから、表紙を閉じながら後退する。
+    const float cardProgress = SmoothStep(progress / 0.28f);
+    UpdateCardTransform(1.0f - cardProgress, 1.0f - cardProgress);
+    const float closeProgress = SmoothStep((progress - 0.10f) / 0.82f);
+    UpdateBookOpening(1.0f - closeProgress);
+
+    const float interfaceAlpha = 1.0f - SmoothStep(progress / 0.35f);
+    titleText_->SetColor({ 0.84f, 0.72f, 0.38f, interfaceAlpha });
+    instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, interfaceAlpha });
+
+    if (progress >= 1.0f) {
+        EnterTitleMode();
+    }
+}
+
 void StageSelectScene::Update()
 {
     float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
+    UpdateDustMotes(deltaTime);
     Input* input = Input::GetInstance();
 
-    if (input->IsKeyTrigger(DIK_BACKSPACE)) {
-        SoundManager::GetInstance()->PlaySE(kBackSoundName, 0.65f);
-        SceneManager::GetInstance()->SetNextScene(std::make_unique<TitleScene>());
+    if (state_ == BookSelectState::TitleIdle) {
+        if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE)) {
+            StartArchiveApproach();
+        }
+    } else if (state_ == BookSelectState::Idle && input->IsKeyTrigger(DIK_BACKSPACE)) {
+        StartTitleReturn();
         return;
     }
 
@@ -302,7 +433,11 @@ void StageSelectScene::Update()
         }
     }
 
-    if (state_ == BookSelectState::CameraApproach) {
+    if (state_ == BookSelectState::TitleIdle) {
+        const float totalTime = static_cast<float>(TimeManager::GetInstance()->GetTotalTime());
+        const float drift = std::sin(totalTime * 0.45f) * 0.10f;
+        camera_->LookAt(kCameraStartEye + Vector3 { drift, drift * 0.25f, 0.0f }, kCameraStartTarget);
+    } else if (state_ == BookSelectState::CameraApproach) {
         UpdateCameraApproach(deltaTime);
     } else if (state_ == BookSelectState::CardOpening) {
         UpdateCardOpening(deltaTime);
@@ -312,6 +447,8 @@ void StageSelectScene::Update()
         UpdateCardClosing(deltaTime);
     } else if (state_ == BookSelectState::PageTurning) {
         UpdatePageTurning(deltaTime);
+    } else if (state_ == BookSelectState::ReturningToTitle) {
+        UpdateTitleReturn(deltaTime);
     }
 
     camera_->Update();
@@ -378,8 +515,8 @@ void StageSelectScene::UpdateBookOpening(float progress)
     const float closed = 1.0f - Clamp01(progress);
     const float foldAngle = closed * std::numbers::pi_v<float> * 0.5f;
     // Separate the two hinges while closed so the covers enclose the page blocks.
-    const float hingeOffset = 0.48f * closed;
-    const Matrix4x4 bookRotation = MatrixMath::MakeRotateYMatrix(-0.85f * closed);
+    const float hingeOffset = kClosedBookHingeOffset * closed;
+    const Matrix4x4 bookRotation = MatrixMath::MakeRotateYMatrix(kClosedBookYaw * closed);
     const Matrix4x4 bookPlacement = MatrixMath::MakeTranslateMatrix({ 0.0f, -0.15f, 0.30f });
     const Matrix4x4 bookWorld = MatrixMath::Multiply(bookRotation, bookPlacement);
 
@@ -404,7 +541,7 @@ void StageSelectScene::UpdateBookOpening(float progress)
     setWing(rightPageBlock_.get(), { kBookPageWidth, kBookPageHeight, 0.24f },
         { 2.27f, 0.07f, -0.34f }, 1.0f);
     const Matrix4x4 spine = MatrixMath::MakeAffineMatrix(
-        { 0.24f + 0.72f * closed, 5.45f, 0.62f },
+        { 0.24f - 0.18f * closed, 5.45f, 0.62f },
         Vector3 { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, -0.32f * progress });
     bookSpine_->SetCustomWorldMatrix(MatrixMath::Multiply(spine, bookWorld));
 }
@@ -413,7 +550,7 @@ void StageSelectScene::UpdateOpeningPages(float cameraProgress, float bookProgre
 {
     const float closed = 1.0f - bookProgress;
     const Matrix4x4 bookWorld = MatrixMath::Multiply(
-        MatrixMath::MakeRotateYMatrix(-0.85f * closed),
+        MatrixMath::MakeRotateYMatrix(kClosedBookYaw * closed),
         MatrixMath::MakeTranslateMatrix({ 0.0f, -0.15f, 0.30f }));
     const float stripWidth = kBookPageWidth / static_cast<float>(kOpeningPageStripCount);
     uint32_t activeLeaves = 0;
@@ -742,9 +879,12 @@ void StageSelectScene::Draw2D()
 {
     TextRenderer::GetInstance()->PreDraw();
     titleText_->Draw();
-    stageText_->Draw();
-    descriptionText_->Draw();
-    pageText_->Draw();
+    if (state_ != BookSelectState::TitleIdle &&
+        state_ != BookSelectState::CameraApproach) {
+        stageText_->Draw();
+        descriptionText_->Draw();
+        pageText_->Draw();
+    }
     instructionText_->Draw();
 }
 
@@ -752,6 +892,9 @@ void StageSelectScene::Draw3D()
 {
     Object3dManager::GetInstance()->PreDraw();
     backdrop_->Draw();
+    for (const DustMote& mote : dustMotes_) {
+        mote.object->Draw();
+    }
     leftBookCover_->Draw();
     rightBookCover_->Draw();
     for (const auto& fitting : bookFittings_) {
@@ -775,7 +918,7 @@ void StageSelectScene::Draw3D()
             strip->Draw();
         }
     }
-    if (state_ != BookSelectState::CameraApproach) {
+    if (state_ != BookSelectState::CameraApproach && state_ != BookSelectState::TitleIdle) {
         stageCardShadow_->Draw();
         stageCard_->Draw();
     }
