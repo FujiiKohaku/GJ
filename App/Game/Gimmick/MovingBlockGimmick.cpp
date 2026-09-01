@@ -1,4 +1,5 @@
 #include "MovingBlockGimmick.h"
+#include "MovingBlockParam.h"
 
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
@@ -8,14 +9,17 @@
 bool MovingBlockGimmick::Initialize(
     const Vector3& position,
     const std::string& texturePath,
-    const LevelData::ObjectData::GimmickData* gimmickData)
+    const BaseGimmickParam* gimmickParam)
 {
     basePosition_ = position;
     
-    if (gimmickData) {
-        speed_ = gimmickData->speed;
-        range_ = gimmickData->range;
-        axis_ = gimmickData->axis;
+    if (gimmickParam) {
+        const MovingBlockParam* param = dynamic_cast<const MovingBlockParam*>(gimmickParam);
+        if (param) {
+            speed_ = param->speed_;
+            range_ = param->range_;
+            axis_ = param->axis_;
+        }
     }
     
     currentPosition_ = basePosition_;

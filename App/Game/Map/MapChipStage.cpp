@@ -37,11 +37,11 @@ void MapChipStage::Initialize(
 
             if (type != MapChipType::Block) {
                 // 同じ座標の ObjectData を探す
-                const LevelData::ObjectData::GimmickData* gimmickData = nullptr;
+                const BaseGimmickParam* gimmickParam = nullptr;
                 for (const auto& obj : levelData.objects) {
                     if (std::abs(obj.translation.x - position.x) < 0.1f &&
                         std::abs(obj.translation.y - position.y) < 0.1f) {
-                        gimmickData = &obj.gimmick;
+                        gimmickParam = obj.gimmickParam.get();
                         break;
                     }
                 }
@@ -51,7 +51,7 @@ void MapChipStage::Initialize(
                         type,
                         position,
                         texturePath,
-                        gimmickData);
+                        gimmickParam);
                 if (gimmick) {
                     gimmicks_.push_back(std::move(gimmick));
                 }

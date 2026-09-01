@@ -9,7 +9,7 @@ public:
     bool Initialize(
         const Vector3& position,
         const std::string& texturePath,
-        const LevelData::ObjectData::GimmickData* gimmickData = nullptr) override;
+        const BaseGimmickParam* gimmickParam = nullptr) override;
     void Update() override;
     void Draw() override;
     void SetEditorMode(bool isEditorMode) override { isEditorMode_ = isEditorMode; }

@@ -8,6 +8,7 @@
 #include "Engine/3D/SkyBox/SkyBoxManager.h"
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/LevelEditor/LevelDataLoader.h"
+#include "Engine/LevelEditor/GimmickParamFactory.h"
 #include "Engine/Logger/Logger.h"
 #include "Engine/ImGuiManager/ImGuiManager.h"
 #include "Engine/3D/ModelManager.h"
@@ -315,32 +316,12 @@ void EditorScene::DrawImGui()
         ImGui::Text("Selected Block: (%d, %d)", selectedX_, selectedY_);
         ImGui::Separator();
         
-        if (selectedGimmick->type == "MovingBlock") {
-            ImGui::Text("Type: MovingBlock");
+        if (selectedGimmick->gimmickParam) {
+            selectedGimmick->gimmickParam->DrawImGui();
+        } else if (selectedGimmick->type == "MovingBlock") {
+            // 互換性（未移行データ用）
+            ImGui::Text("Type: MovingBlock (Legacy)");
             ImGui::DragFloat("Speed", &selectedGimmick->gimmick.speed, 0.1f, 0.0f, 20.0f);
-            
-            // UI上はRangeを整数（マス数）として1つだけ表示する
-            int moveDistanceInt = static_cast<int>(std::round(selectedGimmick->gimmick.range.x));
-            if (ImGui::DragInt("Move Range (Blocks)", &moveDistanceInt, 1.0f, 0, 20)) {
-                selectedGimmick->gimmick.range.x = static_cast<float>(moveDistanceInt);
-            }
-            
-            // 移動方向(Axis)をコンボボックスで選択
-            const char* axisItems[] = { "Up (+Y)", "Down (-Y)", "Left (-X)", "Right (+X)" };
-            int currentItem = -1;
-            
-            if (selectedGimmick->gimmick.axis.y > 0.5f) currentItem = 0;
-            else if (selectedGimmick->gimmick.axis.y < -0.5f) currentItem = 1;
-            else if (selectedGimmick->gimmick.axis.x < -0.5f) currentItem = 2;
-            else if (selectedGimmick->gimmick.axis.x > 0.5f) currentItem = 3;
-            else currentItem = 0; // フォールバック
-            
-            if (ImGui::Combo("Move Direction", &currentItem, axisItems, IM_ARRAYSIZE(axisItems))) {
-                if (currentItem == 0) selectedGimmick->gimmick.axis = { 0.0f, 1.0f, 0.0f };
-                else if (currentItem == 1) selectedGimmick->gimmick.axis = { 0.0f, -1.0f, 0.0f };
-                else if (currentItem == 2) selectedGimmick->gimmick.axis = { -1.0f, 0.0f, 0.0f };
-                else if (currentItem == 3) selectedGimmick->gimmick.axis = { 1.0f, 0.0f, 0.0f };
-            }
         } else {
             ImGui::Text("Type: %s", selectedGimmick->type.c_str());
             ImGui::Text("No editable gimmick properties.");
@@ -554,11 +535,8 @@ void EditorScene::UpdateRaycastEdit()
                                         newData.rotation = {0,0,0};
                                         newData.scale = {1,1,1};
                                         
-                                        newData.gimmick.exists = true;
-                                        newData.gimmick.type = "MovingBlock";
-                                        newData.gimmick.speed = 2.0f;     // デフォルト
-                                        newData.gimmick.range = {2.0f, 0.0f, 0.0f}; // Range.x を幅として使用
-                                        newData.gimmick.axis = {0.0f, 1.0f, 0.0f};  // Y軸移動
+                                        // GimmickParamFactory からデフォルトインスタンスを生成
+                                        newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("MovingBlock");
                                         
                                         currentLevelData_.objects.push_back(newData);
                                     }

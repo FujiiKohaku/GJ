@@ -13,5 +13,5 @@ public:
         MapChipType type,
         const Vector3& position,
         const std::string& texturePath,
-        const LevelData::ObjectData::GimmickData* gimmickData = nullptr);
+        const BaseGimmickParam* gimmickParam = nullptr);
 };

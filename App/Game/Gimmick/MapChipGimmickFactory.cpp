@@ -7,7 +7,7 @@ std::unique_ptr<BaseMapChipGimmick> MapChipGimmickFactory::Create(
     MapChipType type,
     const Vector3& position,
     const std::string& texturePath,
-    const LevelData::ObjectData::GimmickData* gimmickData)
+    const BaseGimmickParam* gimmickParam)
 {
     std::unique_ptr<BaseMapChipGimmick> gimmick;
 
@@ -19,7 +19,7 @@ std::unique_ptr<BaseMapChipGimmick> MapChipGimmickFactory::Create(
         return nullptr;
     }
 
-    if (!gimmick->Initialize(position, texturePath, gimmickData)) {
+    if (gimmick && !gimmick->Initialize(position, texturePath, gimmickParam)) {
         return nullptr;
     }
     return gimmick;
