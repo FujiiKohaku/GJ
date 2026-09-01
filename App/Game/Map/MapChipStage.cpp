@@ -8,17 +8,21 @@
 MapChipStage::~MapChipStage() = default;
 
 void MapChipStage::Initialize(
-    const LevelData::TileMapData& tileMapData,
+    const LevelData& levelData,
     const std::string& texturePath)
 {
-    blockObjects_.clear();
+    // ギミックは数が少ないので毎回作り直す
     gimmicks_.clear();
-    field_.Initialize(tileMapData);
+    
+    if (levelData.tileMaps.empty()) return;
+    field_.Initialize(levelData.tileMaps[0]);
 
     Model* blockModel =
         ModelManager::GetInstance()->CreateCube(texturePath);
     const uint32_t height = field_.GetBlockHeight();
     const uint32_t width = field_.GetBlockWidth();
+
+    size_t currentBlockIndex = 0;
 
     for (uint32_t yIndex = 0; yIndex < height; ++yIndex) {
         for (uint32_t xIndex = 0; xIndex < width; ++xIndex) {
@@ -32,26 +36,49 @@ void MapChipStage::Initialize(
                 field_.GetMapChipPositionByIndex(xIndex, yIndex);
 
             if (type != MapChipType::Block) {
+                // 同じ座標の ObjectData を探す
+                const BaseGimmickParam* gimmickParam = nullptr;
+                for (const auto& obj : levelData.objects) {
+                    if (std::abs(obj.translation.x - position.x) < 0.1f &&
+                        std::abs(obj.translation.y - position.y) < 0.1f) {
+                        gimmickParam = obj.gimmickParam.get();
+                        break;
+                    }
+                }
+                
                 std::unique_ptr<BaseMapChipGimmick> gimmick =
                     MapChipGimmickFactory::Create(
                         type,
                         position,
-                        texturePath);
+                        texturePath,
+                        gimmickParam);
                 if (gimmick) {
                     gimmicks_.push_back(std::move(gimmick));
                 }
                 continue;
             }
 
-            std::unique_ptr<Object3d> block =
-                std::make_unique<Object3d>();
-            block->Initialize(Object3dManager::GetInstance());
-            block->SetModel(blockModel);
-            block->SetTranslate(position);
-            block->SetEnableLighting(true);
-            block->Update();
-            blockObjects_.push_back(std::move(block));
+            // GPUメモリ枯渇(VRAMリーク)を防ぐため、既存の Object3d を再利用する
+            if (currentBlockIndex < blockObjects_.size()) {
+                blockObjects_[currentBlockIndex]->SetTranslate(position);
+                blockObjects_[currentBlockIndex]->Update();
+            } else {
+                std::unique_ptr<Object3d> block =
+                    std::make_unique<Object3d>();
+                block->Initialize(Object3dManager::GetInstance());
+                block->SetModel(blockModel);
+                block->SetTranslate(position);
+                block->SetEnableLighting(true);
+                block->Update();
+                blockObjects_.push_back(std::move(block));
+            }
+            currentBlockIndex++;
         }
+    }
+
+    // 余った(使われなくなった)ブロックを配列から削除
+    if (currentBlockIndex < blockObjects_.size()) {
+        blockObjects_.erase(blockObjects_.begin() + currentBlockIndex, blockObjects_.end());
     }
 }
 
@@ -60,7 +87,9 @@ void MapChipStage::Update()
     for (std::unique_ptr<Object3d>& block : blockObjects_) {
         block->Update();
     }
+    
     for (std::unique_ptr<BaseMapChipGimmick>& gimmick : gimmicks_) {
+        gimmick->SetEditorMode(isEditorMode_);
         gimmick->Update();
     }
 }
@@ -78,4 +107,19 @@ void MapChipStage::Draw()
 const MapChipField& MapChipStage::GetField() const
 {
     return field_;
+}
+
+MapChipField& MapChipStage::GetField()
+{
+    return field_;
+}
+
+std::vector<BaseMapChipGimmick*> MapChipStage::GetGimmicks() const
+{
+    std::vector<BaseMapChipGimmick*> result;
+    result.reserve(gimmicks_.size());
+    for (const auto& gimmick : gimmicks_) {
+        result.push_back(gimmick.get());
+    }
+    return result;
 }

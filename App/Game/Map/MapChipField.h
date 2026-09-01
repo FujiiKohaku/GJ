@@ -20,9 +20,15 @@ public:
     MapChipType GetMapChipTypeByIndex(
         uint32_t xIndex,
         uint32_t yIndex) const;
+    void SetMapChipTypeByIndex(
+        uint32_t xIndex,
+        uint32_t yIndex,
+        MapChipType type);
     Vector3 GetMapChipPositionByIndex(
         uint32_t xIndex,
         uint32_t yIndex) const;
+
+    LevelData::TileMapData GetTileMapData() const;
 
     uint32_t GetBlockWidth() const;
     uint32_t GetBlockHeight() const;

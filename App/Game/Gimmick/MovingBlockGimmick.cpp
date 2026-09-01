@@ -1,20 +1,30 @@
 #include "MovingBlockGimmick.h"
+#include "MovingBlockParam.h"
 
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/Time/TimeManager.h"
 #include <cmath>
 
-namespace {
-constexpr float kMoveRange = 1.5f;
-constexpr float kMoveSpeed = 2.0f;
-}
-
 bool MovingBlockGimmick::Initialize(
     const Vector3& position,
-    const std::string& texturePath)
+    const std::string& texturePath,
+    const BaseGimmickParam* gimmickParam)
 {
     basePosition_ = position;
+    
+    if (gimmickParam) {
+        const MovingBlockParam* param = dynamic_cast<const MovingBlockParam*>(gimmickParam);
+        if (param) {
+            speed_ = param->speed_;
+            range_ = param->range_;
+            axis_ = param->axis_;
+        }
+    }
+    
+    currentPosition_ = basePosition_;
+    previousPosition_ = basePosition_;
+
     Model* model =
         ModelManager::GetInstance()->CreateCube(texturePath);
     if (model == nullptr) {
@@ -37,10 +47,25 @@ void MovingBlockGimmick::Update()
         return;
     }
 
-    elapsedTime_ += TimeManager::GetInstance()->GetDeltaTime();
+    previousPosition_ = currentPosition_;
+
+    if (!isEditorMode_) {
+        elapsedTime_ += TimeManager::GetInstance()->GetDeltaTime();
+    }
     Vector3 position = basePosition_;
-    position.y += std::sin(elapsedTime_ * kMoveSpeed) * kMoveRange;
-    object_->SetTranslate(position);
+    
+    float wave = (1.0f - std::cos(elapsedTime_ * speed_)) * 0.5f;
+    // 1ブロックの実際のワールドサイズ（現状は1.0f）
+    float kBlockSize = 1.0f;
+    // UI上はマス数で設定し、実際の距離に変換する
+    float distance = range_.x * kBlockSize;
+    
+    position.x += axis_.x * wave * distance;
+    position.y += axis_.y * wave * distance;
+    position.z += axis_.z * wave * distance;
+    
+    currentPosition_ = position;
+    object_->SetTranslate(currentPosition_);
     object_->Update();
 }
 
@@ -49,4 +74,18 @@ void MovingBlockGimmick::Draw()
     if (object_) {
         object_->Draw();
     }
+}
+
+AABB MovingBlockGimmick::GetAABB() const
+{
+    // ブロックのサイズは現状 1.0f x 1.0f x 1.0f と仮定
+    AABB aabb;
+    aabb.center = currentPosition_;
+    aabb.size = {1.0f, 1.0f, 1.0f};
+    return aabb;
+}
+
+Vector3 MovingBlockGimmick::GetDeltaPosition() const
+{
+    return currentPosition_ - previousPosition_;
 }

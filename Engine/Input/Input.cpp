@@ -76,7 +76,10 @@ void Input::Update()
         result = keyboard_->GetDeviceState(sizeof(keys_), keys_);
         if (FAILED(result)) {
             keyboard_->Acquire();
+            std::memset(keys_, 0, sizeof(keys_));
         }
+    } else {
+        std::memset(keys_, 0, sizeof(keys_));
     }
 
     result = mouse_->Acquire();
@@ -84,7 +87,10 @@ void Input::Update()
         result = mouse_->GetDeviceState(sizeof(mouseState_), &mouseState_);
         if (FAILED(result)) {
             mouse_->Acquire();
+            std::memset(&mouseState_, 0, sizeof(mouseState_));
         }
+    } else {
+        std::memset(&mouseState_, 0, sizeof(mouseState_));
     }
 
     XINPUT_STATE nextGamepadState = {};
@@ -181,6 +187,15 @@ void Input::ResetMouseDelta()
 {
     mouseState_.lX = 0;
     mouseState_.lY = 0;
+    mouseState_.lZ = 0;
+}
+
+Vector2 Input::GetMousePosition() const
+{
+    POINT pt;
+    GetCursorPos(&pt);
+    ScreenToClient(winApp_->GetHwnd(), &pt);
+    return { static_cast<float>(pt.x), static_cast<float>(pt.y) };
 }
 
 bool Input::IsGamepadConnected() const

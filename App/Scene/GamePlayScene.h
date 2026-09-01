@@ -3,6 +3,9 @@
 #include "App/Game/Map/MapChipStage.h"
 #include "App/Game/Player/MapChipPlayer.h"
 #include "BaseScene.h"
+#ifdef USE_IMGUI
+#include "Engine/LevelEditor/MapEditor.h"
+#endif
 #include "Engine/2D/Text/Text.h"
 #include "Engine/3D/SkyBox/SkyBox.h"
 #include "Engine/Camera/Camera.h"

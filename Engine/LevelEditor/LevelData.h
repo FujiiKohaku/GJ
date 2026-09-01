@@ -2,6 +2,8 @@
 #include "../math/EngineStruct.h"
 #include <string>
 #include <vector>
+#include <memory>
+#include "BaseGimmickParam.h"
 
 struct LevelData {
 
@@ -50,7 +52,9 @@ struct LevelData {
             float speed = 0.0f;
             Vector3 range;
             Vector3 axis = { 0.0f, 1.0f, 0.0f };
-        } gimmick;
+        } gimmick; // TODO: 段階的に削除予定
+
+        std::unique_ptr<BaseGimmickParam> gimmickParam;
 
         struct DestructibleData {
             bool exists = false;
@@ -83,6 +87,48 @@ struct LevelData {
         } terrain;
 
         bool meshSync = false;
+
+        ObjectData() = default;
+        ~ObjectData() = default;
+
+        // コピーコンストラクタ
+        ObjectData(const ObjectData& other) {
+            *this = other; // コピー代入演算子に委譲
+        }
+
+        // コピー代入演算子
+        ObjectData& operator=(const ObjectData& other) {
+            if (this == &other) return *this;
+            name = other.name;
+            type = other.type;
+            fileName = other.fileName;
+            translation = other.translation;
+            rotation = other.rotation;
+            scale = other.scale;
+            disabled = other.disabled;
+            scoreItem = other.scoreItem;
+            collider = other.collider;
+            trigger = other.trigger;
+            hazard = other.hazard;
+            gimmick = other.gimmick;
+            destructible = other.destructible;
+            cameraPoint = other.cameraPoint;
+            cameraFovPoint = other.cameraFovPoint;
+            patrolRoute = other.patrolRoute;
+            terrain = other.terrain;
+            meshSync = other.meshSync;
+
+            if (other.gimmickParam) {
+                gimmickParam = other.gimmickParam->Clone();
+            } else {
+                gimmickParam.reset();
+            }
+            return *this;
+        }
+
+        // ムーブはデフォルト
+        ObjectData(ObjectData&&) = default;
+        ObjectData& operator=(ObjectData&&) = default;
     };
 
     struct PlayerSpawnData {

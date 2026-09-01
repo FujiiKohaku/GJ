@@ -163,14 +163,18 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
     <ItemGroup>
+    <ClCompile Include="Engine\Event\EventDispatcher.cpp" />
     <ClInclude Include="Engine\CollisionManager\CollisionLayer.h" />
     <ClCompile Include="App\SlimePlayer.cpp" />
+    <ClCompile Include="App\Scene\EditorScene.cpp" />
     <ClCompile Include="App\Scene\ArchiveScene.cpp" />
     <ClCompile Include="App\Scene\GamePlayScene.cpp" />
     <ClCompile Include="App\Game\Map\MapChipField.cpp" />
     <ClCompile Include="App\Game\Map\MapChipStage.cpp" />
     <ClCompile Include="App\Game\Gimmick\MapChipGimmickFactory.cpp" />
     <ClCompile Include="App\Game\Gimmick\MovingBlockGimmick.cpp" />
+    <ClCompile Include="App\Game\Gimmick\MovingBlockParam.cpp" />
+    <ClCompile Include="Engine\LevelEditor\GimmickParamFactory.cpp" />
     <ClCompile Include="App\Game\Player\MapChipPlayer.cpp" />
     <ClCompile Include="App\Scene\TestScene.cpp" />
     <ClCompile Include="App\Scene\ClearScene.cpp" />
@@ -287,6 +291,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\PostEffect\PostEffectType.cpp" />
     <ClCompile Include="Engine\LevelEditor\LevelData.cpp" />
     <ClCompile Include="Engine\LevelEditor\LevelDataLoader.cpp" />
+    <ClCompile Include="Engine\LevelEditor\MapEditor.cpp" />
+    <ClCompile Include="Engine\Network\UdpServer.cpp" />
     <ClCompile Include="Engine\math\Ray.cpp" />
     <ClCompile Include="Engine\math\Sphere.cpp" />
     <ClCompile Include="Engine\SceneObjectManager\SceneObjectManager.cpp" />
@@ -310,6 +316,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Engine\Event\EventDispatcher.h" />
+    <ClInclude Include="Engine\Event\IEventReceiver.h" />
     <ClInclude Include="Engine\math\Collision.h" />
     <ClInclude Include="App\SlimePlayer.h" />
     <ClInclude Include="Engine\CollisionManager\CollisionManager.h" />
@@ -393,6 +401,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\SrvManager\SrvManager.h" />
     <ClInclude Include="Engine\StringUtility\StringUtility.h" />
     <ClInclude Include="Engine\TextureManager\TextureManager.h" />
+    <ClInclude Include="App\Scene\EditorScene.h" />
     <ClInclude Include="App\Scene\ArchiveScene.h" />
     <ClInclude Include="App\Scene\PageTransition.h" />
     <ClInclude Include="App\Scene\GamePlayScene.h" />
@@ -401,6 +410,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="App\Game\Gimmick\BaseMapChipGimmick.h" />
     <ClInclude Include="App\Game\Gimmick\MapChipGimmickFactory.h" />
     <ClInclude Include="App\Game\Gimmick\MovingBlockGimmick.h" />
+    <ClInclude Include="App\Game\Gimmick\MovingBlockParam.h" />
+    <ClInclude Include="Engine\LevelEditor\BaseGimmickParam.h" />
+    <ClInclude Include="Engine\LevelEditor\GimmickParamFactory.h" />
     <ClInclude Include="App\Game\Player\MapChipPlayer.h" />
     <ClInclude Include="App\Scene\TestScene.h" />
     <ClInclude Include="App\Scene\ClearScene.h" />
@@ -422,6 +434,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\PostEffect\PostEffectType.h" />
     <ClInclude Include="Engine\LevelEditor\LevelData.h" />
     <ClInclude Include="Engine\LevelEditor\LevelDataLoader.h" />
+    <ClInclude Include="Engine\LevelEditor\MapEditor.h" />
+    <ClInclude Include="Engine\Network\UdpServer.h" />
     <ClInclude Include="Engine\math\Ray.h" />
     <ClInclude Include="Engine\math\Sphere.h" />
     <ClInclude Include="Engine\SceneObjectManager\SceneObjectManager.h" />

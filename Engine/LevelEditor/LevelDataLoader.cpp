@@ -2,6 +2,9 @@
 
 #include <cassert>
 #include <fstream>
+#include <iostream>
+#include "Engine/Logger/Logger.h"
+#include "GimmickParamFactory.h"
 
 LevelData LevelDataLoader::Load(const std::string& filePath)
 {
@@ -207,34 +210,43 @@ void LevelDataLoader::LoadObject(const nlohmann::json& objectJson, LevelData& le
     }
 
     if (objectJson.contains("hazard")) {
-        const nlohmann::json& hazard = objectJson["hazard"];
         objectData.hazard.exists = true;
-        if (hazard.contains("type")) {
-            objectData.hazard.type = hazard["type"].get<std::string>();
+        if (objectJson["hazard"].contains("type")) {
+            objectData.hazard.type = objectJson["hazard"]["type"].get<std::string>();
         }
-        if (hazard.contains("damage")) {
-            objectData.hazard.damage = hazard["damage"].get<int>();
+        if (objectJson["hazard"].contains("damage")) {
+            objectData.hazard.damage = objectJson["hazard"]["damage"].get<int>();
         }
     }
 
+    // 案Cに基づくファクトリによる動的パース処理
     if (objectJson.contains("gimmick")) {
-        const nlohmann::json& gimmick = objectJson["gimmick"];
-        objectData.gimmick.exists = true;
-        if (gimmick.contains("type")) {
-            objectData.gimmick.type = gimmick["type"].get<std::string>();
-        }
-        if (gimmick.contains("speed")) {
-            objectData.gimmick.speed = gimmick["speed"].get<float>();
-        }
-        if (gimmick.contains("range")) {
-            objectData.gimmick.range.x = gimmick["range"][0].get<float>();
-            objectData.gimmick.range.y = gimmick["range"][2].get<float>();
-            objectData.gimmick.range.z = gimmick["range"][1].get<float>();
-        }
-        if (gimmick.contains("axis")) {
-            objectData.gimmick.axis.x = gimmick["axis"][0].get<float>();
-            objectData.gimmick.axis.y = gimmick["axis"][2].get<float>();
-            objectData.gimmick.axis.z = gimmick["axis"][1].get<float>();
+        const nlohmann::json& gimmickJson = objectJson["gimmick"];
+        if (gimmickJson.contains("type")) {
+            std::string gimmickType = gimmickJson["type"].get<std::string>();
+            // ファクトリから対応するパラメータクラスを生成
+            objectData.gimmickParam = GimmickParamFactory::GetInstance()->Create(gimmickType);
+            
+            if (objectData.gimmickParam) {
+                objectData.gimmickParam->Parse(gimmickJson);
+            } else {
+                // 未対応ギミックの場合は従来のフォールバック処理（移行期間用）
+                objectData.gimmick.exists = true;
+                objectData.gimmick.type = gimmickType;
+                if (gimmickJson.contains("speed")) {
+                    objectData.gimmick.speed = gimmickJson["speed"].get<float>();
+                }
+                if (gimmickJson.contains("range")) {
+                    objectData.gimmick.range.x = gimmickJson["range"][0].get<float>();
+                    objectData.gimmick.range.y = gimmickJson["range"][2].get<float>();
+                    objectData.gimmick.range.z = gimmickJson["range"][1].get<float>();
+                }
+                if (gimmickJson.contains("axis")) {
+                    objectData.gimmick.axis.x = gimmickJson["axis"][0].get<float>();
+                    objectData.gimmick.axis.y = gimmickJson["axis"][2].get<float>();
+                    objectData.gimmick.axis.z = gimmickJson["axis"][1].get<float>();
+                }
+            }
         }
     }
 
@@ -311,5 +323,82 @@ void LevelDataLoader::LoadObject(const nlohmann::json& objectJson, LevelData& le
         for (const nlohmann::json& childJson : objectJson["children"]) {
             LoadObject(childJson, levelData);
         }
+    }
+}
+
+void LevelDataLoader::Save(const std::string& filePath, const LevelData& levelData)
+{
+    nlohmann::json root;
+    
+    if (!levelData.tileMaps.empty()) {
+        nlohmann::json tileMapsArray = nlohmann::json::array();
+        for (const auto& mapData : levelData.tileMaps) {
+            nlohmann::json mapJson;
+            mapJson["name"] = mapData.name;
+            mapJson["width"] = mapData.width;
+            mapJson["height"] = mapData.height;
+            mapJson["data"] = mapData.data;
+            tileMapsArray.push_back(mapJson);
+        }
+        root["tileMaps"] = tileMapsArray;
+    }
+
+    if (!levelData.playerSpawns.empty()) {
+        nlohmann::json spawnsArray = nlohmann::json::array();
+        for (const auto& spawn : levelData.playerSpawns) {
+            nlohmann::json spawnJson;
+            spawnJson["type"] = "PlayerSpawn";
+            nlohmann::json transform;
+            // ロード時の仕様 (x=[0], y=[2], z=[1]) に合わせて保存
+            transform["translation"] = { spawn.translation.x, spawn.translation.z, spawn.translation.y };
+            spawnJson["transform"] = transform;
+            spawnsArray.push_back(spawnJson);
+        }
+        root["objects"] = spawnsArray;
+    }
+
+    // objects等の動的オブジェクトも拡張する場合はここに追記
+    if (!levelData.objects.empty()) {
+        if (!root.contains("objects")) {
+            root["objects"] = nlohmann::json::array();
+        }
+        for (const auto& obj : levelData.objects) {
+            nlohmann::json objJson;
+            objJson["type"] = obj.type;
+            nlohmann::json transform;
+            // ロード時の仕様に合わせて保存
+            transform["translation"] = { obj.translation.x, obj.translation.z, obj.translation.y };
+            objJson["transform"] = transform;
+            
+            if (obj.hazard.exists) {
+                nlohmann::json hazard;
+                hazard["type"] = obj.hazard.type;
+                hazard["damage"] = obj.hazard.damage;
+                objJson["hazard"] = hazard;
+            }
+
+            // 新しいポリモーフィズム設計による保存
+            if (obj.gimmickParam) {
+                objJson["gimmick"] = obj.gimmickParam->Serialize();
+            } 
+            // 従来の互換性用
+            else if (obj.gimmick.exists) {
+                nlohmann::json gimmick;
+                gimmick["type"] = obj.gimmick.type;
+                gimmick["speed"] = obj.gimmick.speed;
+                gimmick["range"] = { obj.gimmick.range.x, obj.gimmick.range.z, obj.gimmick.range.y };
+                gimmick["axis"] = { obj.gimmick.axis.x, obj.gimmick.axis.z, obj.gimmick.axis.y };
+                objJson["gimmick"] = gimmick;
+            }
+            
+            // 他のプロパティが必要な場合は追加
+            root["objects"].push_back(objJson);
+        }
+    }
+
+    std::ofstream file(filePath);
+    if (file.is_open()) {
+        file << root.dump(2);
+        file.close();
     }
 }

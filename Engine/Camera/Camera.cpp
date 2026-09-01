@@ -161,3 +161,27 @@ Vector2 Camera::WorldToScreen(const Vector3& worldPosition) const
 
     return screenPosition;
 }
+
+Ray Camera::ScreenToRay(const Vector2& mousePos) const
+{
+    // マウスのスクリーン座標をNDC(-1.0f ～ 1.0f)に変換
+    float ndcX = (2.0f * mousePos.x) / static_cast<float>(WinApp::kClientWidth) - 1.0f;
+    float ndcY = 1.0f - (2.0f * mousePos.y) / static_cast<float>(WinApp::kClientHeight);
+
+    // NearClip平面上のNDC座標
+    Vector3 ndcNear{ndcX, ndcY, 0.0f};
+    // FarClip平面上のNDC座標
+    Vector3 ndcFar{ndcX, ndcY, 1.0f};
+
+    Matrix4x4 viewProjInv = MatrixMath::Inverse(viewProjectionMatrix_);
+
+    // ワールド座標系へ変換
+    Vector3 worldNear = MatrixMath::Transform(ndcNear, viewProjInv);
+    Vector3 worldFar = MatrixMath::Transform(ndcFar, viewProjInv);
+
+    Ray ray;
+    ray.origin = worldNear;
+    ray.direction = Normalize(worldFar - worldNear);
+
+    return ray;
+}

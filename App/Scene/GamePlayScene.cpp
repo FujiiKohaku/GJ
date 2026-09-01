@@ -41,7 +41,8 @@ void GamePlayScene::Initialize()
     if (!levelData.tileMaps.empty()) {
         mapData = levelData.tileMaps[0];
     }
-    mapChipStage_.Initialize(mapData);
+    // levelData 自体を渡して初期化する
+    mapChipStage_.Initialize(levelData);
 
     Vector3 playerStartPos = { 0.0f, 0.0f, 0.0f };
     if (!levelData.playerSpawns.empty()) {
@@ -80,6 +81,7 @@ void GamePlayScene::Initialize()
     collisionText_->SetOutlineColor({ 0.0f, 0.0f, 0.0f, 1.0f });
     collisionText_->SetOutlineWidth(2.0f);
     UpdateCollisionText();
+
     pageReveal_.InitializeIfRequested();
 }
 
@@ -98,11 +100,11 @@ void GamePlayScene::Update()
         return;
     }
 
-    player_->Update();
+    mapChipStage_.Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
+    player_->Update(mapChipStage_.GetGimmicks());
     UpdateFollowCamera();
     camera_->Update();
     skyBox_->Update(camera_.get());
-    mapChipStage_.Update();
     instructionText_->Update();
     UpdateCollisionText();
     collisionText_->Update();

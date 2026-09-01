@@ -13,6 +13,7 @@
 #include "SceneManager.h"
 #include "PageTransition.h"
 #include "TestScene.h"
+#include "EditorScene.h"
 #include <cmath>
 #include <algorithm>
 #include <numbers>
@@ -444,6 +445,14 @@ void ArchiveScene::Update()
 bool ArchiveScene::HandleInput()
 {
     Input* input = Input::GetInstance();
+    
+    // 開発用：F12でエディタへ遷移
+#ifndef NDEBUG
+    if (input->IsKeyTrigger(DIK_F12)) {
+        SceneManager::GetInstance()->SetNextScene(std::make_unique<EditorScene>());
+        return true;
+    }
+#endif
 
 	// タイトル画面の処理
     if (state_ == BookSelectState::TitleIdle) {
