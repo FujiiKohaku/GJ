@@ -66,7 +66,6 @@ void Renderer::Draw(SceneManager* sceneManager)
     postEffectManager_->PreDrawDepth();
     offscreenRenderer_->PreDraw(postEffectManager_->GetDepthDSVHandle());
     sceneManager->Draw3D();
-    DebugRenderer::GetInstance()->Draw();
     postEffectManager_->PostDrawDepth();
     offscreenRenderer_->PostDraw();
 
@@ -87,6 +86,9 @@ void Renderer::Draw(SceneManager* sceneManager)
     postEffectManager_->PostDrawDepth();
 
     postEffectManager_->ApplyAfterParticleDraw(sceneManager);
+
+    // デバッグ線はポストエフェクト(フォグ等)で消えないようにバックバッファへ直接描画する
+    DebugRenderer::GetInstance()->Draw();
 
     // 2D draw
     sceneManager->Draw2D();

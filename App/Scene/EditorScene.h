@@ -4,6 +4,7 @@
 #include "BaseScene.h"
 #include "Engine/Camera/Camera.h"
 #include "Engine/Network/UdpServer.h"
+#include "Engine/3D/SkyBox/SkyBox.h"
 #include <memory>
 #include <string>
 
@@ -25,6 +26,7 @@ private:
     std::unique_ptr<Camera> camera_;
     MapChipStage mapChipStage_;
     std::unique_ptr<UdpServer> udpServer_;
+    std::unique_ptr<SkyBox> skyBox_;
     
     // 現在選択中のパレット（ブロックの種類）
     int currentPalette_ = 1;

@@ -5,6 +5,8 @@
 #include "Engine/Logger/Logger.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/3D/SkinningObject3dManager.h"
+#include "Engine/3D/SkyBox/SkyBoxManager.h"
+#include "Engine/TextureManager/TextureManager.h"
 #include "Engine/LevelEditor/LevelDataLoader.h"
 #include "SceneManager.h"
 #include "StageSelectScene.h"
@@ -18,7 +20,78 @@
 
 namespace {
     constexpr const char* kStage1Json = "resources/Maps/stage1.json";
+    constexpr const char* kSkyBoxTexture = "resources/Textures/skybox.dds";
     constexpr int kUdpPort = 50000;
+    
+    // エディタ専用の巨大キャンバスサイズ
+    constexpr uint32_t kEditorCanvasWidth = 256;
+    constexpr uint32_t kEditorCanvasHeight = 64;
+
+    // ロードしたマップデータを巨大キャンバスに左下基準で拡張する
+    LevelData::TileMapData ExpandTileMapData(const LevelData::TileMapData& src, uint32_t targetWidth, uint32_t targetHeight) {
+        LevelData::TileMapData dest;
+        dest.name = src.name;
+        dest.width = targetWidth > src.width ? targetWidth : src.width;
+        dest.height = targetHeight > src.height ? targetHeight : src.height;
+        dest.data.resize(dest.width * dest.height, 0);
+
+        uint32_t offsetY = dest.height - src.height; // 上端の余白(これを足すことで元配列が下にシフトし、Y=0が保たれる)
+        
+        for (uint32_t sy = 0; sy < src.height; ++sy) {
+            for (uint32_t sx = 0; sx < src.width; ++sx) {
+                uint32_t destIndex = (sy + offsetY) * dest.width + sx;
+                uint32_t srcIndex = sy * src.width + sx;
+                dest.data[destIndex] = src.data[srcIndex];
+            }
+        }
+        return dest;
+    }
+
+    // セーブ時にブロックが存在する最小領域にトリミングする（左端・下端の余白は絶対座標がずれるため残す）
+    LevelData::TileMapData TrimTileMapData(const LevelData::TileMapData& src) {
+        uint32_t maxX = 0;
+        uint32_t minY = src.height; // yIndexが最小(一番上にあるブロック)
+        
+        bool hasBlock = false;
+        for (uint32_t y = 0; y < src.height; ++y) {
+            for (uint32_t x = 0; x < src.width; ++x) {
+                uint32_t index = y * src.width + x;
+                if (src.data[index] != 0) {
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    hasBlock = true;
+                }
+            }
+        }
+        
+        if (!hasBlock) {
+            LevelData::TileMapData dest = src;
+            dest.width = 1;
+            dest.height = 1;
+            dest.data = {0};
+            return dest;
+        }
+        
+        uint32_t destWidth = maxX + 1;
+        uint32_t destHeight = src.height - minY;
+        
+        LevelData::TileMapData dest;
+        dest.name = src.name;
+        dest.width = destWidth;
+        dest.height = destHeight;
+        dest.data.resize(destWidth * destHeight, 0);
+        
+        for (uint32_t dy = 0; dy < destHeight; ++dy) {
+            uint32_t sy = dy + minY;
+            for (uint32_t dx = 0; dx < destWidth; ++dx) {
+                uint32_t sx = dx;
+                uint32_t destIndex = dy * destWidth + dx;
+                uint32_t srcIndex = sy * src.width + sx;
+                dest.data[destIndex] = src.data[srcIndex];
+            }
+        }
+        return dest;
+    }
 }
 
 void EditorScene::Initialize()
@@ -38,9 +111,15 @@ void EditorScene::Initialize()
     LevelData levelData = loader.Load(kStage1Json);
     LevelData::TileMapData mapData{};
     if (!levelData.tileMaps.empty()) {
-        mapData = levelData.tileMaps[0];
+        mapData = ExpandTileMapData(levelData.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
     }
     mapChipStage_.Initialize(mapData);
+
+    // 背景(SkyBox)の初期化: これがないとポストエフェクト合成時に空中が透明扱いになりデバッグ線が消える
+    TextureManager::GetInstance()->LoadTexture(kSkyBoxTexture);
+    skyBox_ = std::make_unique<SkyBox>();
+    skyBox_->Initialize(DirectXCommon::GetInstance());
+    skyBox_->SetTexture(kSkyBoxTexture);
 
     // UDPサーバーの起動
     udpServer_ = std::make_unique<UdpServer>();
@@ -95,6 +174,10 @@ void EditorScene::Update()
     
     camera_->Update();
     mapChipStage_.Update();
+    
+    if (skyBox_) {
+        skyBox_->Update(camera_.get());
+    }
 }
 
 void EditorScene::Draw2D()
@@ -105,14 +188,17 @@ void EditorScene::Draw3D()
 {
     // グリッドの描画
     auto debugRenderer = DebugRenderer::GetInstance();
-    uint32_t width = mapChipStage_.GetField().GetBlockWidth();
-    uint32_t height = mapChipStage_.GetField().GetBlockHeight();
+    // グリッドは実際のブロック数ではなく、固定のキャンバスサイズ全体に引く
+    uint32_t width = kEditorCanvasWidth;
+    uint32_t height = kEditorCanvasHeight;
     
     float kChipWidth = 1.0f;
     float kChipHeight = 1.0f;
     Vector4 gridColor = { 1.0f, 0.0f, 0.0f, 1.0f }; // 赤
-    float thickness = 5.0f; // より太くする
-    float zPos = -2.0f; // ブロックより確実に手前に出す
+    float thickness = 2.5f; // 現在の太さの1/2に縮小
+    // 透視投影(パース)でズレて見えないよう、ブロックの前面(z=-0.5f)にぴったり合わせつつ、
+    // ブロックの面とZ-Fighting(重なって見えなくなる現象)を避けるため、ほんのわずかだけ手前にする
+    float zPos = -0.51f; 
     
     // 縦線
     for (uint32_t x = 0; x <= width; ++x) {
@@ -129,6 +215,10 @@ void EditorScene::Draw3D()
         debugRenderer->AddLine(start, end, gridColor, thickness);
     }
 
+    if (skyBox_) {
+        SkyBoxManager::GetInstance()->PreDraw();
+        skyBox_->Draw(DirectXCommon::GetInstance()->GetCommandList());
+    }
     Object3dManager::GetInstance()->PreDraw();
     mapChipStage_.Draw();
 }
@@ -154,15 +244,21 @@ void EditorScene::ProcessUdpCommand(const std::string& command)
         LevelDataLoader loader;
         LevelData levelData = loader.Load(filename);
         if (!levelData.tileMaps.empty()) {
-            mapChipStage_.Initialize(levelData.tileMaps[0]);
+            LevelData::TileMapData expandedData = ExpandTileMapData(levelData.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
+            mapChipStage_.Initialize(expandedData);
             Logger::Log("Loaded map: " + filename + "\n");
         }
     }
     else if (command.find("SAVE:") == 0) {
         std::string filename = command.substr(5);
+        LevelData::TileMapData rawData = mapChipStage_.GetField().GetTileMapData();
+        LevelData::TileMapData trimmedData = TrimTileMapData(rawData);
+        
         LevelData levelData;
-        LevelData::TileMapData mapData = mapChipStage_.GetField().GetTileMapData();
-        levelData.tileMaps.push_back(mapData);
+        levelData.tileMaps.push_back(trimmedData);
+        // ※ PlayerSpawn等のオブジェクト情報は現在ロード・保存に対応していないため一旦空とする。
+        // 将来的にはロード時に保持しておき、ここで再合成する必要がある。
+        
         LevelDataLoader loader;
         loader.Save(filename, levelData);
         Logger::Log("Saved map to: " + filename + "\n");
