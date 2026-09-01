@@ -4,6 +4,7 @@
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/Input/Input.h"
+#include "Engine/Audio/SoundManager.h"
 #include "Engine/PostEffect/PostEffectType.h"
 #include "Engine/Time/TimeManager.h"
 #include "Engine/math/MatrixMath.h"
@@ -22,6 +23,16 @@ constexpr const char* kPrintedPages = "resources/Models/StageSelectBook/PrintedP
 constexpr const char* kBookLeather = "resources/Models/StageSelectBook/BookLeather.png";
 constexpr const char* kStageCardModel =
     "StageSelectBook/StageCard.obj";
+constexpr const char* kPageTurnSoundName = "StageSelect.PageTurn";
+constexpr const char* kPageFlipSoundName = "StageSelect.PageFlip";
+constexpr const char* kPageRiffleSoundName = "StageSelect.PageRiffle";
+constexpr const char* kConfirmSoundName = "StageSelect.Confirm";
+constexpr const char* kBackSoundName = "StageSelect.Back";
+constexpr const char* kPageTurnSoundPath = "resources/Audio/StageSelect/page_turn.wav";
+constexpr const char* kPageFlipSoundPath = "resources/Audio/StageSelect/page_flip.wav";
+constexpr const char* kPageRiffleSoundPath = "resources/Audio/StageSelect/page_riffle.wav";
+constexpr const char* kConfirmSoundPath = "resources/Audio/StageSelect/confirm.wav";
+constexpr const char* kBackSoundPath = "resources/Audio/StageSelect/back.wav";
 
 constexpr const char* kArchiveRoomModel = "StageSelectBook/ArchiveRoom.obj";
 constexpr float kCameraApproachDuration = 2.4f;
@@ -73,10 +84,18 @@ void StageSelectScene::Initialize()
     InitializeOpeningPages();
     InitializeInterface();
 
+    SoundManager* audio = SoundManager::GetInstance();
+    audio->Load(kPageTurnSoundName, kPageTurnSoundPath, AudioCategory::SE);
+    audio->Load(kPageFlipSoundName, kPageFlipSoundPath, AudioCategory::SE);
+    audio->Load(kPageRiffleSoundName, kPageRiffleSoundPath, AudioCategory::SE);
+    audio->Load(kConfirmSoundName, kConfirmSoundPath, AudioCategory::SE);
+    audio->Load(kBackSoundName, kBackSoundPath, AudioCategory::SE);
+
     state_ = BookSelectState::CameraApproach;
     animationTime_ = 0.0f;
     pageTurnProgress_ = 0.0f;
     stageIndexChanged_ = false;
+    openingRifflePlayed_ = false;
     RefreshStageText();
     UpdateCardTransform(0.0f, 0.0f);
     UpdateCameraApproach(0.0f);
@@ -267,6 +286,7 @@ void StageSelectScene::Update()
     Input* input = Input::GetInstance();
 
     if (input->IsKeyTrigger(DIK_BACKSPACE)) {
+        SoundManager::GetInstance()->PlaySE(kBackSoundName, 0.65f);
         SceneManager::GetInstance()->SetNextScene(std::make_unique<TitleScene>());
         return;
     }
@@ -327,6 +347,10 @@ void StageSelectScene::UpdateCameraApproach(float deltaTime)
 {
     animationTime_ += deltaTime;
     const float progress = Clamp01(animationTime_ / kCameraApproachDuration);
+    if (!openingRifflePlayed_ && progress >= 0.24f) {
+        SoundManager::GetInstance()->PlaySE(kPageRiffleSoundName, 0.48f);
+        openingRifflePlayed_ = true;
+    }
     // Quintic easing starts and ends at rest without a sudden camera stop.
     const float eased = progress * progress * progress *
         (progress * (progress * 6.0f - 15.0f) + 10.0f);
@@ -469,6 +493,9 @@ void StageSelectScene::StartPageTurn(int32_t direction)
     if (state_ != BookSelectState::Idle) {
         return;
     }
+
+    SoundManager::GetInstance()->PlaySE(kPageTurnSoundName, 0.55f);
+    SoundManager::GetInstance()->PlaySE(kPageFlipSoundName, 0.72f);
 
     pageTurnDirection_ = direction;
     nextPrintSpreadIndex_ = (printSpreadIndex_ + direction + kPrintSpreadCount) % kPrintSpreadCount;
@@ -676,6 +703,7 @@ void StageSelectScene::RefreshStageText()
 void StageSelectScene::ConfirmStage()
 {
     state_ = BookSelectState::StageConfirmed;
+    SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.75f);
     const StageData& stage = stages_[currentStageIndex_];
     if (stage.opensTestScene) {
         SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());

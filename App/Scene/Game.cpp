@@ -166,6 +166,7 @@ void Game::Initialize()
 void Game::Update()
 {
     TimeManager::GetInstance()->Update();
+    SoundManager::GetInstance()->Update();
 
     // フレーム全体の開始
     Profiler::GetInstance()->BeginFrame();

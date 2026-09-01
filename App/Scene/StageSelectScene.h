@@ -89,4 +89,5 @@ private:
     float animationTime_ = 0.0f;
     float pageTurnProgress_ = 0.0f;
     bool stageIndexChanged_ = false;
+    bool openingRifflePlayed_ = false;
 };
