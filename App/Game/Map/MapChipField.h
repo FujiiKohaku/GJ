@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/LevelEditor/LevelData.h"
 #include "Engine/Math/MathStruct.h"
 #include <cstdint>
 #include <string>
@@ -13,7 +14,7 @@ enum class MapChipType {
 
 class MapChipField {
 public:
-    bool LoadMapChipCsv(const std::string& filePath);
+    void Initialize(const LevelData::TileMapData& tileMapData);
     void ResetMapChipData();
 
     MapChipType GetMapChipTypeByIndex(

@@ -10,7 +10,7 @@ class MapChipPlayer {
 public:
     ~MapChipPlayer();
 
-    void Initialize(Model* model, const MapChipField* mapChipField);
+    void Initialize(Model* model, const MapChipField* mapChipField, const Vector3& startPosition);
     void Update();
     void Draw();
 
@@ -26,7 +26,7 @@ private:
 
     std::unique_ptr<Object3d> object_;
     const MapChipField* mapChipField_ = nullptr;
-    Vector3 position_ = { 2.0f, 3.0f, -0.1f };
+    Vector3 position_ = { 0.0f, 0.0f, 0.0f };
     Vector3 velocity_ = { 0.0f, 0.0f, 0.0f };
     bool isGrounded_ = false;
     bool isColliding_ = false;

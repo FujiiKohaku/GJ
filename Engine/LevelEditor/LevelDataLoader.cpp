@@ -22,6 +22,33 @@ LevelData LevelDataLoader::Load(const std::string& filePath)
         }
     }
 
+    if (jsonData.contains("objects")) {
+        for (const nlohmann::json& objectJson : jsonData["objects"]) {
+            LoadObject(objectJson, levelData);
+        }
+    }
+
+    if (jsonData.contains("tileMaps")) {
+        for (const nlohmann::json& mapJson : jsonData["tileMaps"]) {
+            LevelData::TileMapData tileMap {};
+            if (mapJson.contains("name")) {
+                tileMap.name = mapJson["name"].get<std::string>();
+            }
+            if (mapJson.contains("width")) {
+                tileMap.width = mapJson["width"].get<uint32_t>();
+            }
+            if (mapJson.contains("height")) {
+                tileMap.height = mapJson["height"].get<uint32_t>();
+            }
+            if (mapJson.contains("data")) {
+                for (const auto& dataVal : mapJson["data"]) {
+                    tileMap.data.push_back(dataVal.get<int32_t>());
+                }
+            }
+            levelData.tileMaps.push_back(tileMap);
+        }
+    }
+
     return levelData;
 }
 

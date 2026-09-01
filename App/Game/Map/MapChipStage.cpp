@@ -7,15 +7,13 @@
 
 MapChipStage::~MapChipStage() = default;
 
-bool MapChipStage::Initialize(
-    const std::string& csvPath,
+void MapChipStage::Initialize(
+    const LevelData::TileMapData& tileMapData,
     const std::string& texturePath)
 {
     blockObjects_.clear();
     gimmicks_.clear();
-    if (!field_.LoadMapChipCsv(csvPath)) {
-        return false;
-    }
+    field_.Initialize(tileMapData);
 
     Model* blockModel =
         ModelManager::GetInstance()->CreateCube(texturePath);
@@ -55,7 +53,6 @@ bool MapChipStage::Initialize(
             blockObjects_.push_back(std::move(block));
         }
     }
-    return true;
 }
 
 void MapChipStage::Update()
