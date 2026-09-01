@@ -4,40 +4,27 @@
 #include <sstream>
 #include <stdexcept>
 
-bool MapChipField::LoadMapChipCsv(const std::string& filePath)
+void MapChipField::Initialize(const LevelData::TileMapData& tileMapData)
 {
-    std::ifstream file(filePath);
-    if (!file.is_open()) {
-        return false;
-    }
-
     ResetMapChipData();
 
-    std::string line;
-    while (std::getline(file, line)) {
-        std::istringstream lineStream(line);
-        std::vector<MapChipType> row;
-        std::string value;
-
-        while (std::getline(lineStream, value, ',')) {
-            int typeId = 0;
-            try {
-                typeId = std::stoi(value);
-            } catch (const std::invalid_argument&) {
-                typeId = 0;
-            } catch (const std::out_of_range&) {
-                typeId = 0;
-            }
-            MapChipType type = static_cast<MapChipType>(typeId);
-            row.push_back(type);
-        }
-
-        if (!row.empty()) {
-            mapChipData_.push_back(row);
-        }
+    if (tileMapData.width == 0 || tileMapData.height == 0) {
+        return;
     }
 
-    return !mapChipData_.empty();
+    uint32_t index = 0;
+    for (uint32_t y = 0; y < tileMapData.height; ++y) {
+        std::vector<MapChipType> row;
+        for (uint32_t x = 0; x < tileMapData.width; ++x) {
+            if (index < tileMapData.data.size()) {
+                row.push_back(static_cast<MapChipType>(tileMapData.data[index]));
+            } else {
+                row.push_back(MapChipType::Blank);
+            }
+            index++;
+        }
+        mapChipData_.push_back(row);
+    }
 }
 
 void MapChipField::ResetMapChipData()

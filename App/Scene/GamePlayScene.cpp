@@ -10,6 +10,7 @@
 #include "Engine/Logger/Logger.h"
 #include "Engine/PostEffect/PostEffectType.h"
 #include "Engine/TextureManager/TextureManager.h"
+#include "Engine/LevelEditor/LevelDataLoader.h"
 #include "SceneManager.h"
 #include "StageSelectScene.h"
 #include <string>
@@ -17,7 +18,7 @@
 namespace {
 constexpr const char* kSkyBoxTexture = "resources/Textures/skybox.dds";
 constexpr const char* kMapChipTexture = "resources/Textures/checkerboard.png";
-constexpr const char* kMapChipCsv = "resources/Maps/blocks.csv";
+constexpr const char* kStage1Json = "resources/Maps/stage1.json";
 constexpr float kCameraDistance = 15.0f;
 constexpr const char* kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
@@ -32,14 +33,24 @@ void GamePlayScene::Initialize()
     Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
     SkinningObject3dManager::GetInstance()->SetDefaultCamera(camera_.get());
 
-    if (!mapChipStage_.Initialize(kMapChipCsv)) {
-        Logger::Log("GamePlayScene: Failed to load map chip CSV");
+    LevelDataLoader loader;
+    LevelData levelData = loader.Load(kStage1Json);
+
+    LevelData::TileMapData mapData{};
+    if (!levelData.tileMaps.empty()) {
+        mapData = levelData.tileMaps[0];
+    }
+    mapChipStage_.Initialize(mapData);
+
+    Vector3 playerStartPos = { 0.0f, 0.0f, 0.0f };
+    if (!levelData.playerSpawns.empty()) {
+        playerStartPos = levelData.playerSpawns[0].translation;
     }
 
     Model* playerModel =
         ModelManager::GetInstance()->CreatePlane(kMapChipTexture);
     player_ = std::make_unique<MapChipPlayer>();
-    player_->Initialize(playerModel, &mapChipStage_.GetField());
+    player_->Initialize(playerModel, &mapChipStage_.GetField(), playerStartPos);
     UpdateFollowCamera();
     camera_->Update();
 

@@ -11,8 +11,8 @@ class MapChipStage {
 public:
     ~MapChipStage();
 
-    bool Initialize(
-        const std::string& csvPath,
+    void Initialize(
+        const LevelData::TileMapData& tileMapData,
         const std::string& texturePath =
             "resources/Textures/checkerboard.png");
     void Update();

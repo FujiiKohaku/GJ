@@ -96,7 +96,15 @@ struct LevelData {
         Vector3 rotation;
     };
 
+    struct TileMapData {
+        std::string name;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        std::vector<int32_t> data;
+    };
+
     std::vector<ObjectData> objects;
     std::vector<PlayerSpawnData> playerSpawns;
     std::vector<EnemySpawnData> enemies;
+    std::vector<TileMapData> tileMaps;
 };

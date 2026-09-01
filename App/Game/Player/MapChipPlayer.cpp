@@ -19,8 +19,9 @@ constexpr float kCollisionEpsilon = 0.0001f;
 
 MapChipPlayer::~MapChipPlayer() = default;
 
-void MapChipPlayer::Initialize(Model* model, const MapChipField* mapChipField)
+void MapChipPlayer::Initialize(Model* model, const MapChipField* mapChipField, const Vector3& startPosition)
 {
+    position_ = startPosition;
     mapChipField_ = mapChipField;
     object_ = std::make_unique<Object3d>();
     object_->Initialize(Object3dManager::GetInstance());
