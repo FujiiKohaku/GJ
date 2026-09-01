@@ -9,6 +9,7 @@
 #include "Engine/3D/Object3d.h"
 #include <memory>
 #include <string>
+#include <list>
 
 class EditorScene : public BaseScene {
 public:
@@ -54,4 +55,17 @@ private:
     void* toolProcessHandle_ = nullptr;
     
     LevelData::ObjectData* GetSelectedGimmick();
+
+    // --- Undo / Redo 用の履歴管理 ---
+    static const size_t kMaxHistory = 30; // 履歴の最大保存数
+    std::list<LevelData> history_;
+    std::list<LevelData>::iterator historyCurrent_;
+    bool isDragging_ = false; // マウスドラッグ操作中かどうかのトラッキング
+    bool hasUnsavedChanges_ = false; // 値が変更され、スナップショット保存待ちか
+    
+    // 現在の状態を履歴に保存する
+    void SaveSnapshot();
+    // 履歴を戻す/進める
+    void Undo();
+    void Redo();
 };

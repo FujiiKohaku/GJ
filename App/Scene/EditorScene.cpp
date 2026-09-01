@@ -167,6 +167,10 @@ void EditorScene::Initialize()
         toolProcessHandle_ = pi.hProcess;
         CloseHandle(pi.hThread);
     }
+
+    // 初期状態を履歴に保存
+    historyCurrent_ = history_.end();
+    SaveSnapshot();
 }
 
 void EditorScene::Finalize()
@@ -198,6 +202,22 @@ void EditorScene::Update()
 #endif
 
     if (!ignoreKeyboard) {
+        // Undo / Redo の入力処理
+        bool isCtrl = input->IsKeyPressed(DIK_LCONTROL) || input->IsKeyPressed(DIK_RCONTROL);
+        bool isShift = input->IsKeyPressed(DIK_LSHIFT) || input->IsKeyPressed(DIK_RSHIFT);
+        
+        if (isCtrl) {
+            if (input->IsKeyTrigger(DIK_Z)) {
+                if (isShift) {
+                    Redo(); // Ctrl + Shift + Z
+                } else {
+                    Undo(); // Ctrl + Z
+                }
+            } else if (input->IsKeyTrigger(DIK_Y)) {
+                Redo(); // Ctrl + Y
+            }
+        }
+
         // BackSpaceキーでステージセレクト（Archive）へ戻る
         if (input->IsKeyTrigger(DIK_BACKSPACE)) {
             SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
@@ -224,6 +244,12 @@ void EditorScene::Update()
     
     if (skyBox_) {
         skyBox_->Update(camera_.get());
+    }
+
+    // 未保存の変更があり、かつマウスがドラッグ中でない（離された）状態ならスナップショットを保存
+    if (hasUnsavedChanges_ && !input->IsMousePressed(0) && !input->IsMousePressed(1)) {
+        SaveSnapshot();
+        hasUnsavedChanges_ = false;
     }
 }
 
@@ -502,6 +528,8 @@ void EditorScene::UpdateRaycastEdit()
                                 mapChipStage_.Initialize(currentLevelData_);
                             }
                             
+                            hasUnsavedChanges_ = true;
+                            
                             if (playerPreview_) {
                                 playerPreview_->SetTranslate(newPos);
                                 playerPreview_->Update();
@@ -524,6 +552,7 @@ void EditorScene::UpdateRaycastEdit()
                                 
                                 if (!isPlayerSpawnHere) {
                                     mapChipStage_.GetField().SetMapChipTypeByIndex(static_cast<uint32_t>(xIndex), static_cast<uint32_t>(yIndex), type);
+                                    hasUnsavedChanges_ = true;
                                     
                                     // ギミック（ObjectData）の同期処理
                                     // まず古いデータを消す
@@ -567,5 +596,71 @@ void EditorScene::UpdateRaycastEdit()
                 }
             }
         }
+    }
+}
+
+void EditorScene::SaveSnapshot()
+{
+    // 現在位置より先の履歴（Redo用）を削除
+    if (historyCurrent_ != history_.end()) {
+        auto eraseStart = historyCurrent_;
+        ++eraseStart;
+        if (eraseStart != history_.end()) {
+            history_.erase(eraseStart, history_.end());
+        }
+    }
+
+    // スナップショットを保存
+    history_.push_back(currentLevelData_);
+
+    // 最大数を超えたら古いものを削除
+    if (history_.size() > kMaxHistory) {
+        history_.pop_front();
+    }
+
+    // 現在位置を末尾に向ける
+    historyCurrent_ = history_.end();
+    --historyCurrent_;
+}
+
+void EditorScene::Undo()
+{
+    if (history_.empty() || historyCurrent_ == history_.begin()) {
+        return; // これ以上戻せない
+    }
+
+    --historyCurrent_;
+    currentLevelData_ = *historyCurrent_;
+
+    DirectXCommon::GetInstance()->WaitForGPU();
+    mapChipStage_.Initialize(currentLevelData_);
+
+    if (playerPreview_ && !currentLevelData_.playerSpawns.empty()) {
+        playerPreview_->SetTranslate(currentLevelData_.playerSpawns[0].translation);
+        playerPreview_->Update();
+    }
+}
+
+void EditorScene::Redo()
+{
+    if (history_.empty()) {
+        return;
+    }
+
+    auto nextIt = historyCurrent_;
+    ++nextIt;
+    if (nextIt == history_.end()) {
+        return; // これ以上進めない
+    }
+
+    historyCurrent_ = nextIt;
+    currentLevelData_ = *historyCurrent_;
+
+    DirectXCommon::GetInstance()->WaitForGPU();
+    mapChipStage_.Initialize(currentLevelData_);
+
+    if (playerPreview_ && !currentLevelData_.playerSpawns.empty()) {
+        playerPreview_->SetTranslate(currentLevelData_.playerSpawns[0].translation);
+        playerPreview_->Update();
     }
 }
