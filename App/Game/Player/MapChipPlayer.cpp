@@ -1,4 +1,6 @@
 #include "MapChipPlayer.h"
+#include "App/Game/Gimmick/BaseMapChipGimmick.h"
+#include "Engine/Logger/Logger.h"
 
 #include "App/Game/Map/MapChipField.h"
 #include "Engine/3D/Object3d.h"
@@ -33,10 +35,26 @@ void MapChipPlayer::Initialize(Model* model, const MapChipField* mapChipField, c
     object_->Update();
 }
 
-void MapChipPlayer::Update()
+void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmicks)
 {
     if (!object_ || !mapChipField_) {
         return;
+    }
+
+    // フェーズ1: Base Movement (足場の追従)
+    if (baseGimmick_) {
+        Vector3 delta = baseGimmick_->GetDeltaPosition();
+        position_.x += delta.x;
+        position_.y += delta.y;
+        position_.z += delta.z;
+        
+        // 追従後に壁にめり込んでいるかチェックし、Crush判定（Cプラン: ログ出力のみ）
+        Vector3 checkPos = position_;
+        if (ResolveHorizontalCollision(checkPos) || ResolveVerticalCollision(checkPos)) {
+            Logger::Log("Crush! (Player squished between moving block and wall)\n");
+            // Cプラン: ゲーム進行を止めないため、ログのみで実際には壁から押し出された位置を適用する
+            position_ = checkPos;
+        }
     }
 
     float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
@@ -66,8 +84,10 @@ void MapChipPlayer::Update()
     }
 
     isColliding_ = false;
-    MoveHorizontal(deltaTime);
-    MoveVertical(deltaTime);
+    baseGimmick_ = nullptr; // 毎フレーム着地判定で更新するためクリア
+    
+    MoveHorizontal(deltaTime, dynamicGimmicks);
+    MoveVertical(deltaTime, dynamicGimmicks);
 
     object_->SetTranslate(position_);
     object_->Update();
@@ -95,10 +115,16 @@ bool MapChipPlayer::IsColliding() const
     return isColliding_;
 }
 
-void MapChipPlayer::MoveHorizontal(float deltaTime)
+void MapChipPlayer::MoveHorizontal(float deltaTime, const std::vector<BaseMapChipGimmick*>& dynamicGimmicks)
 {
     Vector3 nextPosition = position_;
     nextPosition.x += velocity_.x * deltaTime;
+    
+    if (ResolveDynamicCollision(nextPosition, dynamicGimmicks, true)) {
+        velocity_.x = 0.0f;
+        isColliding_ = true;
+    }
+    
     if (ResolveHorizontalCollision(nextPosition)) {
         velocity_.x = 0.0f;
         isColliding_ = true;
@@ -106,12 +132,18 @@ void MapChipPlayer::MoveHorizontal(float deltaTime)
     position_.x = nextPosition.x;
 }
 
-void MapChipPlayer::MoveVertical(float deltaTime)
+void MapChipPlayer::MoveVertical(float deltaTime, const std::vector<BaseMapChipGimmick*>& dynamicGimmicks)
 {
     velocity_.y += kGravity * deltaTime;
     Vector3 nextPosition = position_;
     nextPosition.y += velocity_.y * deltaTime;
     isGrounded_ = false;
+    
+    if (ResolveDynamicCollision(nextPosition, dynamicGimmicks, false)) {
+        velocity_.y = 0.0f;
+        isColliding_ = true;
+    }
+    
     if (ResolveVerticalCollision(nextPosition)) {
         velocity_.y = 0.0f;
         isColliding_ = true;
@@ -134,7 +166,7 @@ bool MapChipPlayer::ResolveHorizontalCollision(Vector3& nextPosition)
 
             const Vector3 blockPosition =
                 mapChipField_->GetMapChipPositionByIndex(xIndex, yIndex);
-            const AABB playerBox = {
+            AABB playerBox = {
                 nextPosition,
                 { kPlayerSize, kPlayerSize, 0.2f }
             };
@@ -148,12 +180,12 @@ bool MapChipPlayer::ResolveHorizontalCollision(Vector3& nextPosition)
                 continue;
             }
 
-            if (velocity_.x > 0.0f) {
-                nextPosition.x = blockPosition.x - kPlayerSize;
-            } else if (velocity_.x < 0.0f) {
-                nextPosition.x = blockPosition.x + kPlayerSize;
+            if (std::abs(hit.normal.x) > 0.0f) {
+                nextPosition.x -= hit.normal.x * hit.penetration;
+                resolved = true;
             }
-            resolved = true;
+            // 連続する衝突のため更新
+            playerBox.center = nextPosition;
         }
     }
     return resolved;
@@ -174,7 +206,7 @@ bool MapChipPlayer::ResolveVerticalCollision(Vector3& nextPosition)
 
             const Vector3 blockPosition =
                 mapChipField_->GetMapChipPositionByIndex(xIndex, yIndex);
-            const AABB playerBox = {
+            AABB playerBox = {
                 nextPosition,
                 { kPlayerSize, kPlayerSize, 0.2f }
             };
@@ -188,14 +220,56 @@ bool MapChipPlayer::ResolveVerticalCollision(Vector3& nextPosition)
                 continue;
             }
 
-            if (velocity_.y > 0.0f) {
-                nextPosition.y = blockPosition.y - kPlayerSize;
-            } else if (velocity_.y < 0.0f) {
-                nextPosition.y = blockPosition.y + kPlayerSize;
-                isGrounded_ = true;
+            if (std::abs(hit.normal.y) > 0.0f) {
+                nextPosition.y -= hit.normal.y * hit.penetration;
+                resolved = true;
+                if (hit.normal.y < 0.0f && velocity_.y <= 0.0f) {
+                    isGrounded_ = true;
+                }
             }
-            resolved = true;
+            // 連続する衝突のため更新
+            playerBox.center = nextPosition;
         }
     }
+    return resolved;
+}
+
+bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::vector<BaseMapChipGimmick*>& dynamicGimmicks, bool isHorizontal)
+{
+    bool resolved = false;
+    AABB playerBox = {
+        nextPosition,
+        { kPlayerSize, kPlayerSize, 0.2f }
+    };
+    
+    for (BaseMapChipGimmick* gimmick : dynamicGimmicks) {
+        AABB blockBox = gimmick->GetAABB();
+        CollisionHit hit = CollisionManager::Intersect(playerBox, blockBox);
+        if (!hit.isHit || hit.penetration <= kCollisionEpsilon) {
+            continue;
+        }
+        
+        if (isHorizontal) {
+            if (std::abs(hit.normal.x) > 0.0f) {
+                // ブロックの方向（hit.normal）の逆へ押し出す
+                nextPosition.x -= hit.normal.x * hit.penetration;
+                resolved = true;
+            }
+        } else {
+            if (std::abs(hit.normal.y) > 0.0f) {
+                nextPosition.y -= hit.normal.y * hit.penetration;
+                resolved = true;
+                
+                // ブロックがプレイヤーの下にある（hit.normal.y が負）場合に着地判定
+                if (hit.normal.y < 0.0f && velocity_.y <= 0.0f) {
+                    isGrounded_ = true;
+                    baseGimmick_ = gimmick;
+                }
+            }
+        }
+        
+        playerBox.center = nextPosition; // 連続する衝突のため更新
+    }
+    
     return resolved;
 }

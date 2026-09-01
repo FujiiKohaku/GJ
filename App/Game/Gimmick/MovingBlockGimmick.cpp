@@ -17,6 +17,10 @@ bool MovingBlockGimmick::Initialize(
         range_ = gimmickData->range;
         axis_ = gimmickData->axis;
     }
+    
+    currentPosition_ = basePosition_;
+    previousPosition_ = basePosition_;
+
     Model* model =
         ModelManager::GetInstance()->CreateCube(texturePath);
     if (model == nullptr) {
@@ -39,6 +43,8 @@ void MovingBlockGimmick::Update()
         return;
     }
 
+    previousPosition_ = currentPosition_;
+
     if (!isEditorMode_) {
         elapsedTime_ += TimeManager::GetInstance()->GetDeltaTime();
     }
@@ -54,7 +60,8 @@ void MovingBlockGimmick::Update()
     position.y += axis_.y * wave * distance;
     position.z += axis_.z * wave * distance;
     
-    object_->SetTranslate(position);
+    currentPosition_ = position;
+    object_->SetTranslate(currentPosition_);
     object_->Update();
 }
 
@@ -63,4 +70,18 @@ void MovingBlockGimmick::Draw()
     if (object_) {
         object_->Draw();
     }
+}
+
+AABB MovingBlockGimmick::GetAABB() const
+{
+    // ブロックのサイズは現状 1.0f x 1.0f x 1.0f と仮定
+    AABB aabb;
+    aabb.center = currentPosition_;
+    aabb.size = {1.0f, 1.0f, 1.0f};
+    return aabb;
+}
+
+Vector3 MovingBlockGimmick::GetDeltaPosition() const
+{
+    return currentPosition_ - previousPosition_;
 }

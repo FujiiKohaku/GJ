@@ -100,11 +100,11 @@ void GamePlayScene::Update()
         return;
     }
 
-    player_->Update();
+    mapChipStage_.Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
+    player_->Update(mapChipStage_.GetGimmicks());
     UpdateFollowCamera();
     camera_->Update();
     skyBox_->Update(camera_.get());
-    mapChipStage_.Update();
     instructionText_->Update();
     UpdateCollisionText();
     collisionText_->Update();

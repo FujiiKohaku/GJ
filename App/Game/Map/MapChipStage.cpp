@@ -113,3 +113,13 @@ MapChipField& MapChipStage::GetField()
 {
     return field_;
 }
+
+std::vector<BaseMapChipGimmick*> MapChipStage::GetGimmicks() const
+{
+    std::vector<BaseMapChipGimmick*> result;
+    result.reserve(gimmicks_.size());
+    for (const auto& gimmick : gimmicks_) {
+        result.push_back(gimmick.get());
+    }
+    return result;
+}

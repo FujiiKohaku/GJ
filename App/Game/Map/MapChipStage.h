@@ -22,6 +22,8 @@ public:
     MapChipField& GetField();
     
     void SetEditorMode(bool isEditor) { isEditorMode_ = isEditor; }
+    
+    std::vector<BaseMapChipGimmick*> GetGimmicks() const;
 
 private:
     MapChipField field_;

@@ -180,10 +180,17 @@ void EditorScene::Update()
     Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
     SkinningObject3dManager::GetInstance()->SetDefaultCamera(camera_.get());
 
-    // BackSpaceキーでステージセレクト（Archive）へ戻る
-    if (input->IsKeyTrigger(DIK_BACKSPACE)) {
-        SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
-        return;
+    bool ignoreKeyboard = false;
+#ifdef USE_IMGUI
+    ignoreKeyboard = ImGui::GetIO().WantCaptureKeyboard;
+#endif
+
+    if (!ignoreKeyboard) {
+        // BackSpaceキーでステージセレクト（Archive）へ戻る
+        if (input->IsKeyTrigger(DIK_BACKSPACE)) {
+            SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
+            return;
+        }
     }
 
     // UDP 受信
@@ -318,8 +325,22 @@ void EditorScene::DrawImGui()
                 selectedGimmick->gimmick.range.x = static_cast<float>(moveDistanceInt);
             }
             
-            // 移動方向(Axis)
-            ImGui::DragFloat3("Move Axis (X,Y,Z)", &selectedGimmick->gimmick.axis.x, 0.1f, -1.0f, 1.0f);
+            // 移動方向(Axis)をコンボボックスで選択
+            const char* axisItems[] = { "Up (+Y)", "Down (-Y)", "Left (-X)", "Right (+X)" };
+            int currentItem = -1;
+            
+            if (selectedGimmick->gimmick.axis.y > 0.5f) currentItem = 0;
+            else if (selectedGimmick->gimmick.axis.y < -0.5f) currentItem = 1;
+            else if (selectedGimmick->gimmick.axis.x < -0.5f) currentItem = 2;
+            else if (selectedGimmick->gimmick.axis.x > 0.5f) currentItem = 3;
+            else currentItem = 0; // フォールバック
+            
+            if (ImGui::Combo("Move Direction", &currentItem, axisItems, IM_ARRAYSIZE(axisItems))) {
+                if (currentItem == 0) selectedGimmick->gimmick.axis = { 0.0f, 1.0f, 0.0f };
+                else if (currentItem == 1) selectedGimmick->gimmick.axis = { 0.0f, -1.0f, 0.0f };
+                else if (currentItem == 2) selectedGimmick->gimmick.axis = { -1.0f, 0.0f, 0.0f };
+                else if (currentItem == 3) selectedGimmick->gimmick.axis = { 1.0f, 0.0f, 0.0f };
+            }
         } else {
             ImGui::Text("Type: %s", selectedGimmick->type.c_str());
             ImGui::Text("No editable gimmick properties.");
@@ -536,7 +557,7 @@ void EditorScene::UpdateRaycastEdit()
                                         newData.gimmick.exists = true;
                                         newData.gimmick.type = "MovingBlock";
                                         newData.gimmick.speed = 2.0f;     // デフォルト
-                                        newData.gimmick.range = {1.5f, 0.0f, 0.0f}; // Range.x を幅として使用
+                                        newData.gimmick.range = {2.0f, 0.0f, 0.0f}; // Range.x を幅として使用
                                         newData.gimmick.axis = {0.0f, 1.0f, 0.0f};  // Y軸移動
                                         
                                         currentLevelData_.objects.push_back(newData);

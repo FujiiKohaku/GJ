@@ -2,6 +2,7 @@
 
 #include "Engine/Math/MathStruct.h"
 #include "Engine/LevelEditor/LevelData.h"
+#include "Engine/CollisionManager/CollisionManager.h"
 #include <string>
 
 class BaseMapChipGimmick {
@@ -15,4 +16,7 @@ public:
     virtual void Update() = 0;
     virtual void Draw() = 0;
     virtual void SetEditorMode(bool isEditorMode) {}
+    
+    virtual AABB GetAABB() const { return AABB(); }
+    virtual Vector3 GetDeltaPosition() const { return {0.0f, 0.0f, 0.0f}; }
 };
