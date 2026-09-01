@@ -1,4 +1,4 @@
-#include "StageSelectScene.h"
+#include "ArchiveScene.h"
 
 #include "Engine/2D/Text/TextRenderer.h"
 #include "Engine/2D/SpriteManager.h"
@@ -18,12 +18,10 @@
 #include <numbers>
 
 namespace {
-constexpr const char* kDefaultFont =
-    "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
+constexpr const char* kDefaultFont ="resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
 constexpr const char* kPrintedPages = "resources/Models/StageSelectBook/PrintedPages.png";
 constexpr const char* kBookLeather = "resources/Models/StageSelectBook/BookLeather.png";
-constexpr const char* kStageCardModel =
-    "StageSelectBook/StageCard.obj";
+constexpr const char* kStageCardModel ="StageSelectBook/StageCard.obj";
 constexpr const char* kPageTurnSoundName = "StageSelect.PageTurn";
 constexpr const char* kPageFlipSoundName = "StageSelect.PageFlip";
 constexpr const char* kPageRiffleSoundName = "StageSelect.PageRiffle";
@@ -51,7 +49,7 @@ constexpr float kCardCloseDuration = 0.22f;
 constexpr float kPageTurnDuration = 0.62f;
 constexpr float kCardRestY = 0.35f;
 constexpr float kCardHiddenY = -2.35f;
-constexpr uint32_t kTurningPageStripCount = 24;
+constexpr uint32_t kTurningPageStripCount = 48;
 constexpr uint32_t kOpeningPageCount = 24;
 constexpr uint32_t kOpeningPageStripCount = 16;
 constexpr uint32_t kPrintPageCount = 8;
@@ -63,19 +61,28 @@ constexpr float kTurningPageBaseZ = -0.19f;
 constexpr float kClosedBookYaw = -std::numbers::pi_v<float> * 0.5f;
 constexpr float kClosedBookHingeOffset = 0.18f;
 
-// Archive-only shader modes: paper=3, leather=4, brass=5.
-void SetArchiveMaterial(Object3d* object, int mode, float u = 0.0f, float width = 1.0f)
+enum class ArchiveMaterialMode : int32_t {
+    Paper = 3,
+    Leather = 4,
+    Brass = 5,
+};
+
+// 本・紙・金具に資料庫専用の質感を設定する補助関数。
+void SetArchiveMaterial(
+    Object3d* object,
+    ArchiveMaterialMode mode,
+    float u = 0.0f,
+    float width = 1.0f)
 {
     Material* material = object->GetMaterial();
-    material->enableLighting = mode;
+    material->enableLighting = static_cast<int32_t>(mode);
     material->enableEnvironmentMap = 0;
     material->environmentCoefficient = 0.0f; // Contact shadow strength in paper mode.
-    material->uvTransform = MatrixMath::MakeAffineMatrix(
-        { width, 1.0f, 1.0f }, Vector3 { 0.0f, 0.0f, 0.0f }, { u, 0.0f, 0.0f });
+    material->uvTransform = MatrixMath::MakeAffineMatrix({ width, 1.0f, 1.0f }, Vector3 { 0.0f, 0.0f, 0.0f }, { u, 0.0f, 0.0f });
 }
 }
 
-void StageSelectScene::Initialize()
+void ArchiveScene::Initialize()
 {
     SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
     SceneManager::GetInstance()->SetArchiveApproach(0.0f);
@@ -104,27 +111,27 @@ void StageSelectScene::Initialize()
     EnterTitleMode();
 }
 
-void StageSelectScene::Finalize()
+void ArchiveScene::Finalize()
 {
     Object3dManager::GetInstance()->SetDefaultCamera(nullptr);
 }
 
-void StageSelectScene::InitializeStageData()
+void ArchiveScene::InitializeStageData()
 {
     StageData gamePlayStage;
     gamePlayStage.name = "STAGE 01  GAME PLAY";
     gamePlayStage.description = "MAP CHIP COLLISION TEST";
-    gamePlayStage.opensTestScene = false;
+    gamePlayStage.destination = StageDestination::GamePlay;
     stages_.push_back(gamePlayStage);
 
     StageData testStage;
     testStage.name = "STAGE 02  TEST SCENE";
     testStage.description = "ENGINE FEATURE TEST";
-    testStage.opensTestScene = true;
+    testStage.destination = StageDestination::Test;
     stages_.push_back(testStage);
 }
 
-void StageSelectScene::InitializeBookObjects()
+void ArchiveScene::InitializeBookObjects()
 {
     Object3dManager* objectManager = Object3dManager::GetInstance();
     ModelManager* modelManager = ModelManager::GetInstance();
@@ -139,7 +146,7 @@ void StageSelectScene::InitializeBookObjects()
         *cover = std::make_unique<Object3d>();
         (*cover)->Initialize(objectManager);
         (*cover)->SetModel(modelManager->CreateCube(kBookLeather));
-        SetArchiveMaterial(cover->get(), 4);
+        SetArchiveMaterial(cover->get(), ArchiveMaterialMode::Leather);
     }
 
     for (uint32_t index = 0; index < 8; ++index) {
@@ -147,7 +154,7 @@ void StageSelectScene::InitializeBookObjects()
         fitting->Initialize(objectManager);
         fitting->SetModel(modelManager->CreateCube("resources/Textures/white.png"));
         fitting->SetColor({ 0.65f, 0.40f, 0.12f, 1.0f });
-        SetArchiveMaterial(fitting.get(), 5);
+        SetArchiveMaterial(fitting.get(), ArchiveMaterialMode::Brass);
         bookFittings_.push_back(std::move(fitting));
     }
 
@@ -156,21 +163,21 @@ void StageSelectScene::InitializeBookObjects()
     bookSpine_->SetModel(modelManager->CreateCube(kBookLeather));
     bookSpine_->SetScale({ 0.24f, 5.45f, 0.62f });
     bookSpine_->SetTranslate({ 0.0f, -0.15f, -0.02f });
-    SetArchiveMaterial(bookSpine_.get(), 4);
+    SetArchiveMaterial(bookSpine_.get(), ArchiveMaterialMode::Leather);
 
     leftPageBlock_ = std::make_unique<Object3d>();
     leftPageBlock_->Initialize(objectManager);
     SetPrintedPage(leftPageBlock_.get(), 0);
     leftPageBlock_->SetScale({ 4.45f, 5.05f, 0.24f });
     leftPageBlock_->SetTranslate({ -2.27f, -0.08f, -0.04f });
-    SetArchiveMaterial(leftPageBlock_.get(), 3);
+    SetArchiveMaterial(leftPageBlock_.get(), ArchiveMaterialMode::Paper);
 
     rightPageBlock_ = std::make_unique<Object3d>();
     rightPageBlock_->Initialize(objectManager);
     SetPrintedPage(rightPageBlock_.get(), 1);
     rightPageBlock_->SetScale({ 4.45f, 5.05f, 0.24f });
     rightPageBlock_->SetTranslate({ 2.27f, -0.08f, -0.04f });
-    SetArchiveMaterial(rightPageBlock_.get(), 3);
+    SetArchiveMaterial(rightPageBlock_.get(), ArchiveMaterialMode::Paper);
 
     stageCard_ = std::make_unique<Object3d>();
     stageCard_->Initialize(objectManager);
@@ -199,7 +206,7 @@ void StageSelectScene::InitializeBookObjects()
     stageCard_->Update();
 }
 
-void StageSelectScene::InitializeTurningPage()
+void ArchiveScene::InitializeTurningPage()
 {
     Object3dManager* objectManager = Object3dManager::GetInstance();
     float stripWidth = kBookPageWidth /
@@ -213,13 +220,13 @@ void StageSelectScene::InitializeTurningPage()
             kPrintedPages, 1, 2, index, kTurningPageStripCount));
         strip->SetScale({ stripWidth * 1.08f, kBookPageHeight, 0.035f });
         strip->SetTranslate({ 0.0f, -8.0f, 2.0f });
-        SetArchiveMaterial(strip.get(), 3);
+        SetArchiveMaterial(strip.get(), ArchiveMaterialMode::Paper);
         strip->Update();
         turningPageStrips_.push_back(std::move(strip));
     }
 }
 
-void StageSelectScene::InitializeOpeningPages()
+void ArchiveScene::InitializeOpeningPages()
 {
     for (uint32_t page = 0; page < kPrintPageCount; ++page) {
         ModelManager::GetInstance()->CreateBookLeaf(kPrintedPages, page, page);
@@ -233,12 +240,12 @@ void StageSelectScene::InitializeOpeningPages()
         strip->SetModel(ModelManager::GetInstance()->CreateBookLeaf(kPrintedPages,
             (leaf * 2 + 1) % kPrintPageCount, (leaf * 2 + 2) % kPrintPageCount,
             index % kOpeningPageStripCount, kOpeningPageStripCount));
-        SetArchiveMaterial(strip.get(), 3);
+        SetArchiveMaterial(strip.get(), ArchiveMaterialMode::Paper);
         openingPageStrips_.push_back(std::move(strip));
     }
 }
 
-void StageSelectScene::InitializeInterface()
+void ArchiveScene::InitializeInterface()
 {
     titleText_ = std::make_unique<Text>();
     titleText_->Initialize(kDefaultFont);
@@ -283,7 +290,7 @@ void StageSelectScene::InitializeInterface()
     instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, 1.0f });
 }
 
-void StageSelectScene::InitializeDustMotes()
+void ArchiveScene::InitializeDustMotes()
 {
     dustMotes_.reserve(kDustMoteCount);
     Model* dustModel = ModelManager::GetInstance()->CreateCube("resources/Textures/white.png");
@@ -316,7 +323,7 @@ void StageSelectScene::InitializeDustMotes()
     }
 }
 
-void StageSelectScene::UpdateDustMotes(float deltaTime)
+void ArchiveScene::UpdateDustMotes(float deltaTime)
 {
     const float totalTime = static_cast<float>(TimeManager::GetInstance()->GetTotalTime());
     for (DustMote& mote : dustMotes_) {
@@ -335,7 +342,7 @@ void StageSelectScene::UpdateDustMotes(float deltaTime)
     }
 }
 
-void StageSelectScene::EnterTitleMode()
+void ArchiveScene::EnterTitleMode()
 {
     state_ = BookSelectState::TitleIdle;
     animationTime_ = 0.0f;
@@ -364,7 +371,7 @@ void StageSelectScene::EnterTitleMode()
     transitionPage_->Update();
 }
 
-void StageSelectScene::StartArchiveApproach()
+void ArchiveScene::StartArchiveApproach()
 {
     SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.65f);
     state_ = BookSelectState::CameraApproach;
@@ -374,12 +381,11 @@ void StageSelectScene::StartArchiveApproach()
     titleText_->SetPosition({ 640.0f, 68.0f });
     titleText_->SetFontSize(48.0f);
     titleText_->SetColor({ 0.84f, 0.72f, 0.38f, 0.0f });
-    instructionText_->SetText(
-        "A / D OR LEFT / RIGHT : TURN PAGE    ENTER : SELECT    BACKSPACE : TITLE");
+    instructionText_->SetText("A / D OR LEFT / RIGHT : TURN PAGE    ENTER : SELECT    BACKSPACE : TITLE");
     instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, 0.0f });
 }
 
-void StageSelectScene::StartTitleReturn()
+void ArchiveScene::StartTitleReturn()
 {
     state_ = BookSelectState::ReturningToTitle;
     animationTime_ = 0.0f;
@@ -393,7 +399,7 @@ void StageSelectScene::StartTitleReturn()
     std::fill(openingPageVisible_.begin(), openingPageVisible_.end(), false);
 }
 
-void StageSelectScene::UpdateTitleReturn(float deltaTime)
+void ArchiveScene::UpdateTitleReturn(float deltaTime)
 {
     animationTime_ += deltaTime;
     const float progress = Clamp01(animationTime_ / kTitleReturnDuration);
@@ -420,52 +426,100 @@ void StageSelectScene::UpdateTitleReturn(float deltaTime)
     }
 }
 
-void StageSelectScene::Update()
-{
-    float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
+void ArchiveScene::Update()
+{//deltaTimeを取得
+    const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
+    //埃を動かす
     UpdateDustMotes(deltaTime);
-    Input* input = Input::GetInstance();
 
-    if (state_ == BookSelectState::TitleIdle) {
-        if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE)) {
-            StartArchiveApproach();
-        }
-    } else if (state_ == BookSelectState::Idle && input->IsKeyTrigger(DIK_BACKSPACE)) {
-        StartTitleReturn();
+	// 入力処理を行い、状態遷移が発生した場合は更新を中断する。
+    if (HandleInput()) {
         return;
     }
 
+    UpdateCurrentState(deltaTime);
+    UpdateSceneObjects();
+}
+
+bool ArchiveScene::HandleInput()
+{
+    Input* input = Input::GetInstance();
+
+	// タイトル画面の処理
+    if (state_ == BookSelectState::TitleIdle) {
+		// タイトル画面でEnterまたはSpaceが押されたら資料庫へ移行する。
+        if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE)) {
+            StartArchiveApproach();
+        }
+		// タイトル画面でBackspaceが押されたらタイトル画面へ戻る。
+    } else if (state_ == BookSelectState::Idle && input->IsKeyTrigger(DIK_BACKSPACE)) {
+        StartTitleReturn();
+        return true;
+    }
+
+	// 資料庫のページ選択中の処理
     if (state_ == BookSelectState::Idle) {
+		// 左右のキー入力でページをめくる。
         if (input->IsKeyTrigger(DIK_RIGHT) || input->IsKeyTrigger(DIK_D)) {
-            StartPageTurn(1);
+            StartPageTurn(PageTurnDirection::Right);
         } else if (input->IsKeyTrigger(DIK_LEFT) || input->IsKeyTrigger(DIK_A)) {
-            StartPageTurn(-1);
+            StartPageTurn(PageTurnDirection::Left);
         } else if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE)) {
             ConfirmStage();
-            return;
+            return true;
         }
     }
 
-    if (state_ == BookSelectState::TitleIdle) {
-        const float totalTime = static_cast<float>(TimeManager::GetInstance()->GetTotalTime());
-        const float drift = std::sin(totalTime * 0.45f) * 0.10f;
-        camera_->LookAt(kCameraStartEye + Vector3 { drift, drift * 0.25f, 0.0f }, kCameraStartTarget);
-    } else if (state_ == BookSelectState::CameraApproach) {
-        UpdateCameraApproach(deltaTime);
-    } else if (state_ == BookSelectState::CardOpening) {
-        UpdateCardOpening(deltaTime);
-    } else if (state_ == BookSelectState::Idle) {
-        UpdateCardIdle();
-    } else if (state_ == BookSelectState::CardClosing) {
-        UpdateCardClosing(deltaTime);
-    } else if (state_ == BookSelectState::PageTurning) {
-        UpdatePageTurning(deltaTime);
-    } else if (state_ == BookSelectState::ReturningToTitle) {
-        UpdateTitleReturn(deltaTime);
-    } else if (state_ == BookSelectState::StageConfirmed) {
-        UpdateStageConfirmed(deltaTime);
-    }
+    return false;
+}
 
+void ArchiveScene::UpdateCurrentState(float deltaTime)
+{
+    switch (state_) {
+    case BookSelectState::TitleIdle:
+		// タイトル画面のIdle状態では、カメラを微妙に揺らす。
+        UpdateTitleIdle();
+        break;
+    case BookSelectState::CameraApproach:
+		//本に近づくアニメーションを更新する。
+        UpdateCameraApproach(deltaTime);
+        break;
+    case BookSelectState::CardOpening:
+		// カードを開くアニメーションを更新する。
+        UpdateCardOpening(deltaTime);
+        break;
+    case BookSelectState::Idle:
+		// カードが開いた状態で、ページ選択中のIdle状態では、カードを微妙に揺らす。
+        UpdateCardIdle();
+        break;
+    case BookSelectState::CardClosing:
+		// カードを閉じるアニメーションを更新する。
+        UpdateCardClosing(deltaTime);
+        break;
+    case BookSelectState::PageTurning:
+		// ページをめくるアニメーションを更新する。
+        UpdatePageTurning(deltaTime);
+        break;
+    case BookSelectState::ReturningToTitle:
+		// タイトル画面へ戻るアニメーションを更新する。
+        UpdateTitleReturn(deltaTime);
+        break;
+    case BookSelectState::StageConfirmed:
+		// ステージが確定した状態で、資料庫の接近度を維持しつつ、カメラをステージカードに寄せる。
+        UpdateStageConfirmed(deltaTime);
+        break;
+    }
+}
+
+void ArchiveScene::UpdateTitleIdle()
+{
+    const float totalTime = static_cast<float>(TimeManager::GetInstance()->GetTotalTime());
+    const float drift = std::sin(totalTime * 0.45f) * 0.10f;
+    camera_->LookAt(kCameraStartEye + Vector3 { drift, drift * 0.25f, 0.0f },kCameraStartTarget);
+}
+
+void ArchiveScene::UpdateSceneObjects()
+{
     camera_->Update();
     if (state_ == BookSelectState::CameraApproach || state_ == BookSelectState::StageConfirmed) {
         for (uint32_t page = 0; page < kOpeningPageCount; ++page) {
@@ -495,27 +549,28 @@ void StageSelectScene::Update()
     instructionText_->Update();
 }
 
-void StageSelectScene::UpdateCameraApproach(float deltaTime)
+void ArchiveScene::UpdateCameraApproach(float deltaTime)
 {
     animationTime_ += deltaTime;
     const float progress = Clamp01(animationTime_ / kCameraApproachDuration);
+	//開けているページの音を2.4秒経過したら鳴らす。
     if (!openingRifflePlayed_ && progress >= 0.24f) {
         SoundManager::GetInstance()->PlaySE(kPageRiffleSoundName, 0.48f);
         openingRifflePlayed_ = true;
     }
-    // Quintic easing starts and ends at rest without a sudden camera stop.
-    const float eased = progress * progress * progress *
-        (progress * (progress * 6.0f - 15.0f) + 10.0f);
+
+	// 進行度をイージングして、カメラの位置と本の開き具合を更新する。
+    const float eased = progress * progress * progress *(progress * (progress * 6.0f - 15.0f) + 10.0f);
+	// SceneManagerに資料庫の接近度を設定することで、ポストエフェクトの強さを変化させる。
     SceneManager::GetInstance()->SetArchiveApproach(eased);
-    camera_->LookAt(
-        kCameraStartEye + (kCameraEndEye - kCameraStartEye) * eased,
-        kCameraStartTarget + (kCameraEndTarget - kCameraStartTarget) * eased);
-    // Briefly show the closed cover, then finish opening before the card appears.
+	// カメラの位置と注視点を更新する。
+    camera_->LookAt(kCameraStartEye + (kCameraEndEye - kCameraStartEye) * eased,kCameraStartTarget + (kCameraEndTarget - kCameraStartTarget) * eased);
+	// 本の開き具合を更新する。（少し遅れて）
     const float coverTime = Clamp01((progress - 0.08f) / 0.88f);
-    const float bookProgress = coverTime * coverTime * coverTime *
-        (coverTime * (coverTime * 6.0f - 15.0f) + 10.0f);
+    const float bookProgress = coverTime * coverTime * coverTime *(coverTime * (coverTime * 6.0f - 15.0f) + 10.0f);
     UpdateBookOpening(bookProgress);
     UpdateOpeningPages(progress, bookProgress);
+	// タイトルと操作説明の表示を徐々にフェードインさせる。
     const float titleAlpha = SmoothStep((progress - 0.55f) / 0.45f);
     titleText_->SetColor({ 0.84f, 0.72f, 0.38f, titleAlpha });
     instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, titleAlpha });
@@ -525,7 +580,7 @@ void StageSelectScene::UpdateCameraApproach(float deltaTime)
     }
 }
 
-void StageSelectScene::UpdateBookOpening(float progress)
+void ArchiveScene::UpdateBookOpening(float progress)
 {
     const float closed = 1.0f - Clamp01(progress);
     const float foldAngle = closed * std::numbers::pi_v<float> * 0.5f;
@@ -546,9 +601,21 @@ void StageSelectScene::UpdateBookOpening(float progress)
     setWing(leftBookCover_.get(), { 4.75f, 5.7f, 0.36f }, { -2.375f, 0.0f, 0.0f }, -1.0f);
     setWing(rightBookCover_.get(), { 4.75f, 5.7f, 0.36f }, { 2.375f, 0.0f, 0.0f }, 1.0f);
     for (uint32_t index = 0; index < bookFittings_.size(); ++index) {
-        const float side = index < 4 ? -1.0f : 1.0f;
-        const float x = (index % 2 == 0 ? 0.25f : 4.5f) * side;
-        const float y = index % 4 < 2 ? -2.60f : 2.60f;
+        float side = 1.0f;
+        if (index < 4) {
+            side = -1.0f;
+        }
+
+        float x = 4.5f;
+        if (index % 2 == 0) {
+            x = 0.25f;
+        }
+        x *= side;
+
+        float y = 2.60f;
+        if (index % 4 < 2) {
+            y = -2.60f;
+        }
         setWing(bookFittings_[index].get(), { 0.34f, 0.32f, 0.055f }, { x, y, -0.20f }, side);
     }
     setWing(leftPageBlock_.get(), { kBookPageWidth, kBookPageHeight, 0.24f },
@@ -561,7 +628,7 @@ void StageSelectScene::UpdateBookOpening(float progress)
     bookSpine_->SetCustomWorldMatrix(MatrixMath::Multiply(spine, bookWorld));
 }
 
-void StageSelectScene::UpdateOpeningPages(float cameraProgress, float bookProgress)
+void ArchiveScene::UpdateOpeningPages(float cameraProgress, float bookProgress)
 {
     const float closed = 1.0f - bookProgress;
     const Matrix4x4 bookWorld = MatrixMath::Multiply(
@@ -575,7 +642,9 @@ void StageSelectScene::UpdateOpeningPages(float cameraProgress, float bookProgre
         const float order = static_cast<float>(page) / static_cast<float>(kOpeningPageCount - 1);
         const float start = 0.24f + (1.65f * order - 0.65f * SmoothStep(order)) * 0.48f;
         const float duration = 0.14f + 0.12f * order * order;
-        activeLeaves += cameraProgress > start && cameraProgress < start + duration ? 1u : 0u;
+        if (cameraProgress > start && cameraProgress < start + duration) {
+            ++activeLeaves;
+        }
         if (cameraProgress > start) latestStarted = static_cast<int32_t>(page);
         if (cameraProgress >= start + duration) latestLanded = static_cast<int32_t>(page);
     }
@@ -635,13 +704,15 @@ void StageSelectScene::UpdateOpeningPages(float cameraProgress, float bookProgre
     }
 }
 
-void StageSelectScene::SetPrintedPage(Object3d* object, uint32_t page)
+void ArchiveScene::SetPrintedPage(Object3d* object, uint32_t page)
 {
     object->SetModel(ModelManager::GetInstance()->CreateBookLeaf(kPrintedPages, page, page));
 }
 
-void StageSelectScene::StartPageTurn(int32_t direction)
+void ArchiveScene::StartPageTurn(PageTurnDirection direction)
 {
+	//資料庫ページをめくる処理Idle状態でない場合は処理を中断する。
+	//安全性を優先して、Idle状態でない場合はページめくりを無視する。
     if (state_ != BookSelectState::Idle) {
         return;
     }
@@ -650,15 +721,22 @@ void StageSelectScene::StartPageTurn(int32_t direction)
     SoundManager::GetInstance()->PlaySE(kPageFlipSoundName, 0.72f);
 
     pageTurnDirection_ = direction;
-    nextPrintSpreadIndex_ = (printSpreadIndex_ + direction + kPrintSpreadCount) % kPrintSpreadCount;
-    // Forward: old right -> new left. Backward: old left -> previous right.
-    const uint32_t front = static_cast<uint32_t>(direction > 0 ?
-        printSpreadIndex_ * 2 + 1 : nextPrintSpreadIndex_ * 2 + 1);
-    const uint32_t back = static_cast<uint32_t>(direction > 0 ?
-        nextPrintSpreadIndex_ * 2 : printSpreadIndex_ * 2);
+    const int32_t directionValue = static_cast<int32_t>(direction);
+	//次のページのインデックスを計算する。右にめくる場合は+1、左にめくる場合は-1。
+    nextPrintSpreadIndex_ =(printSpreadIndex_ + directionValue + kPrintSpreadCount) % kPrintSpreadCount;
+    uint32_t front = 0;
+    uint32_t back = 0;
+	//めくる方向に応じて、表紙と裏表紙のページ番号を取得する。
+    if (direction == PageTurnDirection::Right) {
+        front = static_cast<uint32_t>(printSpreadIndex_ * 2 + 1);
+        back = static_cast<uint32_t>(nextPrintSpreadIndex_ * 2);
+    } else {
+        front = static_cast<uint32_t>(nextPrintSpreadIndex_ * 2 + 1);
+        back = static_cast<uint32_t>(printSpreadIndex_ * 2);
+    }
+	//めくるページの表と裏のモデルを作成し、各ストリップに設定する。
     for (uint32_t index = 0; index < kTurningPageStripCount; ++index) {
-        turningPageStrips_[index]->SetModel(ModelManager::GetInstance()->CreateBookLeaf(
-            kPrintedPages, front, back, index, kTurningPageStripCount));
+        turningPageStrips_[index]->SetModel(ModelManager::GetInstance()->CreateBookLeaf(kPrintedPages, front, back, index, kTurningPageStripCount));
     }
     animationTime_ = 0.0f;
     pageTurnProgress_ = 0.0f;
@@ -666,7 +744,7 @@ void StageSelectScene::StartPageTurn(int32_t direction)
     state_ = BookSelectState::CardClosing;
 }
 
-void StageSelectScene::UpdateCardOpening(float deltaTime)
+void ArchiveScene::UpdateCardOpening(float deltaTime)
 {
     animationTime_ += deltaTime;
     float progress = Clamp01(animationTime_ / kCardOpenDuration);
@@ -680,28 +758,19 @@ void StageSelectScene::UpdateCardOpening(float deltaTime)
     }
 }
 
-void StageSelectScene::UpdateCardIdle()
+void ArchiveScene::UpdateCardIdle()
 {
     float totalTime = static_cast<float>(TimeManager::GetInstance()->GetTotalTime());
     float floating = std::sin(totalTime * 2.0f) * 0.055f;
     stageCard_->SetTranslate({ 0.0f, kCardRestY + floating, -0.70f });
     stageCard_->SetScale({ 3.85f, 2.30f, 0.18f });
-    stageCard_->SetRotate({
-        -0.035f,
-        std::sin(totalTime * 0.85f) * 0.055f,
-        std::sin(totalTime * 1.25f) * 0.012f
+    stageCard_->SetRotate({-0.035f,std::sin(totalTime * 0.85f) * 0.055f,std::sin(totalTime * 1.25f) * 0.012f
     });
 
-    stageCardShadow_->SetTranslate({
-        0.14f,
-        kCardRestY + floating - 0.14f,
-        -0.48f
+    stageCardShadow_->SetTranslate({0.14f,kCardRestY + floating - 0.14f,-0.48f
     });
     stageCardShadow_->SetScale({ 4.05f, 2.42f, 0.12f });
-    stageCardShadow_->SetRotate({
-        -0.035f,
-        std::sin(totalTime * 0.85f) * 0.055f,
-        std::sin(totalTime * 1.25f) * 0.012f
+    stageCardShadow_->SetRotate({-0.035f,std::sin(totalTime * 0.85f) * 0.055f,std::sin(totalTime * 1.25f) * 0.012f
     });
 
     float screenOffset = floating * -38.0f;
@@ -710,7 +779,7 @@ void StageSelectScene::UpdateCardIdle()
     pageText_->SetPosition({ 640.0f, 435.0f + screenOffset });
 }
 
-void StageSelectScene::UpdateCardClosing(float deltaTime)
+void ArchiveScene::UpdateCardClosing(float deltaTime)
 {
     animationTime_ += deltaTime;
     float progress = Clamp01(animationTime_ / kCardCloseDuration);
@@ -721,16 +790,18 @@ void StageSelectScene::UpdateCardClosing(float deltaTime)
         animationTime_ = 0.0f;
         pageTurnProgress_ = 0.0f;
         state_ = BookSelectState::PageTurning;
-        if (pageTurnDirection_ > 0) {
+        if (pageTurnDirection_ == PageTurnDirection::Right) {
             SetPrintedPage(rightPageBlock_.get(), nextPrintSpreadIndex_ * 2 + 1);
         } else {
             SetPrintedPage(leftPageBlock_.get(), nextPrintSpreadIndex_ * 2);
         }
+		// ページめくりのアニメーションを開始する準備。
+        //あらかじめ設置しておく
         UpdateTurningPage();
     }
 }
 
-void StageSelectScene::UpdatePageTurning(float deltaTime)
+void ArchiveScene::UpdatePageTurning(float deltaTime)
 {
     animationTime_ += deltaTime;
     pageTurnProgress_ = Clamp01(animationTime_ / kPageTurnDuration);
@@ -753,9 +824,13 @@ void StageSelectScene::UpdatePageTurning(float deltaTime)
     }
 }
 
-void StageSelectScene::UpdateTurningPage()
+void ArchiveScene::UpdateTurningPage()
 {
-    float baseAngle = (pageTurnDirection_ > 0 ? pageTurnProgress_ : 1.0f - pageTurnProgress_) * std::numbers::pi_v<float>;
+    float angleProgress = 1.0f - pageTurnProgress_;
+    if (pageTurnDirection_ == PageTurnDirection::Right) {
+        angleProgress = pageTurnProgress_;
+    }
+    float baseAngle = angleProgress * std::numbers::pi_v<float>;
     float pageArch = std::sin(baseAngle);
     leftPageBlock_->GetMaterial()->environmentCoefficient = pageArch * 0.65f;
     rightPageBlock_->GetMaterial()->environmentCoefficient = pageArch * 0.65f;
@@ -770,7 +845,8 @@ void StageSelectScene::UpdateTurningPage()
             static_cast<float>(kTurningPageStripCount);
         float curlEnvelope = std::sin(pageRate * std::numbers::pi_v<float>);
         float curlAngle = curlEnvelope * pageArch * 0.58f;
-        float localAngle = baseAngle - static_cast<float>(pageTurnDirection_) * curlAngle;
+        const float directionValue = static_cast<float>(static_cast<int32_t>(pageTurnDirection_));
+        float localAngle = baseAngle - directionValue * curlAngle;
 
         float deltaX = stripWidth * std::cos(localAngle);
         float deltaZ = -stripWidth * std::sin(localAngle);
@@ -798,7 +874,7 @@ void StageSelectScene::UpdateTurningPage()
     }
 }
 
-void StageSelectScene::UpdateCardTransform(float progress, float alpha)
+void ArchiveScene::UpdateCardTransform(float progress, float alpha)
 {
     float positionY = kCardHiddenY + (kCardRestY - kCardHiddenY) * progress;
     float scaleFactor = 0.12f + 0.88f * progress;
@@ -829,9 +905,9 @@ void StageSelectScene::UpdateCardTransform(float progress, float alpha)
     pageText_->SetColor({ 0.82f, 0.74f, 0.55f, alpha });
 }
 
-void StageSelectScene::ChangeStageIndex()
+void ArchiveScene::ChangeStageIndex()
 {
-    currentStageIndex_ += pageTurnDirection_;
+    currentStageIndex_ += static_cast<int32_t>(pageTurnDirection_);
     int32_t stageCount = static_cast<int32_t>(stages_.size());
     if (currentStageIndex_ < 0) {
         currentStageIndex_ = stageCount - 1;
@@ -842,7 +918,7 @@ void StageSelectScene::ChangeStageIndex()
     RefreshStageText();
 }
 
-void StageSelectScene::RefreshStageText()
+void ArchiveScene::RefreshStageText()
 {
     const StageData& stage = stages_[currentStageIndex_];
     stageText_->SetText(stage.name);
@@ -852,18 +928,18 @@ void StageSelectScene::RefreshStageText()
         " / " + std::to_string(stages_.size()));
 }
 
-void StageSelectScene::ConfirmStage()
+void ArchiveScene::ConfirmStage()
 {
     state_ = BookSelectState::StageConfirmed;
     SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.75f);
     const StageData& stage = stages_[currentStageIndex_];
-    confirmedTestScene_ = stage.opensTestScene;
+    confirmedDestination_ = stage.destination;
     confirmationPageSoundPlayed_ = false;
     std::fill(openingPageVisible_.begin(), openingPageVisible_.end(), false);
     animationTime_ = 0.0f;
 }
 
-void StageSelectScene::UpdateStageConfirmed(float deltaTime)
+void ArchiveScene::UpdateStageConfirmed(float deltaTime)
 {
     animationTime_ += deltaTime;
 
@@ -903,15 +979,18 @@ void StageSelectScene::UpdateStageConfirmed(float deltaTime)
 
     if (animationTime_ >= kConfirmSceneChangeTime) {
         PageTransition::RequestReveal();
-        if (confirmedTestScene_) {
-            SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());
-        } else {
+        switch (confirmedDestination_) {
+        case StageDestination::GamePlay:
             SceneManager::GetInstance()->SetNextScene(std::make_unique<GamePlayScene>());
+            break;
+        case StageDestination::Test:
+            SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());
+            break;
         }
     }
 }
 
-float StageSelectScene::Clamp01(float value)
+float ArchiveScene::Clamp01(float value)
 {
     if (value < 0.0f) {
         return 0.0f;
@@ -922,13 +1001,13 @@ float StageSelectScene::Clamp01(float value)
     return value;
 }
 
-float StageSelectScene::SmoothStep(float value)
+float ArchiveScene::SmoothStep(float value)
 {
     float clamped = Clamp01(value);
     return clamped * clamped * (3.0f - 2.0f * clamped);
 }
 
-float StageSelectScene::EaseOutBack(float value)
+float ArchiveScene::EaseOutBack(float value)
 {
     float clamped = Clamp01(value);
     constexpr float c1 = 1.70158f;
@@ -937,7 +1016,7 @@ float StageSelectScene::EaseOutBack(float value)
     return 1.0f + c3 * shifted * shifted * shifted + c1 * shifted * shifted;
 }
 
-void StageSelectScene::Draw2D()
+void ArchiveScene::Draw2D()
 {
     TextRenderer::GetInstance()->PreDraw();
     titleText_->Draw();
@@ -954,7 +1033,7 @@ void StageSelectScene::Draw2D()
     }
 }
 
-void StageSelectScene::Draw3D()
+void ArchiveScene::Draw3D()
 {
     Object3dManager::GetInstance()->PreDraw();
     backdrop_->Draw();
@@ -990,10 +1069,10 @@ void StageSelectScene::Draw3D()
     }
 }
 
-void StageSelectScene::DrawParticle()
+void ArchiveScene::DrawParticle()
 {
 }
 
-void StageSelectScene::DrawImGui()
+void ArchiveScene::DrawImGui()
 {
 }

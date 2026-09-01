@@ -19,10 +19,7 @@
     <None Include="resources\Shaders\PostEffect\LensDirt.PS.hlsl" />
     <None Include="resources\Shaders\PostEffect\LensDistortion.PS.hlsl" />
     <None Include="resources\Shaders\PostEffect\MotionBlur.PS.hlsl" />
-    <ClCompile Include="App\Scene\TitleScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="App\Scene\StageSelectScene.cpp">
+    <ClCompile Include="App\Scene\ArchiveScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="App\Scene\GamePlayScene.cpp">
@@ -555,10 +552,7 @@
     <ClInclude Include="Engine\blend\BlendUtil.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="App\Scene\TitleScene.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="App\Scene\StageSelectScene.h">
+    <ClInclude Include="App\Scene\ArchiveScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="App\Scene\PageTransition.h">

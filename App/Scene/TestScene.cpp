@@ -10,7 +10,7 @@
 #include "Engine/Time/TimeManager.h"
 #include "GameOverScene.h"
 #include "SceneManager.h"
-#include "StageSelectScene.h"
+#include "ArchiveScene.h"
 
 namespace {
 constexpr const char* kDefaultFont =
@@ -77,7 +77,7 @@ void TestScene::Update()
     }
     if (input->IsKeyTrigger(DIK_BACKSPACE)) {
         SceneManager::GetInstance()->SetNextScene(
-            std::make_unique<StageSelectScene>());
+            std::make_unique<ArchiveScene>());
         return;
     }
     if (input->IsKeyTrigger(DIK_R)) {

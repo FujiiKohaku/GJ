@@ -12,7 +12,7 @@
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/Time/TimeManager.h"
 #include "SceneManager.h"
-#include "StageSelectScene.h"
+#include "ArchiveScene.h"
 #include <string>
 
 namespace {
@@ -83,7 +83,7 @@ void GamePlayScene::Update()
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
     if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
         SceneManager::GetInstance()->SetNextScene(
-            std::make_unique<StageSelectScene>());
+            std::make_unique<ArchiveScene>());
         return;
     }
 

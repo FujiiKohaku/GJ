@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-class StageSelectScene : public BaseScene {
+class ArchiveScene : public BaseScene {
 public:
     void Initialize() override;
     void Finalize() override;
@@ -32,10 +32,38 @@ private:
         ReturningToTitle
     };
 
+    enum class PageTurnDirection : int32_t {
+        Right = 1,
+        Left = -1,
+    };
+
+    // 新しい遷移先（例: BossScene）を追加する手順:
+    // 1. 下の列挙型へ「Boss」を追加する。
+    //      enum class StageDestination { GamePlay, Test, Boss };
+    // 2. ArchiveScene.cppの先頭で遷移先シーンをインクルードする。
+    //      #include "BossScene.h"
+    // 3. UpdateStageConfirmed()内のswitchへ遷移処理を追加する。
+    //      case StageDestination::Boss:
+    //          SceneManager::GetInstance()->SetNextScene(
+    //              std::make_unique<BossScene>());
+    //          break;
+    // 4. InitializeStageData()で表示内容と遷移先を登録する。
+    //      StageData bossStage;
+    //      bossStage.name = "STAGE 03  BOSS";
+    //      bossStage.description = "BOSS BATTLE";
+    //      bossStage.destination = StageDestination::Boss;
+    //      stages_.push_back(bossStage);
+    // 既存のGamePlayまたはTestへ移動するステージを増やすだけなら、
+    // 手順4だけを行い、既存のStageDestinationを設定すればよい。
+    enum class StageDestination {
+        GamePlay,
+        Test,
+    };
+
     struct StageData {
         std::string name;
         std::string description;
-        bool opensTestScene = false;
+        StageDestination destination = StageDestination::GamePlay;
     };
 
     struct DustMote {
@@ -53,6 +81,10 @@ private:
     void InitializeInterface();
     void InitializeDustMotes();
     void UpdateDustMotes(float deltaTime);
+    bool HandleInput();
+    void UpdateCurrentState(float deltaTime);
+    void UpdateTitleIdle();
+    void UpdateSceneObjects();
     void EnterTitleMode();
     void StartArchiveApproach();
     void StartTitleReturn();
@@ -60,7 +92,7 @@ private:
     void UpdateCameraApproach(float deltaTime);
     void UpdateBookOpening(float progress);
     void UpdateOpeningPages(float cameraProgress, float bookProgress);
-    void StartPageTurn(int32_t direction);
+    void StartPageTurn(PageTurnDirection direction);
     void SetPrintedPage(Object3d* object, uint32_t page);
     void UpdateCardOpening(float deltaTime);
     void UpdateCardIdle();
@@ -103,7 +135,7 @@ private:
     std::vector<StageData> stages_;
     BookSelectState state_ = BookSelectState::CameraApproach;
     int32_t currentStageIndex_ = 0;
-    int32_t pageTurnDirection_ = 1;
+    PageTurnDirection pageTurnDirection_ = PageTurnDirection::Right;
     int32_t printSpreadIndex_ = 0;
     int32_t nextPrintSpreadIndex_ = 0;
     float animationTime_ = 0.0f;
@@ -111,5 +143,5 @@ private:
     bool stageIndexChanged_ = false;
     bool openingRifflePlayed_ = false;
     bool confirmationPageSoundPlayed_ = false;
-    bool confirmedTestScene_ = false;
+    StageDestination confirmedDestination_ = StageDestination::GamePlay;
 };
