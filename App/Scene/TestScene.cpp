@@ -10,7 +10,7 @@
 #include "Engine/Time/TimeManager.h"
 #include "GameOverScene.h"
 #include "SceneManager.h"
-#include "StageSelectScene.h"
+#include "ArchiveScene.h"
 
 namespace {
 constexpr const char* kDefaultFont =
@@ -51,6 +51,7 @@ void TestScene::Initialize()
     instructionText_->SetAnchorPoint({ 0.5f, 0.5f });
     instructionText_->SetFontSize(18.0f);
     instructionText_->SetColor({ 0.76f, 0.88f, 0.92f, 1.0f });
+    pageReveal_.InitializeIfRequested();
 }
 
 void TestScene::Finalize()
@@ -76,7 +77,7 @@ void TestScene::Update()
     }
     if (input->IsKeyTrigger(DIK_BACKSPACE)) {
         SceneManager::GetInstance()->SetNextScene(
-            std::make_unique<StageSelectScene>());
+            std::make_unique<ArchiveScene>());
         return;
     }
     if (input->IsKeyTrigger(DIK_R)) {
@@ -88,6 +89,7 @@ void TestScene::Update()
     }
 
     const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
+    pageReveal_.Update(deltaTime);
     
     Vector3 moveInput = { 0.0f, 0.0f, 0.0f };
     if (input->IsKeyPressed(DIK_W)) moveInput.z += 1.0f;
@@ -119,6 +121,7 @@ void TestScene::Draw2D()
     TextRenderer::GetInstance()->PreDraw();
     titleText_->Draw();
     instructionText_->Draw();
+    pageReveal_.Draw();
 }
 
 void TestScene::Draw3D()

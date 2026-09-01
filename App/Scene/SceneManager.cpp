@@ -31,6 +31,8 @@ void SceneManager::Update()
 
     if (nextScene_) {
         screenSpaceFluid_ = nullptr;
+        RemovePostEffect(PostEffectType::ArchiveAtmosphere);
+        archiveApproach_ = 0.0f;
     }
 
     ChangeScene(scene_, nextScene_, retiredScene_);

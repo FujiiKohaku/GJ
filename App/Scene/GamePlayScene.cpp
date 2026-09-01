@@ -11,8 +11,9 @@
 #include "Engine/PostEffect/PostEffectType.h"
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/LevelEditor/LevelDataLoader.h"
+#include "Engine/Time/TimeManager.h"
 #include "SceneManager.h"
-#include "StageSelectScene.h"
+#include "ArchiveScene.h"
 #include <string>
 
 namespace {
@@ -79,6 +80,7 @@ void GamePlayScene::Initialize()
     collisionText_->SetOutlineColor({ 0.0f, 0.0f, 0.0f, 1.0f });
     collisionText_->SetOutlineWidth(2.0f);
     UpdateCollisionText();
+    pageReveal_.InitializeIfRequested();
 }
 
 void GamePlayScene::Finalize()
@@ -89,9 +91,10 @@ void GamePlayScene::Finalize()
 
 void GamePlayScene::Update()
 {
+    pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
     if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
         SceneManager::GetInstance()->SetNextScene(
-            std::make_unique<StageSelectScene>());
+            std::make_unique<ArchiveScene>());
         return;
     }
 
@@ -110,6 +113,7 @@ void GamePlayScene::Draw2D()
     TextRenderer::GetInstance()->PreDraw();
     instructionText_->Draw();
     collisionText_->Draw();
+    pageReveal_.Draw();
 }
 
 void GamePlayScene::Draw3D()

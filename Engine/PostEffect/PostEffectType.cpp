@@ -5,6 +5,8 @@ const char* GetPostEffectTypeName(PostEffectType type)
     switch (type) {
     case PostEffectType::Copy:
         return "Copy";
+    case PostEffectType::ArchiveAtmosphere:
+        return "ArchiveAtmosphere";
     case PostEffectType::GrayScale:
         return "GrayScale";
     case PostEffectType::Vignette:

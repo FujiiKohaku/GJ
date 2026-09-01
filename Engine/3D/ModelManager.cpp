@@ -214,6 +214,34 @@ Model* ModelManager::CreatePlane(const std::string& texturePath, float tilingX, 
     return raw;
 }
 
+Model* ModelManager::CreateBookLeaf(const std::string& texturePath, uint32_t frontPage,
+    uint32_t backPage, uint32_t stripIndex, uint32_t stripCount, uint32_t pageCount)
+{
+    assert(pageCount > 0 && stripCount > 0 && stripIndex < stripCount);
+    assert(frontPage < pageCount && backPage < pageCount);
+    const std::string key = "BookLeaf/" + texturePath + "/" + std::to_string(frontPage) +
+        "/" + std::to_string(backPage) + "/" + std::to_string(stripIndex) +
+        "/" + std::to_string(stripCount) + "/" + std::to_string(pageCount);
+    if (auto it = models_.find(key); it != models_.end()) {
+        return it->second.get();
+    }
+    ModelData data = CreateCubeModelData(texturePath);
+    auto& vertices = data.primitives[0].vertices;
+    for (size_t index = 0; index < vertices.size(); ++index) {
+        const bool back = index >= 4 && index < 8;
+        const uint32_t page = back ? backPage : frontPage;
+        const uint32_t slice = back ? stripCount - 1 - stripIndex : stripIndex;
+        auto& uv = vertices[index].texcoord;
+        uv.x = (static_cast<float>(page) + (static_cast<float>(slice) + uv.x) /
+            static_cast<float>(stripCount)) / static_cast<float>(pageCount);
+    }
+    auto model = std::make_unique<Model>();
+    model->Initialize(modelCommon_.get(), data);
+    Model* result = model.get();
+    models_.emplace(key, std::move(model));
+    return result;
+}
+
 Model* ModelManager::CreateCube(const std::string& texturePath)
 {
     std::string actualTexturePath = texturePath;

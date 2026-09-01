@@ -55,6 +55,10 @@ void PostEffectManager::Update(Camera* camera)
         auto& parameter = copyImageRenderer_->GetPostEffectParameter();
         parameter.outlineNearClip = camera->GetNearClip();
         parameter.outlineFarClip = camera->GetFarClip();
+        // View-space depth of the archive's book center, tracking the moving camera.
+        const Matrix4x4& view = camera->GetViewMatrix();
+        parameter.archiveFocusDistance = view.m[3][2] - 0.08f * view.m[1][2];
+        parameter.archiveFocusRange = 2.3f;
         fogManager_->SetCameraInfo(
             camera->GetNearClip(),
             camera->GetFarClip(),
@@ -184,6 +188,7 @@ void PostEffectManager::UpdatePostEffectParameters(
         copyImageRenderer_->GetPostEffectParameter();
     postEffectParameter.radialBlurCenter =
         sceneManager->GetPostEffectCenter();
+    postEffectParameter.archiveApproach = sceneManager->GetArchiveApproach();
     postEffectParameter.cameraShakeStrength =
         sceneManager->GetCameraShakeStrength();
     postEffectParameter.vignetteStrength =
