@@ -9,9 +9,12 @@
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/LevelEditor/LevelDataLoader.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/ImGuiManager/ImGuiManager.h"
 #include "Engine/3D/ModelManager.h"
 #include "SceneManager.h"
-#include "StageSelectScene.h"
+
+#include "ArchiveScene.h"
+#include "GamePlayScene.h"
 #include <iostream>
 #include <Windows.h> // ShellExecute用
 #include <thread>
@@ -170,13 +173,14 @@ void EditorScene::Finalize()
 
 void EditorScene::Update()
 {
+    auto input = Input::GetInstance();
     // シーン遷移による Finalize で nullptr に上書きされるのを防ぐため、毎フレーム再設定する
     Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
     SkinningObject3dManager::GetInstance()->SetDefaultCamera(camera_.get());
 
-    // シーン遷移
-    if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
-        SceneManager::GetInstance()->SetNextScene(std::make_unique<StageSelectScene>());
+    // BackSpaceキーでステージセレクト（Archive）へ戻る
+    if (input->IsKeyTrigger(DIK_BACKSPACE)) {
+        SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
         return;
     }
 

@@ -54,6 +54,8 @@ public:
         PostEffectStage stage = PostEffectStage::BeforeParticle);
     void RemovePostEffect(PostEffectType type);
     void ClearPostEffects();
+    void SetArchiveApproach(float progress) { archiveApproach_ = progress; }
+    float GetArchiveApproach() const { return archiveApproach_; }
     void SetPostEffectEnabled(PostEffectType type, bool enable);
     const std::vector<PostEffectInfo>& GetPostEffects() const;
     void SetPostEffectCenter(const Vector2& center);
@@ -101,6 +103,7 @@ private:
     float postEffectKickStrength_ = 0.0f;
     float cameraShakeStrength_ = kDefaultCameraShakeStrength;
     float vignetteStrength_ = 1.0f;
+    float archiveApproach_ = 0.0f;
     float sonicBoomProgress_ = 0.0f;
     Vector2 sonicBoomCenter_ = { 0.5f, 0.5f };
     Vector2 blackHoleCenter_ = { 0.5f, 0.5f };

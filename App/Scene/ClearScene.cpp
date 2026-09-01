@@ -6,7 +6,7 @@
 #include "Engine/Input/Input.h"
 #include "Engine/PostEffect/PostEffectType.h"
 #include "SceneManager.h"
-#include "TitleScene.h"
+#include "ArchiveScene.h"
 
 namespace {
 constexpr const char* kWhiteTexture = "resources/Textures/white.png";
@@ -48,7 +48,7 @@ void ClearScene::Update()
 {
     Input* input = Input::GetInstance();
     if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE)) {
-        SceneManager::GetInstance()->SetNextScene(std::make_unique<TitleScene>());
+        SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
         return;
     }
 

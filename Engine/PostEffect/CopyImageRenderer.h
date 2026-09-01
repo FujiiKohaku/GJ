@@ -29,9 +29,9 @@ public:
         float colorContrast;
 
         float colorSaturation;
-        float padding0;
-        float padding1;
-        float padding2;
+        float archiveFocusDistance;
+        float archiveFocusRange;
+        float archiveApproach;
 
         float focusDepth;
         float focusRange;

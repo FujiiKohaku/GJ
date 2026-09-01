@@ -166,9 +166,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\Event\EventDispatcher.cpp" />
     <ClInclude Include="Engine\CollisionManager\CollisionLayer.h" />
     <ClCompile Include="App\SlimePlayer.cpp" />
-    <ClCompile Include="App\Scene\TitleScene.cpp" />
-    <ClCompile Include="App\Scene\StageSelectScene.cpp" />
     <ClCompile Include="App\Scene\EditorScene.cpp" />
+    <ClCompile Include="App\Scene\ArchiveScene.cpp" />
     <ClCompile Include="App\Scene\GamePlayScene.cpp" />
     <ClCompile Include="App\Game\Map\MapChipField.cpp" />
     <ClCompile Include="App\Game\Map\MapChipStage.cpp" />
@@ -400,9 +399,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\SrvManager\SrvManager.h" />
     <ClInclude Include="Engine\StringUtility\StringUtility.h" />
     <ClInclude Include="Engine\TextureManager\TextureManager.h" />
-    <ClInclude Include="App\Scene\TitleScene.h" />
-    <ClInclude Include="App\Scene\StageSelectScene.h" />
     <ClInclude Include="App\Scene\EditorScene.h" />
+    <ClInclude Include="App\Scene\ArchiveScene.h" />
+    <ClInclude Include="App\Scene\PageTransition.h" />
     <ClInclude Include="App\Scene\GamePlayScene.h" />
     <ClInclude Include="App\Game\Map\MapChipField.h" />
     <ClInclude Include="App\Game\Map\MapChipStage.h" />

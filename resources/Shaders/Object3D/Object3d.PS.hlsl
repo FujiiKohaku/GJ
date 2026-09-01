@@ -34,6 +34,46 @@ PixelShaderOutput main(VertexShaderOutput input)
         float3 iceTexture = lerp(float3(1.0f, 1.0f, 1.0f), textureColor.rgb, 0.25f);
         output.color = float4(gMaterial.color.rgb * iceTexture * faceTint, gMaterial.color.a * textureColor.a);
     }
+    else if (gMaterial.enableLighting >= 3 && gMaterial.enableLighting <= 5)
+    {
+        // Archive-only materials: paper=3, leather=4, brass=5. Other scenes are unchanged.
+        float3 N = normalize(input.normal);
+        float3 V = normalize(gCamera.worldPosition - input.worldPosition);
+        float3 L = normalize(float3(-3.5f, 6.0f, -6.0f) - input.worldPosition);
+        float3 H = normalize(L + V);
+        float pool = exp(-dot(input.worldPosition.xy * float2(0.095f, 0.10f),
+                              input.worldPosition.xy * float2(0.095f, 0.10f)));
+        float diffuse = saturate(dot(N, L));
+        float3 base = gMaterial.color.rgb * textureColor.rgb;
+        float3 illumination = float3(0.32f, 0.34f, 0.37f) +
+            float3(0.85f, 0.72f, 0.52f) * (0.25f + diffuse * 0.65f) * pool;
+        float occlusion = 1.0f;
+        float specular = 0.0f;
+        if (gMaterial.enableLighting == 3)
+        {
+            // Atlas-aware gutter AO plus a soft moving contact band from the riffle.
+            // environmentCoefficient carries contact strength only in archive mode.
+            float atlasU = min(saturate(transformedUV.x) * 8.0f, 7.99999f);
+            uint pageIndex = (uint)floor(atlasU);
+            float pageU = frac(atlasU);
+            float gutterDistance = (pageIndex % 2 == 0) ? 1.0f - pageU : pageU;
+            float gutter = exp(-gutterDistance * 18.0f) * 0.32f;
+            float contact = saturate(gMaterial.environmentCoefficient);
+            float band = exp(-pow((gutterDistance - (0.16f + contact * 0.42f)) / 0.20f, 2.0f));
+            occlusion = 1.0f - gutter - contact * (0.12f + band * 0.30f);
+            // A little diffuse transmission, without a plastic highlight on paper.
+            illumination += float3(0.12f, 0.10f, 0.07f) * saturate(dot(-N, L));
+        }
+        else
+        {
+            bool brass = gMaterial.enableLighting == 5;
+            float grain = 0.85f + 0.15f * sin(transformedUV.x * 950.0f) * sin(transformedUV.y * 1130.0f);
+            specular = pow(saturate(dot(N, H)), brass ? 72.0f : 30.0f) *
+                (brass ? 0.38f : 0.07f) * pool * grain;
+        }
+        output.color = float4(base * illumination * saturate(occlusion) +
+            float3(1.0f, 0.78f, 0.42f) * specular, gMaterial.color.a * textureColor.a);
+    }
     else if (gMaterial.enableLighting != 0)
     {
         float3 baseColor = gMaterial.color.rgb * textureColor.rgb;

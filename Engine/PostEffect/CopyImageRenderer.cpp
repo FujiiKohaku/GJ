@@ -218,7 +218,9 @@ const wchar_t* CopyImageRenderer::GetPixelShaderPath(PostEffectType type) const
 {
     switch (type) {
     case PostEffectType::Copy:
-        [[fallthrough]];
+        return L"resources/Shaders/PostEffect/Fullscreen.PS.hlsl";
+    case PostEffectType::ArchiveAtmosphere:
+        return L"resources/Shaders/PostEffect/ArchiveAtmosphere.PS.hlsl";
     case PostEffectType::Bloom:
         [[fallthrough]];
     case PostEffectType::Fog:
@@ -370,9 +372,9 @@ void CopyImageRenderer::CreatePostEffectParameterResource()
     postEffectParameterData_->colorBrightness = 0.03f;
     postEffectParameterData_->colorContrast = 1.15f;
     postEffectParameterData_->colorSaturation = 1.25f;
-    postEffectParameterData_->padding0 = 0.0f;
-    postEffectParameterData_->padding1 = 0.0f;
-    postEffectParameterData_->padding2 = 0.0f;
+    postEffectParameterData_->archiveFocusDistance = 16.5f;
+    postEffectParameterData_->archiveFocusRange = 2.3f;
+    postEffectParameterData_->archiveApproach = 0.0f;
     postEffectParameterData_->focusDepth = 0.99f;
     postEffectParameterData_->focusRange = 0.01f;
     postEffectParameterData_->depthOfFieldRadius = 8.0f;
