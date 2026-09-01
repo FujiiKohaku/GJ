@@ -1,5 +1,6 @@
 #pragma once
 #include "Engine/Winapp/WinApp.h"
+#include "Engine/Math/MathStruct.h"
 #include <dinput.h>
 #include <xinput.h>
 #include <memory>
@@ -23,6 +24,8 @@ public:
     LONG GetMouseDeltaY() const;
     LONG GetMouseWheel() const;
     void ResetMouseDelta();
+
+    Vector2 GetMousePosition() const;
 
     bool IsGamepadConnected() const;
     bool IsGamepadButtonPressed(WORD button) const;

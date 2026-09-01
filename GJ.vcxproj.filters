@@ -25,6 +25,9 @@
     <ClCompile Include="App\Scene\StageSelectScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="App\Scene\EditorScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="App\Scene\GamePlayScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -471,6 +474,9 @@
     <ClCompile Include="Engine\EditorManager\EditorManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\Network\UdpServer.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="Engine\Event\EventDispatcher.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -565,6 +571,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="App\Scene\StageSelectScene.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Scene\EditorScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="App\Scene\GamePlayScene.h">
@@ -742,6 +751,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Engine\EditorManager\EditorManager.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Network\UdpServer.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Event\EventDispatcher.h">

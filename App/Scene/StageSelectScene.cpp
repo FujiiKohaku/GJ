@@ -10,6 +10,7 @@
 #include "SceneManager.h"
 #include "TestScene.h"
 #include "TitleScene.h"
+#include "EditorScene.h"
 #include <cmath>
 #include <numbers>
 
@@ -221,6 +222,11 @@ void StageSelectScene::Update()
 
     if (input->IsKeyTrigger(DIK_BACKSPACE)) {
         SceneManager::GetInstance()->SetNextScene(std::make_unique<TitleScene>());
+        return;
+    }
+
+    if (input->IsKeyTrigger(DIK_F12)) {
+        SceneManager::GetInstance()->SetNextScene(std::make_unique<EditorScene>());
         return;
     }
 

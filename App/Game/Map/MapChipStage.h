@@ -19,6 +19,7 @@ public:
     void Draw();
 
     const MapChipField& GetField() const;
+    MapChipField& GetField();
 
 private:
     MapChipField field_;

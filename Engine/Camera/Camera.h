@@ -2,6 +2,7 @@
 #include "Engine/ImGuiManager/ImGuiManager.h"
 #include "Engine/Math/MathStruct.h"
 #include "Engine/Math/MatrixMath.h"
+#include "Engine/Math/Ray.h"
 #include "Engine/WinApp/WinApp.h"
 
 
@@ -26,6 +27,7 @@ public:
     void SetFarClip(float farClip) { farClip_ = farClip; }
     void LookAt(const Vector3& eye, const Vector3& target);
     Vector2 WorldToScreen (const Vector3& worldPosition) const;
+    Ray ScreenToRay(const Vector2& mousePos) const;
     // ===============================
     // getter（外部から値を取得）
     // ===============================
