@@ -79,6 +79,12 @@ void GamePlayScene::Initialize()
     collisionText_->SetOutlineColor({ 0.0f, 0.0f, 0.0f, 1.0f });
     collisionText_->SetOutlineWidth(2.0f);
     UpdateCollisionText();
+
+#ifdef USE_IMGUI
+    mapEditor_ = std::make_unique<MapEditor>();
+    mapEditor_->Initialize();
+    mapEditor_->SetLevelData(levelData, kStage1Json);
+#endif
 }
 
 void GamePlayScene::Finalize()
@@ -94,6 +100,15 @@ void GamePlayScene::Update()
             std::make_unique<StageSelectScene>());
         return;
     }
+
+#ifdef USE_IMGUI
+    if (mapEditor_) {
+        mapEditor_->Update();
+        if (mapEditor_->IsActive()) {
+            return;
+        }
+    }
+#endif
 
     player_->Update();
     UpdateFollowCamera();
@@ -129,6 +144,11 @@ void GamePlayScene::DrawParticle()
 
 void GamePlayScene::DrawImGui()
 {
+#ifdef USE_IMGUI
+    if (mapEditor_) {
+        mapEditor_->DrawImGui();
+    }
+#endif
 }
 
 void GamePlayScene::UpdateFollowCamera()

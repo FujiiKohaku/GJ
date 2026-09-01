@@ -313,3 +313,28 @@ void LevelDataLoader::LoadObject(const nlohmann::json& objectJson, LevelData& le
         }
     }
 }
+
+void LevelDataLoader::Save(const std::string& filePath, const LevelData& levelData)
+{
+    nlohmann::json root;
+    
+    if (!levelData.tileMaps.empty()) {
+        nlohmann::json tileMapsArray = nlohmann::json::array();
+        for (const auto& mapData : levelData.tileMaps) {
+            nlohmann::json mapJson;
+            mapJson["name"] = mapData.name;
+            mapJson["width"] = mapData.width;
+            mapJson["height"] = mapData.height;
+            mapJson["data"] = mapData.data;
+            tileMapsArray.push_back(mapJson);
+        }
+        root["tileMaps"] = tileMapsArray;
+    }
+
+    // 今後 objects やその他のデータも保存できるように拡張する
+    std::ofstream file(filePath);
+    if (file.is_open()) {
+        file << root.dump(4);
+        file.close();
+    }
+}

@@ -3,6 +3,9 @@
 #include "App/Game/Map/MapChipStage.h"
 #include "App/Game/Player/MapChipPlayer.h"
 #include "BaseScene.h"
+#ifdef USE_IMGUI
+#include "Engine/LevelEditor/MapEditor.h"
+#endif
 #include "Engine/2D/Text/Text.h"
 #include "Engine/3D/SkyBox/SkyBox.h"
 #include "Engine/Camera/Camera.h"
@@ -28,4 +31,7 @@ private:
     std::unique_ptr<Text> collisionText_;
     MapChipStage mapChipStage_;
     std::unique_ptr<MapChipPlayer> player_;
+#ifdef USE_IMGUI
+    std::unique_ptr<MapEditor> mapEditor_;
+#endif
 };
