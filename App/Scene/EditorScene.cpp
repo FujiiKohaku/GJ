@@ -153,15 +153,20 @@ void EditorScene::Initialize()
         Logger::Log("Failed to initialize UdpServer\n");
     }
 
-    // Python ツールの自動起動 (黒いターミナルウィンドウを出さないように ShellExecute を使用)
-    ShellExecuteA(
-        nullptr,
-        "open",
-        "pythonw",
-        "C:\\Users\\flone\\.gemini\\antigravity-ide\\brain\\61c407c1-55ac-4150-b0f6-731f9df6b871\\scratch\\editor_tool.py",
-        nullptr,
-        SW_HIDE
-    );
+    // Python ツールの自動起動 (プロセスを管理して終了時にKillするため CreateProcessA を使用)
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+    ZeroMemory(&pi, sizeof(pi));
+
+    char cmd[] = "pythonw C:\\Users\\flone\\.gemini\\antigravity-ide\\brain\\61c407c1-55ac-4150-b0f6-731f9df6b871\\scratch\\editor_tool.py";
+    if (CreateProcessA(nullptr, cmd, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+        toolProcessHandle_ = pi.hProcess;
+        CloseHandle(pi.hThread);
+    }
 }
 
 void EditorScene::Finalize()
@@ -171,6 +176,12 @@ void EditorScene::Finalize()
     
     if (udpServer_) {
         udpServer_->Finalize();
+    }
+
+    if (toolProcessHandle_) {
+        TerminateProcess(static_cast<HANDLE>(toolProcessHandle_), 0);
+        CloseHandle(static_cast<HANDLE>(toolProcessHandle_));
+        toolProcessHandle_ = nullptr;
     }
 }
 

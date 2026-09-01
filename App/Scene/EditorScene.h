@@ -50,5 +50,8 @@ private:
     int32_t selectedX_ = -1;
     int32_t selectedY_ = -1;
     
+    // 外部ツールのプロセスハンドル
+    void* toolProcessHandle_ = nullptr;
+    
     LevelData::ObjectData* GetSelectedGimmick();
 };
