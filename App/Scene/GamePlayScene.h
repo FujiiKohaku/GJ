@@ -6,6 +6,7 @@
 #include "Engine/2D/Text/Text.h"
 #include "Engine/3D/SkyBox/SkyBox.h"
 #include "Engine/Camera/Camera.h"
+#include "PageTransition.h"
 #include <memory>
 
 class GamePlayScene : public BaseScene {
@@ -28,4 +29,5 @@ private:
     std::unique_ptr<Text> collisionText_;
     MapChipStage mapChipStage_;
     std::unique_ptr<MapChipPlayer> player_;
+    PageTransition::RevealOverlay pageReveal_;
 };

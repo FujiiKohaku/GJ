@@ -5,6 +5,7 @@
 #include "Engine/Camera/Camera.h"
 #include "Engine/Fluid/GpuSphFluid.h"
 #include "Engine/Fluid/FluidForceRenderer.h"
+#include "PageTransition.h"
 
 #include <memory>
 
@@ -27,4 +28,5 @@ private:
     std::unique_ptr<Text> instructionText_;
 
     bool showForces_ = false;
+    PageTransition::RevealOverlay pageReveal_;
 };

@@ -2,6 +2,7 @@
 
 #include "BaseScene.h"
 #include "Engine/2D/Text/Text.h"
+#include "Engine/2D/Sprite.h"
 #include "Engine/3D/Object3d.h"
 #include "Engine/Camera/Camera.h"
 #include <cstdint>
@@ -70,6 +71,7 @@ private:
     void ChangeStageIndex();
     void RefreshStageText();
     void ConfirmStage();
+    void UpdateStageConfirmed(float deltaTime);
 
     static float Clamp01(float value);
     static float SmoothStep(float value);
@@ -96,6 +98,7 @@ private:
     std::unique_ptr<Text> descriptionText_;
     std::unique_ptr<Text> pageText_;
     std::unique_ptr<Text> instructionText_;
+    std::unique_ptr<Sprite> transitionPage_;
 
     std::vector<StageData> stages_;
     BookSelectState state_ = BookSelectState::CameraApproach;
@@ -107,4 +110,6 @@ private:
     float pageTurnProgress_ = 0.0f;
     bool stageIndexChanged_ = false;
     bool openingRifflePlayed_ = false;
+    bool confirmationPageSoundPlayed_ = false;
+    bool confirmedTestScene_ = false;
 };

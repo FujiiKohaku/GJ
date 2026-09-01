@@ -1,6 +1,7 @@
 #include "StageSelectScene.h"
 
 #include "Engine/2D/Text/TextRenderer.h"
+#include "Engine/2D/SpriteManager.h"
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/Input/Input.h"
@@ -10,6 +11,7 @@
 #include "Engine/math/MatrixMath.h"
 #include "GamePlayScene.h"
 #include "SceneManager.h"
+#include "PageTransition.h"
 #include "TestScene.h"
 #include <cmath>
 #include <algorithm>
@@ -36,10 +38,13 @@ constexpr const char* kBackSoundPath = "resources/Audio/StageSelect/back.wav";
 constexpr const char* kArchiveRoomModel = "StageSelectBook/ArchiveRoom.obj";
 constexpr float kCameraApproachDuration = 2.4f;
 constexpr float kTitleReturnDuration = 2.0f;
+constexpr float kConfirmSceneChangeTime = 1.15f;
 const Vector3 kCameraStartEye = { 0.0f, 3.8f, -35.0f };
 const Vector3 kCameraEndEye = { 0.75f, 1.65f, -16.5f };
+const Vector3 kConfirmCameraEye = { 0.20f, 0.80f, -7.0f };
 const Vector3 kCameraStartTarget = { 0.0f, -1.0f, 1.0f };
 const Vector3 kCameraEndTarget = { 0.0f, -0.20f, 0.0f };
+const Vector3 kConfirmCameraTarget = { 0.0f, -0.10f, 0.0f };
 
 constexpr float kCardOpenDuration = 0.42f;
 constexpr float kCardCloseDuration = 0.22f;
@@ -50,7 +55,7 @@ constexpr uint32_t kTurningPageStripCount = 24;
 constexpr uint32_t kOpeningPageCount = 24;
 constexpr uint32_t kOpeningPageStripCount = 16;
 constexpr uint32_t kPrintPageCount = 8;
-constexpr uint32_t kDustMoteCount = 42;
+constexpr uint32_t kDustMoteCount = 52;
 constexpr int32_t kPrintSpreadCount = kPrintPageCount / 2;
 constexpr float kBookPageWidth = 4.45f;
 constexpr float kBookPageHeight = 5.05f;
@@ -292,9 +297,9 @@ void StageSelectScene::InitializeDustMotes()
 
         // 決まった数列を使い、起動するたびに配置が変わらないようにする。
         mote.basePosition = {
-            std::sin(seed * 2.17f) * 8.5f,
-            -3.2f + std::fmod(seed * 1.73f, 8.4f),
-            -7.0f + std::fmod(seed * 2.91f, 13.0f)
+            std::sin(seed * 2.17f) * 10.5f,
+            -4.2f + std::fmod(seed * 1.73f, 10.7f),
+            -9.0f + std::fmod(seed * 2.91f, 16.0f)
         };
         mote.phase = seed * 0.83f;
         mote.speed = 0.10f + std::fmod(seed * 0.037f, 0.13f);
@@ -316,8 +321,8 @@ void StageSelectScene::UpdateDustMotes(float deltaTime)
     const float totalTime = static_cast<float>(TimeManager::GetInstance()->GetTotalTime());
     for (DustMote& mote : dustMotes_) {
         mote.basePosition.y += mote.speed * deltaTime;
-        if (mote.basePosition.y > 5.2f) {
-            mote.basePosition.y = -3.2f;
+        if (mote.basePosition.y > 6.5f) {
+            mote.basePosition.y = -4.2f;
         }
 
         const Vector3 position = {
@@ -349,6 +354,14 @@ void StageSelectScene::EnterTitleMode()
     titleText_->SetColor({ 0.35f, 0.85f, 1.0f, 1.0f });
     instructionText_->SetText("ENTER / SPACE : START");
     instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, 1.0f });
+
+    transitionPage_ = std::make_unique<Sprite>();
+    transitionPage_->Initialize(SpriteManager::GetInstance(), "resources/Textures/white.png");
+    transitionPage_->SetAnchorPoint({ 0.5f, 0.5f });
+    transitionPage_->SetPosition({ 640.0f, 360.0f });
+    transitionPage_->SetSize({ 1280.0f, 720.0f });
+    transitionPage_->SetColor({ 1.0f, 0.91f, 0.68f, 0.0f });
+    transitionPage_->Update();
 }
 
 void StageSelectScene::StartArchiveApproach()
@@ -449,10 +462,12 @@ void StageSelectScene::Update()
         UpdatePageTurning(deltaTime);
     } else if (state_ == BookSelectState::ReturningToTitle) {
         UpdateTitleReturn(deltaTime);
+    } else if (state_ == BookSelectState::StageConfirmed) {
+        UpdateStageConfirmed(deltaTime);
     }
 
     camera_->Update();
-    if (state_ == BookSelectState::CameraApproach) {
+    if (state_ == BookSelectState::CameraApproach || state_ == BookSelectState::StageConfirmed) {
         for (uint32_t page = 0; page < kOpeningPageCount; ++page) {
             if (!openingPageVisible_[page]) {
                 continue;
@@ -842,11 +857,58 @@ void StageSelectScene::ConfirmStage()
     state_ = BookSelectState::StageConfirmed;
     SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.75f);
     const StageData& stage = stages_[currentStageIndex_];
-    if (stage.opensTestScene) {
-        SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());
-        return;
+    confirmedTestScene_ = stage.opensTestScene;
+    confirmationPageSoundPlayed_ = false;
+    std::fill(openingPageVisible_.begin(), openingPageVisible_.end(), false);
+    animationTime_ = 0.0f;
+}
+
+void StageSelectScene::UpdateStageConfirmed(float deltaTime)
+{
+    animationTime_ += deltaTime;
+
+    // 選択カードを弾ませたあと紙面へ沈め、ページの奥へ入る感触を作る。
+    const float bumpProgress = Clamp01(animationTime_ / 0.20f);
+    const float bump = std::sin(bumpProgress * std::numbers::pi_v<float>) * 0.08f;
+    const float cardSink = SmoothStep((animationTime_ - 0.18f) / 0.28f);
+    UpdateCardTransform(1.0f - cardSink, 1.0f - cardSink);
+    if (cardSink <= 0.0f) {
+        stageCard_->SetScale({ 3.85f * (1.0f + bump), 2.30f * (1.0f + bump), 0.18f });
+        stageCardShadow_->SetScale({ 4.05f * (1.0f + bump), 2.42f * (1.0f + bump), 0.12f });
     }
-    SceneManager::GetInstance()->SetNextScene(std::make_unique<GamePlayScene>());
+
+    const float goldProgress = SmoothStep((animationTime_ - 0.15f) / 0.40f);
+    stageText_->SetColor({
+        0.93f + 0.07f * goldProgress,
+        0.98f - 0.20f * goldProgress,
+        1.0f - 0.62f * goldProgress,
+        1.0f - cardSink
+    });
+
+    const float pageProgress = SmoothStep((animationTime_ - 0.25f) / 0.80f);
+    if (!confirmationPageSoundPlayed_ && animationTime_ >= 0.25f) {
+        SoundManager::GetInstance()->PlaySE(kPageRiffleSoundName, 0.72f);
+        confirmationPageSoundPlayed_ = true;
+    }
+    UpdateOpeningPages(0.24f + pageProgress * 0.76f, 1.0f);
+
+    const float cameraProgress = SmoothStep((animationTime_ - 0.30f) / 0.78f);
+    camera_->LookAt(
+        kCameraEndEye + (kConfirmCameraEye - kCameraEndEye) * cameraProgress,
+        kCameraEndTarget + (kConfirmCameraTarget - kCameraEndTarget) * cameraProgress);
+
+    const float lightProgress = SmoothStep((animationTime_ - 0.72f) / 0.43f);
+    transitionPage_->SetColor({ 1.0f, 0.91f, 0.68f, lightProgress });
+    transitionPage_->Update();
+
+    if (animationTime_ >= kConfirmSceneChangeTime) {
+        PageTransition::RequestReveal();
+        if (confirmedTestScene_) {
+            SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());
+        } else {
+            SceneManager::GetInstance()->SetNextScene(std::make_unique<GamePlayScene>());
+        }
+    }
 }
 
 float StageSelectScene::Clamp01(float value)
@@ -886,6 +948,10 @@ void StageSelectScene::Draw2D()
         pageText_->Draw();
     }
     instructionText_->Draw();
+    if (state_ == BookSelectState::StageConfirmed) {
+        SpriteManager::GetInstance()->PreDraw();
+        transitionPage_->Draw();
+    }
 }
 
 void StageSelectScene::Draw3D()
@@ -903,7 +969,7 @@ void StageSelectScene::Draw3D()
     bookSpine_->Draw();
     leftPageBlock_->Draw();
     rightPageBlock_->Draw();
-    if (state_ == BookSelectState::CameraApproach) {
+    if (state_ == BookSelectState::CameraApproach || state_ == BookSelectState::StageConfirmed) {
         for (uint32_t page = 0; page < kOpeningPageCount; ++page) {
             if (!openingPageVisible_[page]) {
                 continue;
