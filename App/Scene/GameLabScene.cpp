@@ -19,6 +19,7 @@ namespace {
 constexpr const char* kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
 constexpr const char* kFloorTexture = "resources/Textures/checkerboard.png";
+constexpr const char* kShipModelPath = "sailing_ship.obj";
 constexpr int32_t kGridHalfExtent = 10;
 constexpr float kGridSpacing = 1.0f;
 constexpr Vector3 kSmokePreviewPosition = { 3.0f, 0.05f, 2.0f };
@@ -113,6 +114,16 @@ void GameLabScene::Initialize()
     floor_->SetEnableLighting(false);
     floor_->Update();
 
+    // 帆船モデルの初期化
+    ModelManager::GetInstance()->Load(kShipModelPath);
+    shipObject_ = std::make_unique<Object3d>();
+    shipObject_->Initialize(Object3dManager::GetInstance());
+    shipObject_->SetModel(kShipModelPath);
+    shipObject_->SetTranslate({ 0.0f, 1.2f, 0.0f });
+    shipObject_->SetScale({ 0.6f, 0.6f, 0.6f });
+    shipObject_->SetEnableLighting(true);
+    shipObject_->Update();
+
     titleText_ = std::make_unique<Text>();
     titleText_->Initialize(kDefaultFont);
     titleText_->SetText("STAGE 03  GAMELAB");
@@ -178,6 +189,19 @@ void GameLabScene::Update()
     EffectManager::GetInstance()->SetCamera(camera_.get());
     EffectManager::GetInstance()->UpdatePerView();
     floor_->Update();
+
+    // 帆船のアニメーション（ゆっくり回転＋波揺れ）
+    if (shipObject_) {
+        float dt = TimeManager::GetInstance()->GetDeltaTime();
+        shipRotationY_ += 0.3f * dt;
+        float waveY = 1.2f + std::sin(shipRotationY_ * 2.5f) * 0.08f;
+        float tiltZ = std::sin(shipRotationY_ * 1.8f) * 0.06f;
+        float pitchX = std::cos(shipRotationY_ * 1.8f) * 0.04f;
+        shipObject_->SetTranslate({ 0.0f, waveY, 0.0f });
+        shipObject_->SetRotate({ pitchX, shipRotationY_, tiltZ });
+        shipObject_->Update();
+    }
+
     titleText_->Update();
     instructionText_->Update();
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
@@ -195,6 +219,9 @@ void GameLabScene::Draw3D()
 {
     Object3dManager::GetInstance()->PreDraw();
     floor_->Draw();
+    if (shipObject_) {
+        shipObject_->Draw();
+    }
     DrawDebugGrid();
 }
 
@@ -221,6 +248,23 @@ void GameLabScene::DrawImGui()
 
     ImGui::Separator();
     ImGui::Checkbox("Smoke", &isSmokeEnabled_);
+
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0.4f, 0.85f, 1.0f, 1.0f), "--- FIREWORK EFFECTS ---");
+    ImGui::DragFloat3("Launch Pos", &fireworkLaunchPosition_.x, 0.1f, -20.0f, 20.0f);
+
+    if (ImGui::Button("LAUNCH BLUE FIREWORK")) {
+        EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks", fireworkLaunchPosition_);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("LAUNCH 6-DIR TRAIL")) {
+        EffectManager::GetInstance()->PlayEffect("SixDirectionFireworkTrails", fireworkLaunchPosition_);
+    }
+
+    if (ImGui::Button("LAUNCH COMBO FIREWORK")) {
+        EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks", fireworkLaunchPosition_);
+        EffectManager::GetInstance()->PlayEffect("SixDirectionFireworkTrails", fireworkLaunchPosition_);
+    }
 
     ImGui::Separator();
     for (PostEffectToggle& toggle : postEffectToggles_) {

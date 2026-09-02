@@ -15,6 +15,7 @@
 #include "Engine/Time/TimeManager.h"
 #include "SceneManager.h"
 #include "ArchiveScene.h"
+#include "GameOverScene.h"
 #include <string>
 
 namespace {
@@ -113,7 +114,7 @@ void GamePlayScene::Initialize()
     // メニュー説明文
     menuInstructionText_ = std::make_unique<Text>();
     menuInstructionText_->Initialize(kDefaultFont);
-    menuInstructionText_->SetText("TAB : RESUME GAME\n\nBACKSPACE : STAGE SELECT");
+    menuInstructionText_->SetText("TAB : RESUME GAME\n\nG : GAME OVER\n\nBACKSPACE : STAGE SELECT");
     menuInstructionText_->SetPosition({ 640.0f, 360.0f });
     menuInstructionText_->SetAnchorPoint({ 0.5f, 0.5f });
     menuInstructionText_->SetFontSize(24.0f);
@@ -139,6 +140,11 @@ void GamePlayScene::Update()
 
     // メニューが開いているときはゲーム内処理を行わずに早期リターン
     if (isMenuOpen_) {
+        if (Input::GetInstance()->IsKeyTrigger(DIK_G)) {
+            SceneManager::GetInstance()->SetNextScene(
+                std::make_unique<GameOverScene>());
+            return;
+        }
         if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
             SceneManager::GetInstance()->SetNextScene(
                 std::make_unique<ArchiveScene>());

@@ -255,8 +255,7 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
         if (gimmick->IsGoal()) {
             Logger::Log("Goal reached\n");
             // クリアシーンへ遷移
-            SceneManager::GetInstance()->SetNextScene(
-                std::make_unique<ClearScene>());
+            SceneManager::GetInstance()->SetNextScene(std::make_unique<ClearScene>());
             return true;
         }
         

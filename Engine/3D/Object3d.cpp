@@ -137,12 +137,27 @@ ModelData Object3d::LoadModeFile(const std::string& directoryPath,
     ModelData modelData;
 
     Assimp::Importer importer;
-    std::string filePath = directoryPath + "/" + filename;
+    std::string filePath;
+    if (std::filesystem::path(filename).is_absolute() || (!directoryPath.empty() && filename.rfind(directoryPath, 0) == 0)) {
+        filePath = filename;
+    } else if (!directoryPath.empty()) {
+        filePath = directoryPath + "/" + filename;
+    } else {
+        filePath = filename;
+    }
+
+    if (!std::filesystem::exists(filePath)) {
+        if (std::filesystem::exists(filename)) {
+            filePath = filename;
+        } else if (std::filesystem::exists("resources/Models/" + filename)) {
+            filePath = "resources/Models/" + filename;
+        }
+    }
+
     std::filesystem::path modelFilePath(filePath);
     std::filesystem::path modelDirectory = modelFilePath.parent_path(); // Model Path
 
-    std::filesystem::path p(filePath);
-    if (!std::filesystem::exists(p)) {
+    if (!std::filesystem::exists(filePath)) {
         OutputDebugStringA("FILE NOT FOUND: ");
         OutputDebugStringA(filePath.c_str());
         OutputDebugStringA("\n");
@@ -158,8 +173,13 @@ ModelData Object3d::LoadModeFile(const std::string& directoryPath,
         filePath.c_str(),
         aiProcess_Triangulate | aiProcess_FlipWindingOrder | aiProcess_FlipUVs);
 
-    assert(scene);
-    assert(scene->HasMeshes());
+    if (!scene || !scene->HasMeshes()) {
+        OutputDebugStringA("Failed to load model file or no meshes: ");
+        OutputDebugStringA(filePath.c_str());
+        OutputDebugStringA("\n");
+        assert(false);
+        return modelData;
+    }
 
     // -------------------------
     // Mesh -> MeshPrimitive

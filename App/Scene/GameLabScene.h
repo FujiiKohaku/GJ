@@ -39,6 +39,8 @@ private:
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
     std::unique_ptr<Object3d> floor_;
+    std::unique_ptr<Object3d> shipObject_;
+    float shipRotationY_ = 0.0f;
     std::unique_ptr<Text> titleText_;
     std::unique_ptr<Text> instructionText_;
     std::vector<PostEffectToggle> postEffectToggles_;
@@ -51,5 +53,6 @@ private:
     float postEffectPreviewProgress_ = 0.05f;
     EffectHandle smokeEffectHandle_ = kInvalidEffectHandle;
     bool isSmokeEnabled_ = false;
+    Vector3 fireworkLaunchPosition_ = { 0.0f, 4.0f, 0.0f };
     PageTransition::RevealOverlay pageReveal_;
 };
