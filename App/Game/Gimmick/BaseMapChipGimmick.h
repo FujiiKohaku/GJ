@@ -19,4 +19,6 @@ public:
     
     virtual AABB GetAABB() const { return AABB(); }
     virtual Vector3 GetDeltaPosition() const { return {0.0f, 0.0f, 0.0f}; }
+    // ゴール判定用フラグ（デフォルトは偽）
+    virtual bool IsGoal() const { return false; }
 };
