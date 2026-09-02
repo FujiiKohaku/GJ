@@ -5,10 +5,15 @@
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/Debug/DebugRenderer.h"
+#include "Engine/Effect/EffectManager.h"
 #include "Engine/Input/Input.h"
 #include "Engine/PostEffect/PostEffectType.h"
 #include "Engine/Time/TimeManager.h"
 #include "SceneManager.h"
+
+#ifdef USE_IMGUI
+#include "externals/imgui/imgui.h"
+#endif
 
 namespace {
 constexpr const char* kDefaultFont =
@@ -16,11 +21,72 @@ constexpr const char* kDefaultFont =
 constexpr const char* kFloorTexture = "resources/Textures/checkerboard.png";
 constexpr int32_t kGridHalfExtent = 10;
 constexpr float kGridSpacing = 1.0f;
+constexpr Vector3 kSmokePreviewPosition = { 3.0f, 0.05f, 2.0f };
+const PostEffectType kPostEffectTypes[] = {
+    PostEffectType::Copy,
+    PostEffectType::GrayScale,
+    PostEffectType::Vignette,
+    PostEffectType::DepthOfField,
+    PostEffectType::MotionBlur,
+    PostEffectType::ChromaticAberration,
+    PostEffectType::LensDistortion,
+    PostEffectType::FilmGrain,
+    PostEffectType::LensDirt,
+    PostEffectType::CameraShake,
+    PostEffectType::BokehShape,
+    PostEffectType::Fisheye,
+    PostEffectType::Pixelate,
+    PostEffectType::ColorAdjust,
+    PostEffectType::smoothing,
+    PostEffectType::GaussianFilter,
+    PostEffectType::LuminanceBasedOutline,
+    PostEffectType::DepthOutline,
+    PostEffectType::RadialBlur,
+    PostEffectType::Dissolve,
+    PostEffectType::Random,
+    PostEffectType::Bloom,
+    PostEffectType::LensFlare,
+    PostEffectType::Glare,
+    PostEffectType::LightShafts,
+    PostEffectType::VolumetricLight,
+    PostEffectType::AnamorphicFlare,
+    PostEffectType::Halo,
+    PostEffectType::LightStreak,
+    PostEffectType::NeonGlow,
+    PostEffectType::GhostImage,
+    PostEffectType::Outline,
+    PostEffectType::Fog,
+    PostEffectType::FocusLine,
+    PostEffectType::Paint,
+    PostEffectType::GlassCrack,
+    PostEffectType::Shockwave,
+    PostEffectType::HeatHaze,
+    PostEffectType::SonicBoom,
+    PostEffectType::RainDrops,
+    PostEffectType::CyberScanline,
+    PostEffectType::HexShield,
+    PostEffectType::BlackHoleDistortion,
+    PostEffectType::ArchiveAtmosphere,
+};
 }
 
 void GameLabScene::Initialize()
 {
-    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
+    SceneManager* sceneManager = SceneManager::GetInstance();
+    previousTimeScale_ = TimeManager::GetInstance()->GetTimeScale();
+    previousArchiveApproach_ = sceneManager->GetArchiveApproach();
+    previousVignetteStrength_ = sceneManager->GetVignetteStrength();
+    previousPaintProgress_ = sceneManager->GetPaintProgress();
+    previousPaintIntensity_ = sceneManager->GetPaintIntensity();
+    previousSonicBoomProgress_ = sceneManager->GetSonicBoomProgress();
+    postEffectPreviewProgress_ = 0.05f;
+    sceneManager->ClearPostEffects();
+    sceneManager->AddPostEffect(
+        PostEffectType::Copy,
+        PostEffectStage::AfterParticle);
+    sceneManager->SetPostEffectKickStrength(1.0f);
+    sceneManager->SetPaintIntensity(1.0f);
+    UpdatePostEffectPreviewParameters();
     DebugRenderer::GetInstance()->SetVisible(true);
 
     camera_ = std::make_unique<Camera>();
@@ -31,6 +97,12 @@ void GameLabScene::Initialize()
 
     debugCameraController_.SetTargetCamera(camera_.get());
     debugCameraController_.SetDebugMode(true);
+
+    EffectManager::GetInstance()->SetCamera(camera_.get());
+    smokeEffectHandle_ = kInvalidEffectHandle;
+    isSmokeEnabled_ = false;
+
+    InitializePostEffectList();
 
     floor_ = std::make_unique<Object3d>();
     floor_->Initialize(Object3dManager::GetInstance());
@@ -66,6 +138,20 @@ void GameLabScene::Initialize()
 
 void GameLabScene::Finalize()
 {
+    if (EffectManager::GetInstance()->IsEffectAlive(smokeEffectHandle_)) {
+        EffectManager::GetInstance()->StopEffect(smokeEffectHandle_);
+    }
+    smokeEffectHandle_ = kInvalidEffectHandle;
+    EffectManager::GetInstance()->SetCamera(nullptr);
+
+    TimeManager::GetInstance()->SetTimeScale(previousTimeScale_);
+    SceneManager* sceneManager = SceneManager::GetInstance();
+    sceneManager->SetArchiveApproach(previousArchiveApproach_);
+    sceneManager->SetVignetteStrength(previousVignetteStrength_);
+    sceneManager->SetPaintProgress(previousPaintProgress_);
+    sceneManager->SetPaintIntensity(previousPaintIntensity_);
+    sceneManager->SetSonicBoomProgress(previousSonicBoomProgress_);
+    sceneManager->ClearPostEffects();
     debugCameraController_.SetTargetCamera(nullptr);
     Object3dManager::GetInstance()->SetDefaultCamera(nullptr);
     DebugRenderer::GetInstance()->SetVisible(false);
@@ -81,10 +167,16 @@ void GameLabScene::Update()
 
     DebugRenderer::GetInstance()->SetVisible(true);
     debugCameraController_.SetDebugMode(true);
+
+    UpdatePostEffectPreviewParameters();
+    UpdateSmokePreview();
+    EffectManager::GetInstance()->Update();
     debugCameraController_.Update();
     debugCameraController_.SetDebugMode(true);
 
     camera_->Update();
+    EffectManager::GetInstance()->SetCamera(camera_.get());
+    EffectManager::GetInstance()->UpdatePerView();
     floor_->Update();
     titleText_->Update();
     instructionText_->Update();
@@ -108,11 +200,101 @@ void GameLabScene::Draw3D()
 
 void GameLabScene::DrawParticle()
 {
+    EffectManager* effectManager = EffectManager::GetInstance();
+    effectManager->PreDraw();
+    effectManager->Draw();
 }
 
 void GameLabScene::DrawImGui()
 {
-    camera_->DrawImGui();
+#ifdef USE_IMGUI
+    ImGui::SetNextWindowSize(ImVec2(410.0f, 620.0f), ImGuiCond_FirstUseEver);
+    ImGui::Begin("GAMELAB - Engine Post Effects");
+
+    if (ImGui::Button("START TIME")) {
+        TimeManager::GetInstance()->SetTimeScale(1.0f);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("STOP TIME")) {
+        TimeManager::GetInstance()->SetTimeScale(0.0f);
+    }
+
+    ImGui::Separator();
+    ImGui::Checkbox("Smoke", &isSmokeEnabled_);
+
+    ImGui::Separator();
+    for (PostEffectToggle& toggle : postEffectToggles_) {
+        bool enabled = toggle.enabled;
+        const char* effectName = GetPostEffectTypeName(toggle.type);
+        if (ImGui::Checkbox(effectName, &enabled)) {
+            toggle.enabled = enabled;
+            ApplyPostEffectToggle(toggle);
+        }
+    }
+
+    ImGui::End();
+#endif
+}
+
+void GameLabScene::InitializePostEffectList()
+{
+    postEffectToggles_.clear();
+    for (PostEffectType type : kPostEffectTypes) {
+        PostEffectToggle toggle;
+        toggle.type = type;
+        if (type == PostEffectType::Copy) {
+            toggle.enabled = true;
+        }
+        postEffectToggles_.push_back(toggle);
+    }
+}
+
+void GameLabScene::UpdatePostEffectPreviewParameters()
+{
+    postEffectPreviewProgress_ +=
+        TimeManager::GetInstance()->GetDeltaTime() * 0.45f;
+    if (postEffectPreviewProgress_ >= 1.0f) {
+        postEffectPreviewProgress_ -= 1.0f;
+    }
+
+    SceneManager* sceneManager = SceneManager::GetInstance();
+    sceneManager->SetArchiveApproach(postEffectPreviewProgress_);
+    sceneManager->SetVignetteStrength(postEffectPreviewProgress_);
+    sceneManager->SetPaintProgress(postEffectPreviewProgress_);
+    sceneManager->SetSonicBoomProgress(postEffectPreviewProgress_);
+}
+
+void GameLabScene::UpdateSmokePreview()
+{
+    EffectManager* effectManager = EffectManager::GetInstance();
+    if (isSmokeEnabled_) {
+        if (!effectManager->IsEffectAlive(smokeEffectHandle_)) {
+            smokeEffectHandle_ = effectManager->PlayLoopEffect(
+                "Smoke",
+                kSmokePreviewPosition);
+        }
+        effectManager->SetEffectPosition(
+            smokeEffectHandle_,
+            kSmokePreviewPosition);
+        return;
+    }
+
+    if (effectManager->IsEffectAlive(smokeEffectHandle_)) {
+        effectManager->StopEffect(smokeEffectHandle_);
+    }
+    smokeEffectHandle_ = kInvalidEffectHandle;
+}
+
+void GameLabScene::ApplyPostEffectToggle(PostEffectToggle& toggle)
+{
+    SceneManager* sceneManager = SceneManager::GetInstance();
+    if (toggle.enabled) {
+        sceneManager->AddPostEffect(
+            toggle.type,
+            PostEffectStage::AfterParticle);
+        return;
+    }
+    sceneManager->RemovePostEffect(toggle.type);
 }
 
 void GameLabScene::DrawDebugGrid()
