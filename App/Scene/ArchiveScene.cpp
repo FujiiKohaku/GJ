@@ -13,14 +13,17 @@
 #include "SceneManager.h"
 #include "PageTransition.h"
 #include "TestScene.h"
+#include "GameLabScene.h"
 #include "EditorScene.h"
 #include <cmath>
 #include <algorithm>
+#include <filesystem>
 #include <numbers>
 
 namespace {
 constexpr const char* kDefaultFont ="resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
-constexpr const char* kPrintedPages = "resources/Models/StageSelectBook/PrintedPages.png";
+constexpr const char* kPrintedPageDirectory =
+    "resources/Models/StageSelectBook/Pages";
 constexpr const char* kBookLeather = "resources/Models/StageSelectBook/BookLeather.png";
 constexpr const char* kStageCardModel ="StageSelectBook/StageCard.obj";
 constexpr const char* kPageTurnSoundName = "StageSelect.PageTurn";
@@ -53,9 +56,7 @@ constexpr float kCardHiddenY = -2.35f;
 constexpr uint32_t kTurningPageStripCount = 48;
 constexpr uint32_t kOpeningPageCount = 24;
 constexpr uint32_t kOpeningPageStripCount = 16;
-constexpr uint32_t kPrintPageCount = 8;
 constexpr uint32_t kDustMoteCount = 52;
-constexpr int32_t kPrintSpreadCount = kPrintPageCount / 2;
 constexpr float kBookPageWidth = 4.45f;
 constexpr float kBookPageHeight = 5.05f;
 constexpr float kTurningPageBaseZ = -0.19f;
@@ -95,6 +96,7 @@ void ArchiveScene::Initialize()
     Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
 
     InitializeStageData();
+    LoadPrintedPagePaths();
     InitializeBookObjects();
     InitializeTurningPage();
     InitializeOpeningPages();
@@ -130,6 +132,36 @@ void ArchiveScene::InitializeStageData()
     testStage.description = "ENGINE FEATURE TEST";
     testStage.destination = StageDestination::Test;
     stages_.push_back(testStage);
+
+    StageData gameLabStage;
+    gameLabStage.name = "STAGE 03  GAMELAB";
+    gameLabStage.description = "FREE CAMERA ENGINE LAB";
+    gameLabStage.destination = StageDestination::GameLab;
+    stages_.push_back(gameLabStage);
+}
+
+void ArchiveScene::LoadPrintedPagePaths()
+{
+    printedPagePaths_.clear();
+
+    const std::filesystem::path directory(kPrintedPageDirectory);
+    std::error_code error;
+    std::filesystem::directory_iterator iterator(directory, error);
+    const std::filesystem::directory_iterator end;
+    while (!error && iterator != end) {
+        const std::filesystem::directory_entry& entry = *iterator;
+        const std::filesystem::path extension = entry.path().extension();
+        const bool isPng = extension == ".png" || extension == ".PNG";
+        if (entry.is_regular_file(error) && isPng) {
+            printedPagePaths_.push_back(entry.path().generic_string());
+        }
+        iterator.increment(error);
+    }
+
+    std::sort(printedPagePaths_.begin(), printedPagePaths_.end());
+    if (printedPagePaths_.empty()) {
+        printedPagePaths_.push_back("resources/Textures/white.png");
+    }
 }
 
 void ArchiveScene::InitializeBookObjects()
@@ -218,7 +250,8 @@ void ArchiveScene::InitializeTurningPage()
         std::unique_ptr<Object3d> strip = std::make_unique<Object3d>();
         strip->Initialize(objectManager);
         strip->SetModel(ModelManager::GetInstance()->CreateBookLeaf(
-            kPrintedPages, 1, 2, index, kTurningPageStripCount));
+            GetPrintedPagePath(1), GetPrintedPagePath(2),
+            index, kTurningPageStripCount));
         strip->SetScale({ stripWidth * 1.08f, kBookPageHeight, 0.035f });
         strip->SetTranslate({ 0.0f, -8.0f, 2.0f });
         SetArchiveMaterial(strip.get(), ArchiveMaterialMode::Paper);
@@ -229,8 +262,9 @@ void ArchiveScene::InitializeTurningPage()
 
 void ArchiveScene::InitializeOpeningPages()
 {
-    for (uint32_t page = 0; page < kPrintPageCount; ++page) {
-        ModelManager::GetInstance()->CreateBookLeaf(kPrintedPages, page, page);
+    for (uint32_t page = 0; page < GetPrintPageCount(); ++page) {
+        ModelManager::GetInstance()->CreateBookLeaf(
+            GetPrintedPagePath(page), GetPrintedPagePath(page));
     }
     openingPageStrips_.reserve(kOpeningPageCount * kOpeningPageStripCount);
     openingPageVisible_.assign(kOpeningPageCount, false);
@@ -238,9 +272,11 @@ void ArchiveScene::InitializeOpeningPages()
         auto strip = std::make_unique<Object3d>();
         strip->Initialize(Object3dManager::GetInstance());
         const uint32_t leaf = index / kOpeningPageStripCount;
-        strip->SetModel(ModelManager::GetInstance()->CreateBookLeaf(kPrintedPages,
-            (leaf * 2 + 1) % kPrintPageCount, (leaf * 2 + 2) % kPrintPageCount,
-            index % kOpeningPageStripCount, kOpeningPageStripCount));
+        strip->SetModel(ModelManager::GetInstance()->CreateBookLeaf(
+            GetPrintedPagePath(leaf * 2 + 1),
+            GetPrintedPagePath(leaf * 2 + 2),
+            index % kOpeningPageStripCount,
+            kOpeningPageStripCount));
         SetArchiveMaterial(strip.get(), ArchiveMaterialMode::Paper);
         openingPageStrips_.push_back(std::move(strip));
     }
@@ -657,8 +693,8 @@ void ArchiveScene::UpdateOpeningPages(float cameraProgress, float bookProgress)
         if (cameraProgress > start) latestStarted = static_cast<int32_t>(page);
         if (cameraProgress >= start + duration) latestLanded = static_cast<int32_t>(page);
     }
-    SetPrintedPage(rightPageBlock_.get(), static_cast<uint32_t>(latestStarted * 2 + 3) % kPrintPageCount);
-    SetPrintedPage(leftPageBlock_.get(), static_cast<uint32_t>(latestLanded * 2 + 2) % kPrintPageCount);
+    SetPrintedPage(rightPageBlock_.get(), static_cast<uint32_t>(latestStarted * 2 + 3));
+    SetPrintedPage(leftPageBlock_.get(), static_cast<uint32_t>(latestLanded * 2 + 2));
     const float contact = Clamp01(static_cast<float>(activeLeaves) * 0.065f);
     leftPageBlock_->GetMaterial()->environmentCoefficient = contact;
     rightPageBlock_->GetMaterial()->environmentCoefficient = contact;
@@ -715,7 +751,25 @@ void ArchiveScene::UpdateOpeningPages(float cameraProgress, float bookProgress)
 
 void ArchiveScene::SetPrintedPage(Object3d* object, uint32_t page)
 {
-    object->SetModel(ModelManager::GetInstance()->CreateBookLeaf(kPrintedPages, page, page));
+    const std::string& pagePath = GetPrintedPagePath(page);
+    object->SetModel(ModelManager::GetInstance()->CreateBookLeaf(pagePath, pagePath));
+}
+
+const std::string& ArchiveScene::GetPrintedPagePath(uint32_t page) const
+{
+    const uint32_t pageCount = GetPrintPageCount();
+    return printedPagePaths_[page % pageCount];
+}
+
+uint32_t ArchiveScene::GetPrintPageCount() const
+{
+    return static_cast<uint32_t>(printedPagePaths_.size());
+}
+
+int32_t ArchiveScene::GetPrintSpreadCount() const
+{
+    const uint32_t pageCount = GetPrintPageCount();
+    return static_cast<int32_t>((pageCount + 1) / 2);
 }
 
 void ArchiveScene::StartPageTurn(PageTurnDirection direction)
@@ -732,7 +786,9 @@ void ArchiveScene::StartPageTurn(PageTurnDirection direction)
     pageTurnDirection_ = direction;
     const int32_t directionValue = static_cast<int32_t>(direction);
 	//次のページのインデックスを計算する。右にめくる場合は+1、左にめくる場合は-1。
-    nextPrintSpreadIndex_ =(printSpreadIndex_ + directionValue + kPrintSpreadCount) % kPrintSpreadCount;
+    const int32_t printSpreadCount = GetPrintSpreadCount();
+    nextPrintSpreadIndex_ =
+        (printSpreadIndex_ + directionValue + printSpreadCount) % printSpreadCount;
     uint32_t front = 0;
     uint32_t back = 0;
 	//めくる方向に応じて、表紙と裏表紙のページ番号を取得する。
@@ -745,7 +801,10 @@ void ArchiveScene::StartPageTurn(PageTurnDirection direction)
     }
 	//めくるページの表と裏のモデルを作成し、各ストリップに設定する。
     for (uint32_t index = 0; index < kTurningPageStripCount; ++index) {
-        turningPageStrips_[index]->SetModel(ModelManager::GetInstance()->CreateBookLeaf(kPrintedPages, front, back, index, kTurningPageStripCount));
+        turningPageStrips_[index]->SetModel(
+            ModelManager::GetInstance()->CreateBookLeaf(
+                GetPrintedPagePath(front), GetPrintedPagePath(back),
+                index, kTurningPageStripCount));
     }
     animationTime_ = 0.0f;
     pageTurnProgress_ = 0.0f;
@@ -994,6 +1053,9 @@ void ArchiveScene::UpdateStageConfirmed(float deltaTime)
             break;
         case StageDestination::Test:
             SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());
+            break;
+        case StageDestination::GameLab:
+            SceneManager::GetInstance()->SetNextScene(std::make_unique<GameLabScene>());
             break;
         }
     }
