@@ -9,6 +9,7 @@
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/LevelEditor/LevelDataLoader.h"
 #include "Engine/LevelEditor/GimmickParamFactory.h"
+#include "App/Game/Gimmick/MovingBlockParam.h"
 #include "Engine/Logger/Logger.h"
 #include "Engine/ImGuiManager/ImGuiManager.h"
 #include "Engine/3D/ModelManager.h"
@@ -315,13 +316,26 @@ void EditorScene::Draw3D()
     // Debug線の描画 (選択中のギミックがある場合)
     if (selectedGimmick && selectedGimmick->type == "MovingBlock") {
         Vector3 basePos = selectedGimmick->translation;
-        // ギミックの移動幅(range)はUI上ではマス数で持つが、実際の距離に変換する
-        float distance = selectedGimmick->gimmick.range.x; // RangeのX成分をスライダーとして使う
+        
+        float distance = 0.0f;
+        Vector3 axis = {0.0f, 0.0f, 0.0f};
+        
+        // 新しいパラメータクラスが存在する場合はそちらを使用
+        if (selectedGimmick->gimmickParam) {
+            MovingBlockParam* param = dynamic_cast<MovingBlockParam*>(selectedGimmick->gimmickParam.get());
+            if (param) {
+                distance = param->range_.x; // RangeのX成分をスライダーとして使う
+                axis = param->axis_;
+            }
+        } else {
+            distance = selectedGimmick->gimmick.range.x;
+            axis = selectedGimmick->gimmick.axis;
+        }
         
         Vector3 endPos = {
-            basePos.x + selectedGimmick->gimmick.axis.x * distance,
-            basePos.y + selectedGimmick->gimmick.axis.y * distance,
-            basePos.z + selectedGimmick->gimmick.axis.z * distance
+            basePos.x + axis.x * distance,
+            basePos.y + axis.y * distance,
+            basePos.z + axis.z * distance
         };
         
         DebugRenderer::GetInstance()->AddLine(basePos, endPos, { 0.0f, 1.0f, 0.0f, 1.0f }, 2.0f);

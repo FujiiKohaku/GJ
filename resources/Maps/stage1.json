@@ -12,6 +12,21 @@
     },
     {
       "file_name": "cube",
+      "gimmick": {
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "exists": true,
+        "range": [
+          3.0,
+          0.0,
+          0.0
+        ],
+        "speed": 2.0,
+        "type": "MovingBlock"
+      },
       "name": "MovingBlock",
       "transform": {
         "translation": [
@@ -24,6 +39,21 @@
     },
     {
       "file_name": "cube",
+      "gimmick": {
+        "axis": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "exists": true,
+        "range": [
+          3.0,
+          0.0,
+          0.0
+        ],
+        "speed": 2.0,
+        "type": "MovingBlock"
+      },
       "name": "MovingBlock",
       "transform": {
         "translation": [
@@ -36,6 +66,21 @@
     },
     {
       "file_name": "cube",
+      "gimmick": {
+        "axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "exists": true,
+        "range": [
+          4.0,
+          0.0,
+          0.0
+        ],
+        "speed": 2.0,
+        "type": "MovingBlock"
+      },
       "name": "MovingBlock",
       "transform": {
         "translation": [
@@ -1371,7 +1416,7 @@
         0,
         0,
         1,
-        0,
+        1,
         0,
         0,
         2,

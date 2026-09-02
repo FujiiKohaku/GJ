@@ -228,32 +228,39 @@ void LevelDataLoader::LoadObject(const nlohmann::json& objectJson, LevelData& le
     }
 
     // 案Cに基づくファクトリによる動的パース処理
+    // 古いデータや保存漏れに備えて、まずは親の type でインスタンスを生成する
+    objectData.gimmickParam = GimmickParamFactory::GetInstance()->Create(objectData.type);
+
     if (objectJson.contains("gimmick")) {
         const nlohmann::json& gimmickJson = objectJson["gimmick"];
+        
+        std::string gimmickType = objectData.type;
         if (gimmickJson.contains("type")) {
-            std::string gimmickType = gimmickJson["type"].get<std::string>();
-            // ファクトリから対応するパラメータクラスを生成
-            objectData.gimmickParam = GimmickParamFactory::GetInstance()->Create(gimmickType);
-            
-            if (objectData.gimmickParam) {
-                objectData.gimmickParam->Parse(gimmickJson);
-            } else {
-                // 未対応ギミックの場合は従来のフォールバック処理（移行期間用）
-                objectData.gimmick.exists = true;
-                objectData.gimmick.type = gimmickType;
-                if (gimmickJson.contains("speed")) {
-                    objectData.gimmick.speed = gimmickJson["speed"].get<float>();
-                }
-                if (gimmickJson.contains("range")) {
-                    objectData.gimmick.range.x = gimmickJson["range"][0].get<float>();
-                    objectData.gimmick.range.y = gimmickJson["range"][2].get<float>();
-                    objectData.gimmick.range.z = gimmickJson["range"][1].get<float>();
-                }
-                if (gimmickJson.contains("axis")) {
-                    objectData.gimmick.axis.x = gimmickJson["axis"][0].get<float>();
-                    objectData.gimmick.axis.y = gimmickJson["axis"][2].get<float>();
-                    objectData.gimmick.axis.z = gimmickJson["axis"][1].get<float>();
-                }
+            gimmickType = gimmickJson["type"].get<std::string>();
+            // 親と異なる場合のみ再生成
+            if (gimmickType != objectData.type) {
+                objectData.gimmickParam = GimmickParamFactory::GetInstance()->Create(gimmickType);
+            }
+        }
+        
+        if (objectData.gimmickParam) {
+            objectData.gimmickParam->Parse(gimmickJson);
+        } else {
+            // 未対応ギミックの場合は従来のフォールバック処理（移行期間用）
+            objectData.gimmick.exists = true;
+            objectData.gimmick.type = gimmickType;
+            if (gimmickJson.contains("speed")) {
+                objectData.gimmick.speed = gimmickJson["speed"].get<float>();
+            }
+            if (gimmickJson.contains("range")) {
+                objectData.gimmick.range.x = gimmickJson["range"][0].get<float>();
+                objectData.gimmick.range.y = gimmickJson["range"][2].get<float>();
+                objectData.gimmick.range.z = gimmickJson["range"][1].get<float>();
+            }
+            if (gimmickJson.contains("axis")) {
+                objectData.gimmick.axis.x = gimmickJson["axis"][0].get<float>();
+                objectData.gimmick.axis.y = gimmickJson["axis"][2].get<float>();
+                objectData.gimmick.axis.z = gimmickJson["axis"][1].get<float>();
             }
         }
     }
