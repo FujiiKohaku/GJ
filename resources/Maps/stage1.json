@@ -78,6 +78,17 @@
         ]
       },
       "type": "MovingBlock"
+    },
+    {
+      "transform": {
+        "translation": [
+          2.0,
+          0.0,
+          1.0
+        ]
+      },
+      "type": "Goal",
+      "file_name": "GoalPost/GoalPost.obj"
     }
   ],
   "tileMaps": [

@@ -162,8 +162,10 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
-    <ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="App\Game\Gimmick\GoalGimmick.cpp" />
     <ClCompile Include="Engine\Event\EventDispatcher.cpp" />
+    <ClInclude Include="App\Game\Gimmick\GoalGimmick.h" />
     <ClInclude Include="Engine\CollisionManager\CollisionLayer.h" />
     <ClCompile Include="App\SlimePlayer.cpp" />
     <ClCompile Include="App\Scene\EditorScene.cpp" />
