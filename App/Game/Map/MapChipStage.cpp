@@ -1,6 +1,7 @@
 #include "MapChipStage.h"
 
 #include "App/Game/Gimmick/MapChipGimmickFactory.h"
+#include "App/Game/Gimmick/GoalGimmick.h"
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3d.h"
 #include "Engine/3D/Object3dManager.h"
@@ -79,6 +80,18 @@ void MapChipStage::Initialize(
     // 余った(使われなくなった)ブロックを配列から削除
     if (currentBlockIndex < blockObjects_.size()) {
         blockObjects_.erase(blockObjects_.begin() + currentBlockIndex, blockObjects_.end());
+    }
+
+    // objects 配列に独立して存在するギミック（例: Goal）を追加で作成
+    for (const auto& obj : levelData.objects) {
+        if (obj.type == "Goal") {
+            std::unique_ptr<BaseMapChipGimmick> gimmick = std::make_unique<GoalGimmick>();
+            // fileName が指定されていればモデルファイルとして渡す
+            const std::string modelFile = obj.fileName.empty() ? std::string() : obj.fileName;
+            if (gimmick->Initialize(obj.translation, modelFile, obj.gimmickParam.get())) {
+                gimmicks_.push_back(std::move(gimmick));
+            }
+        }
     }
 }
 

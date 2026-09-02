@@ -1,6 +1,8 @@
 #include "MapChipPlayer.h"
 #include "App/Game/Gimmick/BaseMapChipGimmick.h"
 #include "Engine/Logger/Logger.h"
+#include "App/Scene/SceneManager.h"
+#include "App/Scene/ArchiveScene.h"
 
 #include "App/Game/Map/MapChipField.h"
 #include "Engine/3D/Object3d.h"
@@ -247,6 +249,14 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
         CollisionHit hit = CollisionManager::Intersect(playerBox, blockBox);
         if (!hit.isHit || hit.penetration <= kCollisionEpsilon) {
             continue;
+        }
+        // ゴール判定
+        if (gimmick->IsGoal()) {
+            Logger::Log("Goal reached\n");
+            // シンプルにアーカイブシーンへ遷移（クリア演出は別途実装）
+            SceneManager::GetInstance()->SetNextScene(
+                std::make_unique<ArchiveScene>());
+            return true;
         }
         
         if (isHorizontal) {
