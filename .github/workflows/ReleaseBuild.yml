@@ -7,7 +7,7 @@ on:
 
 env:
   # リポジトリのルートディレクトリを基点としたソリューションファイルのパス
-  SOLUTION_FILE_PATH: project/Irufemi.sln
+  SOLUTION_FILE_PATH: GJ.sln
   # Visual Studio の構成
   CONFIGURATION: Release
 
@@ -33,9 +33,9 @@ jobs:
       - name: Build for IBS Branch (Application_team only)
         if: github.ref_name == 'IBS'
         run: |
-          msbuild ${{ env.SOLUTION_FILE_PATH }} /t:Application_team /p:Platform=x64;Configuration=${{ env.CONFIGURATION }};PlatformToolset=v143
+          msbuild ${{ env.SOLUTION_FILE_PATH }} /t:Application_team /p:Platform=x64,Configuration=${{ env.CONFIGURATION }},PlatformToolset=v143
 
       - name: Build for Other Branches (Whole Solution)
         if: github.ref_name != 'IBS'
         run: |
-          msbuild ${{ env.SOLUTION_FILE_PATH }} /p:Platform=x64;Configuration=${{ env.CONFIGURATION }};PlatformToolset=v143
+          msbuild ${{ env.SOLUTION_FILE_PATH }} /p:Platform=x64,Configuration=${{ env.CONFIGURATION }},PlatformToolset=v143
