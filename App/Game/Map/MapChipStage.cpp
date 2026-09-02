@@ -86,8 +86,8 @@ void MapChipStage::Initialize(
     for (const auto& obj : levelData.objects) {
         if (obj.type == "Goal") {
             std::unique_ptr<BaseMapChipGimmick> gimmick = std::make_unique<GoalGimmick>();
-            // fileName が指定されていればモデルファイルとして渡す
-            const std::string modelFile = obj.fileName.empty() ? std::string() : obj.fileName;
+            // fileName が指定されていればモデルファイルとして渡す。古いデータ等で空の場合はデフォルトを設定
+            const std::string modelFile = obj.fileName.empty() ? "GoalPost/GoalPost.obj" : obj.fileName;
             if (gimmick->Initialize(obj.translation, modelFile, obj.gimmickParam.get())) {
                 gimmicks_.push_back(std::move(gimmick));
             }

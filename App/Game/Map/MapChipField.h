@@ -10,6 +10,7 @@ enum class MapChipType {
     Blank = 0,
     Block = 1,
     MovingBlock = 2,
+    Goal = 4,
 };
 
 class MapChipField {
