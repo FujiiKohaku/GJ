@@ -3,6 +3,7 @@
 #include "Engine/Logger/Logger.h"
 #include "App/Scene/SceneManager.h"
 #include "App/Scene/ArchiveScene.h"
+#include "App/Scene/ClearScene.h"
 
 #include "App/Game/Map/MapChipField.h"
 #include "Engine/3D/Object3d.h"
@@ -253,9 +254,9 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
         // ゴール判定
         if (gimmick->IsGoal()) {
             Logger::Log("Goal reached\n");
-            // シンプルにアーカイブシーンへ遷移（クリア演出は別途実装）
+            // クリアシーンへ遷移
             SceneManager::GetInstance()->SetNextScene(
-                std::make_unique<ArchiveScene>());
+                std::make_unique<ClearScene>());
             return true;
         }
         

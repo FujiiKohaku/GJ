@@ -1,5 +1,6 @@
 #include "GamePlayScene.h"
 
+#include "Engine/2D/SpriteManager.h"
 #include "Engine/2D/Text/TextRenderer.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/3D/ModelManager.h"
@@ -19,6 +20,7 @@
 namespace {
 constexpr const char* kSkyBoxTexture = "resources/Textures/skybox.dds";
 constexpr const char* kMapChipTexture = "resources/Textures/checkerboard.png";
+constexpr const char* kWhiteTexture = "resources/Textures/white.png";
 constexpr const char* kStage1Json = "resources/Maps/stage1.json";
 constexpr float kCameraDistance = 15.0f;
 constexpr const char* kDefaultFont =
@@ -66,7 +68,7 @@ void GamePlayScene::Initialize()
     instructionText_->Initialize(kDefaultFont);
     instructionText_->SetText(
         "MOVE : A/D OR LEFT/RIGHT   JUMP : SPACE/W/UP   "
-        "BACKSPACE : STAGE SELECT");
+        "TAB : MENU   BACKSPACE : STAGE SELECT");
     instructionText_->SetPosition({ 32.0f, 32.0f });
     instructionText_->SetFontSize(24.0f);
     instructionText_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
@@ -82,6 +84,41 @@ void GamePlayScene::Initialize()
     collisionText_->SetOutlineWidth(2.0f);
     UpdateCollisionText();
 
+    // メニューUIの初期化
+    TextureManager::GetInstance()->LoadTexture(kWhiteTexture);
+
+    // 全画面半透明暗幕
+    menuBackgroundSprite_ = std::make_unique<Sprite>();
+    menuBackgroundSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+    menuBackgroundSprite_->SetSize({ 1280.0f, 720.0f });
+    menuBackgroundSprite_->SetPosition({ 0.0f, 0.0f });
+    menuBackgroundSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.65f });
+
+    // 中央パネル
+    menuPanelSprite_ = std::make_unique<Sprite>();
+    menuPanelSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+    menuPanelSprite_->SetSize({ 640.0f, 380.0f });
+    menuPanelSprite_->SetPosition({ 320.0f, 170.0f });
+    menuPanelSprite_->SetColor({ 0.08f, 0.12f, 0.16f, 0.95f });
+
+    // メニュータイトル
+    menuTitleText_ = std::make_unique<Text>();
+    menuTitleText_->Initialize(kDefaultFont);
+    menuTitleText_->SetText("PAUSE MENU");
+    menuTitleText_->SetPosition({ 640.0f, 230.0f });
+    menuTitleText_->SetAnchorPoint({ 0.5f, 0.5f });
+    menuTitleText_->SetFontSize(44.0f);
+    menuTitleText_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+
+    // メニュー説明文
+    menuInstructionText_ = std::make_unique<Text>();
+    menuInstructionText_->Initialize(kDefaultFont);
+    menuInstructionText_->SetText("TAB : RESUME GAME\n\nBACKSPACE : STAGE SELECT");
+    menuInstructionText_->SetPosition({ 640.0f, 360.0f });
+    menuInstructionText_->SetAnchorPoint({ 0.5f, 0.5f });
+    menuInstructionText_->SetFontSize(24.0f);
+    menuInstructionText_->SetColor({ 0.8f, 0.88f, 0.95f, 1.0f });
+
     pageReveal_.InitializeIfRequested();
 }
 
@@ -94,6 +131,27 @@ void GamePlayScene::Finalize()
 void GamePlayScene::Update()
 {
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
+
+    // TABキーでメニュー開閉
+    if (Input::GetInstance()->IsKeyTrigger(DIK_TAB)) {
+        isMenuOpen_ = !isMenuOpen_;
+    }
+
+    // メニューが開いているときはゲーム内処理を行わずに早期リターン
+    if (isMenuOpen_) {
+        if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
+            SceneManager::GetInstance()->SetNextScene(
+                std::make_unique<ArchiveScene>());
+            return;
+        }
+
+        menuBackgroundSprite_->Update();
+        menuPanelSprite_->Update();
+        menuTitleText_->Update();
+        menuInstructionText_->Update();
+        return;
+    }
+
     if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
         SceneManager::GetInstance()->SetNextScene(
             std::make_unique<ArchiveScene>());
@@ -116,6 +174,17 @@ void GamePlayScene::Draw2D()
     instructionText_->Draw();
     collisionText_->Draw();
     pageReveal_.Draw();
+
+    // メニュー表示中は最前面に暗幕とメニューパネルを描画
+    if (isMenuOpen_) {
+        SpriteManager::GetInstance()->PreDraw();
+        menuBackgroundSprite_->Draw();
+        menuPanelSprite_->Draw();
+
+        TextRenderer::GetInstance()->PreDraw();
+        menuTitleText_->Draw();
+        menuInstructionText_->Draw();
+    }
 }
 
 void GamePlayScene::Draw3D()
