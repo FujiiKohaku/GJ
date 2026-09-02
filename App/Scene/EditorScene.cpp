@@ -162,7 +162,7 @@ void EditorScene::Initialize()
     si.wShowWindow = SW_HIDE;
     ZeroMemory(&pi, sizeof(pi));
 
-    char cmd[] = "pythonw C:\\Users\\flone\\.gemini\\antigravity-ide\\brain\\61c407c1-55ac-4150-b0f6-731f9df6b871\\scratch\\editor_tool.py";
+    char cmd[] = "pythonw Tools/editor_tool.py";
     if (CreateProcessA(nullptr, cmd, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
         toolProcessHandle_ = pi.hProcess;
         CloseHandle(pi.hThread);
