@@ -131,6 +131,14 @@ void LevelDataLoader::LoadObject(const nlohmann::json& objectJson, LevelData& le
 
     if (objectJson.contains("file_name")) {
         objectData.fileName = objectJson["file_name"].get<std::string>();
+    } else {
+        if (objectData.type == "Goal") {
+            objectData.fileName = "GoalPost/GoalPost.obj";
+            objectData.name = "Goal";
+        } else if (objectData.type == "MovingBlock") {
+            objectData.fileName = "cube";
+            objectData.name = "MovingBlock";
+        }
     }
 
     if (objectJson.contains("transform")) {
@@ -365,6 +373,12 @@ void LevelDataLoader::Save(const std::string& filePath, const LevelData& levelDa
         for (const auto& obj : levelData.objects) {
             nlohmann::json objJson;
             objJson["type"] = obj.type;
+            if (!obj.name.empty()) {
+                objJson["name"] = obj.name;
+            }
+            if (!obj.fileName.empty()) {
+                objJson["file_name"] = obj.fileName;
+            }
             nlohmann::json transform;
             // ロード時の仕様に合わせて保存
             transform["translation"] = { obj.translation.x, obj.translation.z, obj.translation.y };

@@ -11,19 +11,8 @@
       "type": "PlayerSpawn"
     },
     {
-      "gimmick": {
-        "axis": [
-          0.0,
-          1.0,
-          0.0
-        ],
-        "range": [
-          2.0,
-          0.0,
-          0.0
-        ],
-        "speed": 2.0
-      },
+      "file_name": "cube",
+      "name": "MovingBlock",
       "transform": {
         "translation": [
           3.0,
@@ -34,19 +23,8 @@
       "type": "MovingBlock"
     },
     {
-      "gimmick": {
-        "axis": [
-          -1.0,
-          0.0,
-          0.0
-        ],
-        "range": [
-          4.0,
-          0.0,
-          0.0
-        ],
-        "speed": 2.0
-      },
+      "file_name": "cube",
+      "name": "MovingBlock",
       "transform": {
         "translation": [
           6.0,
@@ -57,19 +35,8 @@
       "type": "MovingBlock"
     },
     {
-      "gimmick": {
-        "axis": [
-          0.0,
-          1.0,
-          0.0
-        ],
-        "range": [
-          2.0,
-          0.0,
-          0.0
-        ],
-        "speed": 2.0
-      },
+      "file_name": "cube",
+      "name": "MovingBlock",
       "transform": {
         "translation": [
           12.0,
@@ -80,15 +47,16 @@
       "type": "MovingBlock"
     },
     {
+      "file_name": "GoalPost/GoalPost.obj",
+      "name": "Goal",
       "transform": {
         "translation": [
-          2.0,
+          7.0,
           0.0,
           1.0
         ]
       },
-      "type": "Goal",
-      "file_name": "GoalPost/GoalPost.obj"
+      "type": "Goal"
     }
   ],
   "tileMaps": [

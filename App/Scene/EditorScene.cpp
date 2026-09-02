@@ -460,9 +460,42 @@ void EditorScene::UpdateRaycastEdit()
     bool isLeftClick = !input->IsKeyPressed(DIK_LSHIFT) && !input->IsKeyPressed(DIK_LCONTROL) && input->IsMousePressed(0);
     bool isRightClick = !input->IsKeyPressed(DIK_LCONTROL) && input->IsMousePressed(1);
     
-    // 左クリックを離したらドラッグ解除
+    // 左クリックを離したらドラッグ解除＆最終位置のブロックを消去
     if (!input->IsMousePressed(0)) {
+        if (isDraggingPlayer_ || isDraggingGoal_) {
+            Vector3 finalPos = {0,0,0};
+            bool doErase = false;
+            
+            if (isDraggingPlayer_ && !currentLevelData_.playerSpawns.empty()) {
+                finalPos = currentLevelData_.playerSpawns[0].translation;
+                doErase = true;
+            } else if (isDraggingGoal_) {
+                auto goalIt = std::find_if(currentLevelData_.objects.begin(), currentLevelData_.objects.end(),
+                    [](const LevelData::ObjectData& o) { return o.type == "Goal"; });
+                if (goalIt != currentLevelData_.objects.end()) {
+                    finalPos = goalIt->translation;
+                    doErase = true;
+                }
+            }
+            
+            if (doErase) {
+                uint32_t height = mapChipStage_.GetField().GetBlockHeight();
+                if (height > 0) {
+                    int px = static_cast<int>(std::round(finalPos.x / 1.0f));
+                    int py = static_cast<int>(height) - 1 - static_cast<int>(std::round(finalPos.y / 1.0f));
+                    if (mapChipStage_.GetField().GetMapChipTypeByIndex(px, py) != MapChipType::Blank) {
+                        mapChipStage_.GetField().SetMapChipTypeByIndex(static_cast<uint32_t>(px), static_cast<uint32_t>(py), MapChipType::Blank);
+                        DirectXCommon::GetInstance()->WaitForGPU();
+                        currentLevelData_.tileMaps[0] = mapChipStage_.GetField().GetTileMapData();
+                        mapChipStage_.Initialize(currentLevelData_);
+                        hasUnsavedChanges_ = true;
+                    }
+                }
+            }
+        }
+        
         isDraggingPlayer_ = false;
+        isDraggingGoal_ = false;
     }
 
     if (isLeftClick || isRightClick || isCtrlClick) {
@@ -500,11 +533,22 @@ void EditorScene::UpdateRaycastEdit()
                             return; // 選択したら配置処理へは行かない
                         }
 
-                        // ドラッグ開始判定 (新しくクリックしたマスに自機がいればドラッグ開始)
-                        if (isLeftClick && !isDraggingPlayer_ && !currentLevelData_.playerSpawns.empty()) {
-                            const Vector3& ppos = currentLevelData_.playerSpawns[0].translation;
-                            if (std::abs(ppos.x - snapX) < 0.1f && std::abs(ppos.y - snapY) < 0.1f) {
-                                isDraggingPlayer_ = true;
+                        // ドラッグ開始判定 (新しくクリックしたマスに自機やGoalがいればドラッグ開始)
+                        if (isLeftClick && !isDraggingPlayer_ && !isDraggingGoal_) {
+                            if (!currentLevelData_.playerSpawns.empty()) {
+                                const Vector3& ppos = currentLevelData_.playerSpawns[0].translation;
+                                if (std::abs(ppos.x - snapX) < 0.1f && std::abs(ppos.y - snapY) < 0.1f) {
+                                    isDraggingPlayer_ = true;
+                                }
+                            }
+                            
+                            // Goal のドラッグ開始判定
+                            auto goalIt = std::find_if(currentLevelData_.objects.begin(), currentLevelData_.objects.end(),
+                                [](const LevelData::ObjectData& o) { return o.type == "Goal"; });
+                            if (goalIt != currentLevelData_.objects.end()) {
+                                if (std::abs(goalIt->translation.x - snapX) < 0.1f && std::abs(goalIt->translation.y - snapY) < 0.1f) {
+                                    isDraggingGoal_ = true;
+                                }
                             }
                         }
 
@@ -519,13 +563,9 @@ void EditorScene::UpdateRaycastEdit()
                                 currentLevelData_.playerSpawns[0].translation = newPos;
                             }
                             
-                            // 自機を置いたマスのブロックは強制的に消す（Airにする）
-                            MapChipType currentType = mapChipStage_.GetField().GetMapChipTypeByIndex(xIndex, yIndex);
-                            if (currentType != MapChipType::Blank) {
-                                mapChipStage_.GetField().SetMapChipTypeByIndex(static_cast<uint32_t>(xIndex), static_cast<uint32_t>(yIndex), MapChipType::Blank);
-                                DirectXCommon::GetInstance()->WaitForGPU();
-                                currentLevelData_.tileMaps[0] = mapChipStage_.GetField().GetTileMapData();
-                                mapChipStage_.Initialize(currentLevelData_);
+                            // パレットから新規配置した際もドラッグ状態にする
+                            if (!isDraggingPlayer_) {
+                                isDraggingPlayer_ = true;
                             }
                             
                             hasUnsavedChanges_ = true;
@@ -535,8 +575,37 @@ void EditorScene::UpdateRaycastEdit()
                                 playerPreview_->Update();
                             }
                         } 
+                        // ドラッグ中、またはパレットがGoal配置(4)の場合
+                        else if (isDraggingGoal_ || (currentPalette_ == static_cast<int>(MapChipType::Goal) && isLeftClick)) {
+                            auto goalIt = std::find_if(currentLevelData_.objects.begin(), currentLevelData_.objects.end(),
+                                [](const LevelData::ObjectData& o) { return o.type == "Goal"; });
+                            
+                            if (goalIt == currentLevelData_.objects.end()) {
+                                LevelData::ObjectData newData;
+                                newData.name = "Goal";
+                                newData.type = "Goal";
+                                newData.fileName = "GoalPost/GoalPost.obj";
+                                newData.translation = newPos;
+                                newData.rotation = {0,0,0};
+                                newData.scale = {1,1,1};
+                                currentLevelData_.objects.push_back(newData);
+                            } else {
+                                goalIt->translation = newPos;
+                            }
+                            
+                            // パレットから新規配置した際もドラッグ状態にする
+                            if (!isDraggingGoal_) {
+                                isDraggingGoal_ = true;
+                            }
+                            
+                            // 座標だけ変わった場合でもInitializeでGoalのインスタンス位置を更新させるため
+                            DirectXCommon::GetInstance()->WaitForGPU();
+                            mapChipStage_.Initialize(currentLevelData_);
+                            
+                            hasUnsavedChanges_ = true;
+                        }
                         // 通常のブロック配置・削除（ドラッグ中でない場合のみ）
-                        else if (!isDraggingPlayer_) {
+                        else if (!isDraggingPlayer_ && !isDraggingGoal_) {
                             MapChipType type = isLeftClick ? static_cast<MapChipType>(currentPalette_) : MapChipType::Blank;
                             MapChipType currentType = mapChipStage_.GetField().GetMapChipTypeByIndex(xIndex, yIndex);
                             
@@ -565,17 +634,16 @@ void EditorScene::UpdateRaycastEdit()
                                         currentLevelData_.objects.erase(it, currentLevelData_.objects.end());
                                     }
                                     
-                                    // 新しく置くブロックが移動ブロックならデータを追加する
+                                    // ギミック（MovingBlock など）なら ObjectData を追加する
                                     if (type == MapChipType::MovingBlock) {
                                         LevelData::ObjectData newData;
-                                        newData.name = "MovingBlock";
-                                        newData.type = "MovingBlock";
-                                        newData.fileName = "cube";
                                         newData.translation = newPos;
                                         newData.rotation = {0,0,0};
                                         newData.scale = {1,1,1};
                                         
-                                        // GimmickParamFactory からデフォルトインスタンスを生成
+                                        newData.name = "MovingBlock";
+                                        newData.type = "MovingBlock";
+                                        newData.fileName = "cube";
                                         newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("MovingBlock");
                                         
                                         currentLevelData_.objects.push_back(newData);
