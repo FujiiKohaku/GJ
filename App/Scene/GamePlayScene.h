@@ -6,6 +6,7 @@
 #ifdef USE_IMGUI
 #include "Engine/LevelEditor/MapEditor.h"
 #endif
+#include "Engine/2D/Sprite.h"
 #include "Engine/2D/Text/Text.h"
 #include "Engine/3D/SkyBox/SkyBox.h"
 #include "Engine/Camera/Camera.h"
@@ -33,4 +34,11 @@ private:
     MapChipStage mapChipStage_;
     std::unique_ptr<MapChipPlayer> player_;
     PageTransition::RevealOverlay pageReveal_;
+
+    // メニュー関連
+    bool isMenuOpen_ = false;
+    std::unique_ptr<Sprite> menuBackgroundSprite_;
+    std::unique_ptr<Sprite> menuPanelSprite_;
+    std::unique_ptr<Text> menuTitleText_;
+    std::unique_ptr<Text> menuInstructionText_;
 };

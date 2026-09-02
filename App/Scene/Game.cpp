@@ -228,7 +228,7 @@ void Game::Update()
     DebugRenderer::GetInstance()->Update();
     
 #ifdef USE_IMGUI
-    if (showDebugUI_) {
+    if (showDebugUI_ || SceneManager::GetInstance()->WantsImGuiAlways()) {
         SceneManager::GetInstance()->DrawImGui();
     }
 #endif
@@ -240,8 +240,10 @@ void Game::Update()
     
 #ifdef USE_IMGUI
     if (showDebugUI_) {
-        renderer_->DrawImGui();
-        Profiler::GetInstance()->DrawImGui();
+        if (!SceneManager::GetInstance()->WantsImGuiAlways()) {
+            renderer_->DrawImGui();
+            Profiler::GetInstance()->DrawImGui();
+        }
     }
 
     ImGuiManager::GetInstance()->End();

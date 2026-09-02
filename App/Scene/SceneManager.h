@@ -46,6 +46,7 @@ public:
     void Draw2D();
     void Draw3D();
     void DrawParticle();
+    bool WantsImGuiAlways() const;
     // PostEffectTypeのセッターとゲッター
     void SetPostEffectType(PostEffectType postEffectType);
     PostEffectType GetPostEffectType() const;

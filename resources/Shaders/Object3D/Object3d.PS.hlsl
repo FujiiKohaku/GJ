@@ -51,16 +51,15 @@ PixelShaderOutput main(VertexShaderOutput input)
         float specular = 0.0f;
         if (gMaterial.enableLighting == 3)
         {
-            // Atlas-aware gutter AO plus a soft moving contact band from the riffle.
+            // Each page now uses one full texture. Shade only the real outer edges;
+            // subdividing the UV here would create dark seams across the page.
             // environmentCoefficient carries contact strength only in archive mode.
-            float atlasU = min(saturate(transformedUV.x) * 8.0f, 7.99999f);
-            uint pageIndex = (uint)floor(atlasU);
-            float pageU = frac(atlasU);
-            float gutterDistance = (pageIndex % 2 == 0) ? 1.0f - pageU : pageU;
-            float gutter = exp(-gutterDistance * 18.0f) * 0.32f;
+            float pageU = saturate(transformedUV.x);
+            float edgeDistance = min(pageU, 1.0f - pageU);
+            float edgeShade = exp(-edgeDistance * 36.0f) * 0.08f;
             float contact = saturate(gMaterial.environmentCoefficient);
-            float band = exp(-pow((gutterDistance - (0.16f + contact * 0.42f)) / 0.20f, 2.0f));
-            occlusion = 1.0f - gutter - contact * (0.12f + band * 0.30f);
+            float band = exp(-pow((edgeDistance - (0.12f + contact * 0.28f)) / 0.18f, 2.0f));
+            occlusion = 1.0f - edgeShade - contact * (0.08f + band * 0.18f);
             // A little diffuse transmission, without a plastic highlight on paper.
             illumination += float3(0.12f, 0.10f, 0.07f) * saturate(dot(-N, L));
         }

@@ -86,6 +86,14 @@ void SceneManager::DrawImGui()
     }
 }
 
+bool SceneManager::WantsImGuiAlways() const
+{
+    if (!scene_) {
+        return false;
+    }
+    return scene_->WantsImGuiAlways();
+}
+
 void SceneManager::SetPostEffectType(PostEffectType postEffectType)
 {
     ClearPostEffects();
