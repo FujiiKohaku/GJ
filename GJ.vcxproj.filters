@@ -40,6 +40,18 @@
     <ClCompile Include="App\Game\Gimmick\MapChipGimmickFactory.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Trap\SpikeGimmick.cpp">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Trap\SpikeParam.cpp">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Trap\LaserGimmick.cpp">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Trap\LaserParam.cpp">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClCompile>
     <ClCompile Include="App\Game\Gimmick\MovingBlockGimmick.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -659,6 +671,18 @@
     </ClInclude>
     <ClInclude Include="App\Game\Gimmick\MapChipGimmickFactory.h">
       <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Trap\SpikeGimmick.h">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Trap\SpikeParam.h">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Trap\LaserGimmick.h">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Trap\LaserParam.h">
+      <Filter>App\Game\Gimmick\Trap</Filter>
     </ClInclude>
     <ClInclude Include="App\Game\Gimmick\MovingBlockGimmick.h">
       <Filter>ヘッダー ファイル</Filter>

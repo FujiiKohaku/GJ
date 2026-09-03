@@ -742,7 +742,8 @@ void EditorScene::UpdateRaycastEdit()
                                         type == MapChipType::GasEmitter ||
                                         type == MapChipType::Bonfire ||
                                         type == MapChipType::DestructibleWall ||
-                                        type == MapChipType::Spike) {
+                                        type == MapChipType::Spike ||
+                                        type == MapChipType::LaserEmitter) {
                                         
                                         LevelData::ObjectData newData;
                                         newData.translation = newPos;
@@ -798,6 +799,12 @@ void EditorScene::UpdateRaycastEdit()
                                             newData.type = "Spike";
                                             newData.fileName = "Thorn/Thorn.obj";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Spike");
+                                        }
+                                        else if (type == MapChipType::LaserEmitter) {
+                                            newData.name = "LaserEmitter";
+                                            newData.type = "LaserEmitter";
+                                            newData.fileName = "LaserEmitter/LaserEmitter.obj";
+                                            newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("LaserEmitter");
                                         }
                                         
                                         currentLevelData_.objects.push_back(newData);
