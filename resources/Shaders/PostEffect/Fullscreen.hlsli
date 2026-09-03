@@ -60,4 +60,6 @@ cbuffer PostEffectParameter : register(b0)
     float outlineFarClip;
     float outlineThreshold;
     float outlineSoftness;
+    float slimeScreenProgress;
+    float3 paddingSlimeScreen;
 };

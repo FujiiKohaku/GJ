@@ -215,6 +215,8 @@ void PostEffectManager::UpdatePostEffectParameters(
         sceneManager->GetPaintPatternType();
     postEffectParameter.paintColor =
         sceneManager->GetPaintColor();
+    postEffectParameter.slimeScreenProgress =
+        sceneManager->GetSlimeScreenProgress();
 }
 
 void PostEffectManager::Apply(SceneManager* sceneManager, D3D12_GPU_DESCRIPTOR_HANDLE sceneColorHandle)

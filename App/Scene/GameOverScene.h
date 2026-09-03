@@ -38,4 +38,6 @@ private:
     std::unique_ptr<Text> titleText_;
     std::unique_ptr<Text> instructionText_;
     float sceneTime_ = 0.0f;
+    float transitionTime_ = 0.0f;
+    bool isTransitioning_ = false;
 };

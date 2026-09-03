@@ -8,6 +8,7 @@
 #include "Engine/Time/TimeManager.h"
 #include "SceneManager.h"
 #include "ArchiveScene.h"
+#include "PageTransition.h"
 #include <algorithm>
 #include <cmath>
 
@@ -112,24 +113,45 @@ void GameOverScene::Initialize()
     instructionText_->SetFontSize(28.0f);
     instructionText_->SetColor({ 0.82f, 0.74f, 0.74f, 1.0f });
     sceneTime_ = 0.0f;
+    transitionTime_ = 0.0f;
+    isTransitioning_ = false;
+    SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
 }
 
 void GameOverScene::Finalize()
 {
+    SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     Object3dManager::GetInstance()->SetDefaultCamera(nullptr);
 }
 
 void GameOverScene::Update()
 {
     Input* input = Input::GetInstance();
-    if (sceneTime_ >= 1.0f &&
+    if (!isTransitioning_ && sceneTime_ >= 1.0f &&
         (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE))) {
-        SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
-        return;
+        isTransitioning_ = true;
+        transitionTime_ = 0.0f;
+        SceneManager::GetInstance()->SetPaintSeed(sceneTime_ * 17.31f);
+        SceneManager::GetInstance()->AddPostEffect(
+            PostEffectType::SlimeScreen,
+            PostEffectStage::AfterParticle);
     }
 
     const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
     sceneTime_ += deltaTime;
+    if (isTransitioning_) {
+        constexpr float kTransitionDuration = 2.1f;
+        transitionTime_ += deltaTime;
+        const float progress = (std::min)(transitionTime_ / kTransitionDuration, 1.0f);
+        SceneManager::GetInstance()->SetSlimeScreenProgress(progress);
+        titleText_->SetColor({ 1.0f, 0.35f, 0.40f, 1.0f - progress });
+        instructionText_->SetColor({ 0.82f, 0.74f, 0.74f, 1.0f - progress });
+        if (progress >= 1.0f) {
+            PageTransition::RequestSlimeReveal();
+            SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
+            return;
+        }
+    }
     camera_->Update();
     backdrop_->Update();
     for (FallingProp& prop : fallingProps_) {

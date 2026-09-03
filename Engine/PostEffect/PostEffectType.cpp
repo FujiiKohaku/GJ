@@ -7,6 +7,8 @@ const char* GetPostEffectTypeName(PostEffectType type)
         return "Copy";
     case PostEffectType::ArchiveAtmosphere:
         return "ArchiveAtmosphere";
+    case PostEffectType::SlimeScreen:
+        return "SlimeScreen";
     case PostEffectType::GrayScale:
         return "GrayScale";
     case PostEffectType::Vignette:

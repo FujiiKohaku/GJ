@@ -89,6 +89,8 @@ public:
     float GetBlackHoleStrength() const { return blackHoleStrength_; }
     void SetWaterEffectIntensity(float intensity) { waterEffectIntensity_ = intensity; }
     float GetWaterEffectIntensity() const { return waterEffectIntensity_; }
+    void SetSlimeScreenProgress(float progress) { slimeScreenProgress_ = progress; }
+    float GetSlimeScreenProgress() const { return slimeScreenProgress_; }
     void SetScreenSpaceFluid(GpuSphFluid* fluid) { screenSpaceFluid_ = fluid; }
     GpuSphFluid* GetScreenSpaceFluid() const { return screenSpaceFluid_; }
 
@@ -114,6 +116,7 @@ private:
     float paintProgress_ = 0.0f;
     float paintIntensity_ = 0.0f;
     float paintSeed_ = 0.0f;
+    float slimeScreenProgress_ = 0.0f;
     int paintPatternType_ = 0;
     Vector3 paintColor_ = { 0.95f, 0.10f, 0.58f };
     GpuSphFluid* screenSpaceFluid_ = nullptr;
