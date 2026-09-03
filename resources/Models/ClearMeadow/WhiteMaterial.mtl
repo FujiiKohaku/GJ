@@ -1,0 +1,4 @@
+newmtl WhiteMaterial
+Kd 1.0 1.0 1.0
+Ka 0.1 0.1 0.1
+map_Kd ../../Textures/white.png

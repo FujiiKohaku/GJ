@@ -28,6 +28,9 @@
     <ClCompile Include="App\Scene\GamePlayScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="App\Scene\GameLabScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="App\Game\Map\MapChipField.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -115,6 +118,12 @@
     <Filter Include="Renderer">
       <UniqueIdentifier>{31A1888E-8B1B-4DAF-8F0D-79A38E5F6A7B}</UniqueIdentifier>
     </Filter>
+    <None Include="resources\Shaders\PostEffect\GlassCrack.PS.hlsl" />
+    <None Include="resources\Shaders\PostEffect\Shockwave.PS.hlsl" />
+    <None Include="resources\Shaders\PostEffect\HeatHaze.PS.hlsl" />
+    <None Include="resources\Shaders\PostEffect\SonicBoom.PS.hlsl" />
+    <None Include="resources\Shaders\PostEffect\RainDrops.PS.hlsl" />
+    <None Include="resources\Shaders\PostEffect\CyberScanline.PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App\main.cpp">
@@ -498,6 +507,42 @@
     <ClCompile Include="Engine\SceneObjectManager\SceneObjectManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\Fluid\FluidForceRenderer.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Debug\Profiler\Profiler.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Debug\Profiler\CPUProfiler.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Debug\Profiler\GPUProfiler.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Debug\Profiler\MemoryProfiler.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Debug\Profiler\PerformanceCounter.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Debug\Profiler\BootProfiler.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Debug\Profiler\TimelineProfiler.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Debug\Profiler\ProfilerScope.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\3D\OceanSurface.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\3D\WaterPillarRenderer.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\GoalGimmick.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="resources\Shaders\Object3D\Object3d.VS.hlsl" />
@@ -580,6 +625,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="App\Scene\GamePlayScene.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Scene\GameLabScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="App\Game\Map\MapChipField.h">
@@ -789,6 +837,69 @@
     <ClInclude Include="Engine\SceneObjectManager\SceneObjectManager.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Engine\CollisionManager\CollisionLayer.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Fluid\FluidForceRenderer.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\DirectXCommon\DirectXCommon.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Debug\Profiler\Profiler.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Debug\Profiler\CPUProfiler.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Debug\Profiler\GPUProfiler.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Debug\Profiler\MemoryProfiler.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Debug\Profiler\PerformanceCounter.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Debug\Profiler\BootProfiler.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Debug\Profiler\TimelineProfiler.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Debug\Profiler\ProfilerScope.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\input\Input.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Logger\Logger.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\audio\SoundManager.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\3D\OceanSurface.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\3D\WaterPillarRenderer.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\StringUtility\StringUtility.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Winapp\Utility.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\math\MatrixMath.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Winapp\WinApp.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\GoalGimmick.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\Shaders\Debug\DebugLine.GS.hlsl" />
@@ -801,7 +912,6 @@
     <None Include="resources\Shaders\PostEffect\Bloom\BloomExtract.PS.hlsl" />
     <None Include="resources\Shaders\PostEffect\Fog\DistanceFog.PS.hlsl" />
     <None Include="resources\Shaders\PostEffect\Fog\Fog.VS.hlsl" />
-    <None Include="resources\Shaders\Object3D\Object3d.hlsli" />
     <None Include="resources\Shaders\PostEffect\BoxFilter.PS.hlsl" />
     <None Include="resources\Shaders\PostEffect\ColorAdjust.PS.hlsl" />
     <None Include="resources\Shaders\PostEffect\DepthBasedOutline.PS.hlsl" />

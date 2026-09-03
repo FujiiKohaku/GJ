@@ -7,6 +7,8 @@ const char* GetPostEffectTypeName(PostEffectType type)
         return "Copy";
     case PostEffectType::ArchiveAtmosphere:
         return "ArchiveAtmosphere";
+    case PostEffectType::SlimeScreen:
+        return "SlimeScreen";
     case PostEffectType::GrayScale:
         return "GrayScale";
     case PostEffectType::Vignette:
@@ -68,8 +70,18 @@ const char* GetPostEffectTypeName(PostEffectType type)
         return "Paint";
     case PostEffectType::GlassCrack:
         return "GlassCrack";
+    case PostEffectType::Shockwave:
+        return "Shockwave";
+    case PostEffectType::HeatHaze:
+        return "HeatHaze";
+    case PostEffectType::SonicBoom:
+        return "SonicBoom";
     case PostEffectType::RainDrops:
         return "RainDrops";
+    case PostEffectType::CyberScanline:
+        return "CyberScanline";
+    case PostEffectType::HexShield:
+        return "HexShield";
     case PostEffectType::BlackHoleDistortion:
         return "BlackHoleDistortion";
     }

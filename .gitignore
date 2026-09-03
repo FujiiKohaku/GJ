@@ -369,6 +369,8 @@ Tools/UIAnimationEditor/ai_settings.json
 
 # Keep the Wavefront OBJ assets used by the book stage selector.
 !/resources/Models/StageSelectBook/*.obj
+# Allow tracking all model assets under resources/Models/
+!/resources/Models/**
 
 # Keep the prebuilt Assimp libraries required by GJ.vcxproj.
 !/externals/assimp/lib/Debug/

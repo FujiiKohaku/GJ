@@ -97,9 +97,9 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
     float32_t3 normal = normalize(lerp(alphaNormal, farNormal, blendFactor));
 
     float32_t3 viewDir = float32_t3(0.0f, 0.0f, -1.0f);
-    float32_t3 lightDir = normalize(float32_t3(0.4f, 0.6f, -1.0f));
+    float32_t3 lightDir = normalize(float32_t3(0.35f, 0.75f, -0.8f));
     float32_t NdotV = max(dot(normal, viewDir), 0.0f);
-    float32_t fresnel = pow(1.0f - NdotV, 2.5f);
+    float32_t fresnel = pow(1.0f - NdotV, 2.2f);
 
     // 上向き法線(頭部・上部)のみハイライト・反射を許可するマスク（足元の白反射を解消）
     float32_t topHighlightMask = saturate(1.0f - smoothstep(-0.15f, 0.25f, normal.y));

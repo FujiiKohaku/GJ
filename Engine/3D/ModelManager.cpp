@@ -214,27 +214,54 @@ Model* ModelManager::CreatePlane(const std::string& texturePath, float tilingX, 
     return raw;
 }
 
-Model* ModelManager::CreateBookLeaf(const std::string& texturePath, uint32_t frontPage,
-    uint32_t backPage, uint32_t stripIndex, uint32_t stripCount, uint32_t pageCount)
+Model* ModelManager::CreateBookLeaf(
+    const std::string& frontTexturePath,
+    const std::string& backTexturePath,
+    uint32_t stripIndex,
+    uint32_t stripCount)
 {
-    assert(pageCount > 0 && stripCount > 0 && stripIndex < stripCount);
-    assert(frontPage < pageCount && backPage < pageCount);
-    const std::string key = "BookLeaf/" + texturePath + "/" + std::to_string(frontPage) +
-        "/" + std::to_string(backPage) + "/" + std::to_string(stripIndex) +
-        "/" + std::to_string(stripCount) + "/" + std::to_string(pageCount);
+    assert(stripCount > 0 && stripIndex < stripCount);
+    const std::string key = "BookLeaf/" + frontTexturePath + "/" + backTexturePath +
+        "/" + std::to_string(stripIndex) + "/" + std::to_string(stripCount);
     if (auto it = models_.find(key); it != models_.end()) {
         return it->second.get();
     }
-    ModelData data = CreateCubeModelData(texturePath);
-    auto& vertices = data.primitives[0].vertices;
-    for (size_t index = 0; index < vertices.size(); ++index) {
-        const bool back = index >= 4 && index < 8;
-        const uint32_t page = back ? backPage : frontPage;
-        const uint32_t slice = back ? stripCount - 1 - stripIndex : stripIndex;
-        auto& uv = vertices[index].texcoord;
-        uv.x = (static_cast<float>(page) + (static_cast<float>(slice) + uv.x) /
-            static_cast<float>(stripCount)) / static_cast<float>(pageCount);
+
+    ModelData data = CreateCubeModelData(frontTexturePath);
+    const MeshPrimitive source = data.primitives[0];
+
+    MeshPrimitive frontPrimitive = source;
+    frontPrimitive.materialIndex = 0;
+    frontPrimitive.indices = {
+        0, 1, 2, 0, 2, 3,
+        8, 9, 10, 8, 10, 11,
+        12, 13, 14, 12, 14, 15,
+        16, 17, 18, 16, 18, 19,
+        20, 21, 22, 20, 22, 23
+    };
+    for (VertexData& vertex : frontPrimitive.vertices) {
+        vertex.texcoord.x =
+            (static_cast<float>(stripIndex) + vertex.texcoord.x) /
+            static_cast<float>(stripCount);
     }
+
+    MeshPrimitive backPrimitive = source;
+    backPrimitive.materialIndex = 1;
+    backPrimitive.indices = { 4, 5, 6, 4, 6, 7 };
+    const uint32_t backStripIndex = stripCount - 1 - stripIndex;
+    for (VertexData& vertex : backPrimitive.vertices) {
+        vertex.texcoord.x =
+            (static_cast<float>(backStripIndex) + vertex.texcoord.x) /
+            static_cast<float>(stripCount);
+    }
+
+    data.primitives.clear();
+    data.primitives.push_back(std::move(frontPrimitive));
+    data.primitives.push_back(std::move(backPrimitive));
+    data.materials.clear();
+    data.materials.push_back({ frontTexturePath });
+    data.materials.push_back({ backTexturePath });
+
     auto model = std::make_unique<Model>();
     model->Initialize(modelCommon_.get(), data);
     Model* result = model.get();

@@ -5,6 +5,7 @@
 #include "Engine/2D/Sprite.h"
 #include "Engine/3D/Object3d.h"
 #include "Engine/Camera/Camera.h"
+#include "PageTransition.h"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -58,6 +59,7 @@ private:
     enum class StageDestination {
         GamePlay,
         Test,
+        GameLab,
     };
 
     struct StageData {
@@ -75,6 +77,7 @@ private:
     };
 
     void InitializeStageData();
+    void LoadPrintedPagePaths();
     void InitializeBookObjects();
     void InitializeTurningPage();
     void InitializeOpeningPages();
@@ -94,6 +97,9 @@ private:
     void UpdateOpeningPages(float cameraProgress, float bookProgress);
     void StartPageTurn(PageTurnDirection direction);
     void SetPrintedPage(Object3d* object, uint32_t page);
+    const std::string& GetPrintedPagePath(uint32_t page) const;
+    uint32_t GetPrintPageCount() const;
+    int32_t GetPrintSpreadCount() const;
     void UpdateCardOpening(float deltaTime);
     void UpdateCardIdle();
     void UpdateCardClosing(float deltaTime);
@@ -131,8 +137,12 @@ private:
     std::unique_ptr<Text> pageText_;
     std::unique_ptr<Text> instructionText_;
     std::unique_ptr<Sprite> transitionPage_;
+    PageTransition::RevealOverlay pageReveal_;
+    bool slimeRevealActive_ = false;
+    float slimeRevealTime_ = 0.0f;
 
     std::vector<StageData> stages_;
+    std::vector<std::string> printedPagePaths_;
     BookSelectState state_ = BookSelectState::CameraApproach;
     int32_t currentStageIndex_ = 0;
     PageTurnDirection pageTurnDirection_ = PageTurnDirection::Right;

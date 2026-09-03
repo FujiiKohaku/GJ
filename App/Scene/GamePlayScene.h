@@ -9,6 +9,7 @@
 #include "Engine/Fluid/GpuSphFluid.h"
 #include "Engine/Fluid/FluidForceRenderer.h"
 #include "Engine/Fluid/GpuSphFluidRenderer.h"
+#include "Engine/2D/Sprite.h"
 #include "Engine/2D/Text/Text.h"
 #include "Engine/3D/SkyBox/SkyBox.h"
 #include "Engine/Camera/Camera.h"
@@ -39,6 +40,13 @@ private:
     std::unique_ptr<FluidForceRenderer> fluidForceRenderer_;
     std::unique_ptr<GpuSphFluidRenderer> gpuSphFluidRenderer_;
     PageTransition::RevealOverlay pageReveal_;
+
+    // メニュー関連
+    bool isMenuOpen_ = false;
+    std::unique_ptr<Sprite> menuBackgroundSprite_;
+    std::unique_ptr<Sprite> menuPanelSprite_;
+    std::unique_ptr<Text> menuTitleText_;
+    std::unique_ptr<Text> menuInstructionText_;
     bool wasPlayerCrushed_ = false;
     bool wasLeftMousePressed_ = false;
     uint32_t emittedParticleTotal_ = 0;

@@ -74,6 +74,8 @@ public:
         float outlineFarClip;
         float outlineThreshold;
         float outlineSoftness;
+        float slimeScreenProgress;
+        Vector3 paddingSlimeScreen;
     };
     void Initialize(DirectXCommon* dxCommon);
     void Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureHandle, D3D12_GPU_DESCRIPTOR_HANDLE depthTextureHandle);
