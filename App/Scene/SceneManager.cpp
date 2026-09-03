@@ -12,8 +12,10 @@ bool ChangeScene(
     }
 
     if (scene) {
-        retiredScene = std::move(scene);
+        scene->Finalize();
+        scene.reset();
     }
+    retiredScene.reset();
 
     scene = std::move(nextScene);
     scene->Initialize();

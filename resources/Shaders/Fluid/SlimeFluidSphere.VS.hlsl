@@ -49,14 +49,25 @@ VSOutput main(uint32_t vertexID : SV_VertexID, uint32_t instanceID : SV_Instance
     VSOutput output;
     SlimeFluidParticle p = Particles[instanceID];
 
-    // ローカル座標からワールド座標へ（パーティクル位置はすでにワールド空間）
+    if (p.padding <= 0.0f)
+    {
+        output.pos = float32_t4(2.0f, 2.0f, 0.0f, 1.0f);
+        output.uv = float32_t2(2.0f, 2.0f);
+        output.viewPos = float32_t3(0.0f, 0.0f, 0.0f);
+        output.worldPos = float32_t3(0.0f, 0.0f, 0.0f);
+        output.centerWorldPos = float32_t3(0.0f, 0.0f, 0.0f);
+        output.radius = 0.0f;
+        output.color = float32_t3(0.0f, 0.0f, 0.0f);
+        return output;
+    }
+
     float32_t3 centerWorld = p.position;
-    float32_t radius = 0.7f; // スライムらしい丸みを帯びた融合表現のために大きめにする
+    float32_t radius = 0.12f;
 
     float32_t2 offset = quadOffsets[vertexID];
-    float32_t3 up = float32_t3(view._12, view._22, view._32);
-    float32_t3 right = float32_t3(view._11, view._21, view._31);
-    float32_t3 worldPos = centerWorld + right * offset.x * radius + up * offset.y * radius;
+    float32_t3 right = float32_t3(view._11, view._12, view._13);
+    float32_t3 up = float32_t3(view._21, view._22, view._23);
+    float32_t3 worldPos = centerWorld + right * (offset.x * radius) + up * (offset.y * radius);
 
     float32_t4 worldPos4 = float32_t4(worldPos, 1.0f);
     float32_t4 vPos = mul(worldPos4, view);
@@ -67,17 +78,11 @@ VSOutput main(uint32_t vertexID : SV_VertexID, uint32_t instanceID : SV_Instance
     output.centerWorldPos = centerWorld;
     output.radius = radius;
 
-    // 速度と位置（中心距離）ベースのヒートマップ
-    // 中心（radialT=0）が赤、外側（radialT=1）が青になるように反転する
     float32_t speedT = saturate(length(p.velocity) / 5.0f);
-    float32_t radialT = saturate(length(p.position) / 1.2f);
-    
-    // tが0(外側)で青、tが1(中心または高速)で赤
-    float32_t t = saturate((1.0f - radialT) * 0.7f + speedT * 0.3f);
-    
-    float32_t3 heatColor = lerp(float32_t3(0.1f, 0.4f, 1.0f), float32_t3(0.2f, 0.9f, 0.3f), saturate(t * 2.0f));
-    heatColor = lerp(heatColor, float32_t3(1.0f, 0.2f, 0.1f), saturate((t - 0.5f) * 2.0f));
-    output.color = heatColor;
+    output.color = lerp(
+        float32_t3(0.05f, 0.45f, 1.0f),
+        float32_t3(0.12f, 1.0f, 0.62f),
+        saturate(0.35f + speedT * 0.65f));
 
     return output;
 }

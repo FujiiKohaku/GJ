@@ -3,6 +3,7 @@
 #include "Engine/Camera/Camera.h"
 #include "Engine/Fluid/GpuSphFluid.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/Math/MatrixMath.h"
 #include "Engine/Winapp/WinApp.h"
 
 #include <algorithm>
@@ -163,9 +164,11 @@ void ScreenSpaceFluidRenderer::SmoothDepth()
 }
 
 void ScreenSpaceFluidRenderer::Composite(
+    const GpuSphFluid& fluid,
+    const Camera& camera,
     D3D12_GPU_DESCRIPTOR_HANDLE sceneColorHandle)
 {
-    UpdateCompositeParameter();
+    UpdateCompositeParameter(fluid, camera);
     DrawFullScreen(
         fullScreenRootSignature_.Get(),
         compositePipelineState_.Get(),
@@ -182,7 +185,7 @@ void ScreenSpaceFluidRenderer::Render(
 {
     RenderDepth(fluid, camera);
     SmoothDepth();
-    Composite(sceneColorHandle);
+    Composite(fluid, camera, sceneColorHandle);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE ScreenSpaceFluidRenderer::GetDepthSrvHandleGPU() const
@@ -476,7 +479,7 @@ ScreenSpaceFluidRenderer::CreateFullScreenPipelineState(
 
 void ScreenSpaceFluidRenderer::CreateConstantBuffers()
 {
-    perViewResource_ = dxCommon_->CreateBufferResource(sizeof(PerViewParameter));
+    perViewResource_ = dxCommon_->CreateBufferResource((sizeof(PerViewParameter) + 0xff) & ~0xff);
     perViewResource_->SetName(L"ScreenSpaceFluidRenderer::PerViewCB");
     HRESULT result = perViewResource_->Map(
         0,
@@ -484,7 +487,7 @@ void ScreenSpaceFluidRenderer::CreateConstantBuffers()
         reinterpret_cast<void**>(&perViewData_));
     assert(SUCCEEDED(result));
 
-    blurResource_ = dxCommon_->CreateBufferResource(sizeof(BlurParameter));
+    blurResource_ = dxCommon_->CreateBufferResource((sizeof(BlurParameter) + 0xff) & ~0xff);
     blurResource_->SetName(L"ScreenSpaceFluidRenderer::BlurCB");
     result = blurResource_->Map(
         0,
@@ -493,7 +496,7 @@ void ScreenSpaceFluidRenderer::CreateConstantBuffers()
     assert(SUCCEEDED(result));
 
     compositeResource_ =
-        dxCommon_->CreateBufferResource(sizeof(CompositeParameter));
+        dxCommon_->CreateBufferResource((sizeof(CompositeParameter) + 0xff) & ~0xff);
     compositeResource_->SetName(L"ScreenSpaceFluidRenderer::CompositeCB");
     result = compositeResource_->Map(
         0,
@@ -545,7 +548,9 @@ void ScreenSpaceFluidRenderer::UpdateBlurParameter(int32_t direction)
     blurData_->padding1 = 0.0f;
 }
 
-void ScreenSpaceFluidRenderer::UpdateCompositeParameter()
+void ScreenSpaceFluidRenderer::UpdateCompositeParameter(
+    const GpuSphFluid& fluid,
+    const Camera& camera)
 {
     assert(compositeData_ != nullptr);
     compositeData_->texelSize = {
@@ -557,9 +562,9 @@ void ScreenSpaceFluidRenderer::UpdateCompositeParameter()
     compositeData_->slimeColor = settings_.slimeColor;
     compositeData_->specularStrength = settings_.specularStrength;
     compositeData_->fresnelStrength = settings_.fresnelStrength;
-    compositeData_->padding0 = 0.0f;
-    compositeData_->padding1 = 0.0f;
-    compositeData_->padding2 = 0.0f;
+    compositeData_->floorHeightWorld = fluid.GetSettings().floorHeight;
+    compositeData_->padding0 = { 0.0f, 0.0f };
+    compositeData_->invViewProj = MatrixMath::Inverse(camera.GetViewProjectionMatrix());
 }
 
 void ScreenSpaceFluidRenderer::DrawFullScreen(

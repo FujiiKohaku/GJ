@@ -3,29 +3,120 @@
 #include "Engine/2D/SpriteManager.h"
 #include "Engine/2D/Text/TextRenderer.h"
 #include "Engine/3D/Object3dManager.h"
-#include "Engine/3D/ModelManager.h"
 #include "Engine/3D/SkinningObject3dManager.h"
 #include "Engine/3D/SkyBox/SkyBoxManager.h"
 #include "Engine/DirectXCommon/DirectXCommon.h"
 #include "Engine/Input/Input.h"
 #include "Engine/Logger/Logger.h"
 #include "Engine/PostEffect/PostEffectType.h"
-#include "Engine/TextureManager/TextureManager.h"
 #include "Engine/LevelEditor/LevelDataLoader.h"
+#include "Engine/SrvManager/SrvManager.h"
 #include "Engine/Time/TimeManager.h"
+#include "Engine/TextureManager/TextureManager.h"
 #include "SceneManager.h"
 #include "ArchiveScene.h"
 #include "GameOverScene.h"
+#include <algorithm>
+#include <format>
 #include <string>
+#include <vector>
+#include <Windows.h>
 
 namespace {
 constexpr const char* kSkyBoxTexture = "resources/Textures/skybox.dds";
 constexpr const char* kMapChipTexture = "resources/Textures/checkerboard.png";
 constexpr const char* kWhiteTexture = "resources/Textures/white.png";
 constexpr const char* kStage1Json = "resources/Maps/stage1.json";
-constexpr float kCameraDistance = 15.0f;
+constexpr float kCameraDistance = 12.0f;
 constexpr const char* kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
+constexpr float kFluidRenderZ = -0.72f;
+constexpr Vector3 kSlimeRenderForward = { 0.0f, 0.0f, 1.0f };
+
+Vector3 MakeFluidCorePosition(const MapChipPlayer& player)
+{
+    Vector3 corePosition = player.GetPosition();
+    corePosition.z = kFluidRenderZ;
+    return corePosition;
+}
+
+Vector3 MakeFluidEmitterPosition(const MapChipPlayer& player)
+{
+    return MakeFluidCorePosition(player);
+}
+
+Vector3 MakeFluidTargetVelocity(const Vector3& playerVelocity)
+{
+    return {
+        playerVelocity.x,
+        playerVelocity.y,
+        0.0f
+    };
+}
+
+GpuSphFluid::CollisionObstacle MakeFluidObstacle(
+    const Vector3& center,
+    const Vector3& size,
+    const Vector3& velocity)
+{
+    GpuSphFluid::CollisionObstacle obstacle {};
+    obstacle.center = { center.x, center.y, kFluidRenderZ };
+    obstacle.halfSize = {
+        size.x * 0.5f,
+        size.y * 0.5f,
+        0.65f
+    };
+    obstacle.velocity = { velocity.x, velocity.y, 0.0f };
+    return obstacle;
+}
+
+bool IsLeftMouseButtonDown(Input* input)
+{
+    return input->IsMousePressed(0) ||
+        (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+}
+
+std::vector<GpuSphFluid::CollisionObstacle> BuildFluidObstacles(
+    const MapChipStage& stage,
+    const std::vector<BaseMapChipGimmick*>& gimmicks,
+    float deltaTime)
+{
+    std::vector<GpuSphFluid::CollisionObstacle> obstacles;
+    const MapChipField& field = stage.GetField();
+    obstacles.reserve(
+        static_cast<size_t>(field.GetBlockWidth()) *
+            static_cast<size_t>(field.GetBlockHeight()) +
+        gimmicks.size());
+
+    for (uint32_t y = 0; y < field.GetBlockHeight(); ++y) {
+        for (uint32_t x = 0; x < field.GetBlockWidth(); ++x) {
+            if (field.GetMapChipTypeByIndex(x, y) != MapChipType::Block) {
+                continue;
+            }
+
+            obstacles.push_back(MakeFluidObstacle(
+                field.GetMapChipPositionByIndex(x, y),
+                { 1.0f, 1.0f, 1.0f },
+                { 0.0f, 0.0f, 0.0f }));
+        }
+    }
+
+    const float safeDeltaTime = (std::max)(deltaTime, 0.0001f);
+    for (BaseMapChipGimmick* gimmick : gimmicks) {
+        const AABB box = gimmick->GetAABB();
+        const Vector3 delta = gimmick->GetDeltaPosition();
+        obstacles.push_back(MakeFluidObstacle(
+            box.center,
+            box.size,
+            {
+                delta.x / safeDeltaTime,
+                delta.y / safeDeltaTime,
+                delta.z / safeDeltaTime
+            }));
+    }
+
+    return obstacles;
+}
 }
 
 void GamePlayScene::Initialize()
@@ -40,11 +131,6 @@ void GamePlayScene::Initialize()
     LevelDataLoader loader;
     LevelData levelData = loader.Load(kStage1Json);
 
-    LevelData::TileMapData mapData{};
-    if (!levelData.tileMaps.empty()) {
-        mapData = levelData.tileMaps[0];
-    }
-    // levelData 自体を渡して初期化する
     mapChipStage_.Initialize(levelData);
 
     Vector3 playerStartPos = { 0.0f, 0.0f, 0.0f };
@@ -52,10 +138,76 @@ void GamePlayScene::Initialize()
         playerStartPos = levelData.playerSpawns[0].translation;
     }
 
-    Model* playerModel =
-        ModelManager::GetInstance()->CreatePlane(kMapChipTexture);
     player_ = std::make_unique<MapChipPlayer>();
-    player_->Initialize(playerModel, &mapChipStage_.GetField(), playerStartPos);
+    player_->Initialize(&mapChipStage_.GetField(), playerStartPos);
+    
+    gpuSphFluid_ = std::make_unique<GpuSphFluid>();
+    GpuSphFluid::Settings fluidSettings;
+    fluidSettings.particleCount = 1280;
+    fluidSettings.particleRadius = 0.14f;
+    fluidSettings.smoothingRadius = 0.45f;
+    fluidSettings.blobRadii = { 0.65f, 0.65f, 0.65f }; // 完全な球体形状
+    fluidSettings.stiffness = 22.0f;        // SPH圧力反発力
+    fluidSettings.shapeAttraction = 9.0f;   // Shape Matchingバネ強度
+    fluidSettings.velocityAttraction = 8.5f; // 移動速度同期
+    fluidSettings.viscosity = 2.8f;         // まとまりのある粘性
+    fluidSettings.surfaceTension = 5.0f;    // ピンと張った滑らかな水面（表面張力）
+    fluidSettings.gravity = { 0.0f, -16.0f, 0.0f }; // 重力
+    fluidSettings.damping = 0.25f;          // 振動ダンピング制御
+    fluidSettings.horizontalFriction = 0.95f;
+    fluidSettings.liquidShapeAttraction = 0.0f;
+    fluidSettings.liquidVelocityAttraction = 0.0f;
+    fluidSettings.liquidViscosity = 1.15f;
+    fluidSettings.liquidSurfaceTension = 1.8f;
+    fluidSettings.liquidDamping = 0.04f;
+    fluidSettings.liquidHorizontalFriction = 0.992f;
+    fluidSettings.liquidGravityScale = 1.45f;
+    fluidSettings.sloshStrength = 0.0f;
+    fluidSettings.puddleSpread = 0.0f;
+    fluidSettings.emitterRate = 560.0f;
+    fluidSettings.emitterRadius = 0.20f;
+    fluidSettings.emitterSpeed = 6.4f;
+    fluidSettings.particleLifetime = 6.0f;
+    fluidSettings.collisionFriction = 0.78f;
+    fluidSettings.collisionBounce = 0.06f;
+    fluidSettings.simulationSubsteps = 3;
+    fluidSettings.corePosition = MakeFluidCorePosition(*player_);
+    fluidSettings.floorHeight = player_->GetFluidFloorHeight();
+
+    fluidSettings.boundsMin = {
+        -4.0f,
+        -20.0f,
+        kFluidRenderZ - 2.0f
+    };
+    fluidSettings.boundsMax = {
+        static_cast<float>(mapChipStage_.GetField().GetBlockWidth()) + 4.0f,
+        static_cast<float>(mapChipStage_.GetField().GetBlockHeight()) + 8.0f,
+        kFluidRenderZ + 2.0f
+    };
+    gpuSphFluid_->Initialize(DirectXCommon::GetInstance(), SrvManager::GetInstance(), fluidSettings);
+    gpuSphFluid_->SetLiquidated(false); // スライムプレイヤーとしてのまとまった形状を維持
+    
+    fluidForceRenderer_ = std::make_unique<FluidForceRenderer>();
+    fluidForceRenderer_->Initialize(DirectXCommon::GetInstance());
+
+    gpuSphFluidRenderer_ = std::make_unique<GpuSphFluidRenderer>();
+    gpuSphFluidRenderer_->Initialize(DirectXCommon::GetInstance());
+    
+    SceneManager::GetInstance()->SetScreenSpaceFluid(gpuSphFluid_.get());
+    Logger::Log(std::format(
+        "[GamePlayScene] GpuSphFluid initialized. particles={} core=({:.2f},{:.2f},{:.2f}) floor={:.2f} boundsMin=({:.2f},{:.2f},{:.2f}) boundsMax=({:.2f},{:.2f},{:.2f})\n",
+        fluidSettings.particleCount,
+        fluidSettings.corePosition.x,
+        fluidSettings.corePosition.y,
+        fluidSettings.corePosition.z,
+        fluidSettings.floorHeight,
+        fluidSettings.boundsMin.x,
+        fluidSettings.boundsMin.y,
+        fluidSettings.boundsMin.z,
+        fluidSettings.boundsMax.x,
+        fluidSettings.boundsMax.y,
+        fluidSettings.boundsMax.z));
+    
     UpdateFollowCamera();
     camera_->Update();
 
@@ -125,12 +277,17 @@ void GamePlayScene::Initialize()
 
 void GamePlayScene::Finalize()
 {
+    SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
+    if (gpuSphFluid_) {
+        gpuSphFluid_->Finalize();
+    }
     Object3dManager::GetInstance()->SetDefaultCamera(nullptr);
     SkinningObject3dManager::GetInstance()->SetDefaultCamera(nullptr);
 }
 
 void GamePlayScene::Update()
 {
+    Input* input = Input::GetInstance();
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
 
     // TABキーでメニュー開閉
@@ -163,9 +320,56 @@ void GamePlayScene::Update()
             std::make_unique<ArchiveScene>());
         return;
     }
+    
+    if (input->IsKeyTrigger(DIK_Y)) {
+        showForces_ = !showForces_;
+    }
 
     mapChipStage_.Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
     player_->Update(mapChipStage_.GetGimmicks());
+    if (gpuSphFluid_) {
+        const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
+        const std::vector<BaseMapChipGimmick*> gimmicks = mapChipStage_.GetGimmicks();
+        gpuSphFluid_->SetObstacles(
+            BuildFluidObstacles(mapChipStage_, gimmicks, deltaTime));
+        gpuSphFluid_->SetFloorHeight(player_->GetFluidFloorHeight());
+        Vector3 targetRadii = player_->IsGrounded()
+            ? Vector3{ 0.76f, 0.48f, 0.76f }
+            : Vector3{ 0.65f, 0.65f, 0.65f };
+        gpuSphFluid_->SetBlobRadii(targetRadii);
+        float minX = -1000.0f, maxX = 1000.0f, maxY = 1000.0f;
+        player_->GetWallBoundaries(minX, maxX, maxY, gimmicks);
+        Vector3 corePos = MakeFluidCorePosition(*player_);
+        float minZ = corePos.z - 0.22f;
+        float maxZ = corePos.z + 0.22f;
+        gpuSphFluid_->SetWallBoundaries(minX, maxX, minZ, maxZ, -1000.0f, maxY);
+        gpuSphFluid_->SetLiquidated(false);
+        gpuSphFluid_->SetControlState(
+            MakeFluidCorePosition(*player_),
+            MakeFluidTargetVelocity(player_->GetVelocity()),
+            kSlimeRenderForward);
+        const bool leftMousePressed = IsLeftMouseButtonDown(input);
+        const bool leftMouseTriggered =
+            leftMousePressed && !wasLeftMousePressed_;
+        const Vector3 emitterPosition = MakeFluidEmitterPosition(*player_);
+        if (leftMouseTriggered) {
+            constexpr uint32_t kClickBurstParticleCount = 260;
+            gpuSphFluid_->TriggerEmitBurst(kClickBurstParticleCount);
+            emittedParticleTotal_ += kClickBurstParticleCount;
+            Logger::Log(std::format(
+                "[GamePlayScene] Liquid emit burst. source=({:.2f},{:.2f},{:.2f}) total={}\n",
+                emitterPosition.x,
+                emitterPosition.y,
+                emitterPosition.z,
+                emittedParticleTotal_));
+        }
+        gpuSphFluid_->SetEmitter(
+            leftMousePressed,
+            emitterPosition,
+            MakeFluidTargetVelocity(player_->GetVelocity()));
+        wasLeftMousePressed_ = leftMousePressed;
+        gpuSphFluid_->Update(deltaTime);
+    }
     UpdateFollowCamera();
     camera_->Update();
     skyBox_->Update(camera_.get());
@@ -176,6 +380,10 @@ void GamePlayScene::Update()
 
 void GamePlayScene::Draw2D()
 {
+    if (showForces_) {
+        fluidForceRenderer_->Draw(*gpuSphFluid_, *camera_);
+    }
+
     TextRenderer::GetInstance()->PreDraw();
     instructionText_->Draw();
     collisionText_->Draw();
@@ -200,12 +408,13 @@ void GamePlayScene::Draw3D()
 
     Object3dManager::GetInstance()->PreDraw();
     mapChipStage_.Draw();
-    player_->Draw();
-
 }
 
 void GamePlayScene::DrawParticle()
 {
+    if (showForces_ && gpuSphFluid_ && gpuSphFluidRenderer_) {
+        gpuSphFluidRenderer_->Draw(*gpuSphFluid_, *camera_);
+    }
 }
 
 void GamePlayScene::DrawImGui()
@@ -230,7 +439,9 @@ void GamePlayScene::UpdateCollisionText()
     }
 
     std::string state = "AIR";
-    if (player_->IsGrounded()) {
+    if (player_->IsCrushed()) {
+        state = "CRUSHED / LIQUID";
+    } else if (player_->IsGrounded()) {
         state = "GROUND COLLISION";
     } else if (player_->IsColliding()) {
         state = "WALL/CEILING COLLISION";
@@ -239,5 +450,6 @@ void GamePlayScene::UpdateCollisionText()
     collisionText_->SetText(
         "COLLISION : " + state +
         "   PLAYER X=" + std::to_string(position.x) +
-        " Y=" + std::to_string(position.y));
+        " Y=" + std::to_string(position.y) +
+        "   LIQUID BURST=" + std::to_string(emittedParticleTotal_));
 }

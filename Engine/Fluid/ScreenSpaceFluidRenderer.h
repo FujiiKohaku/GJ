@@ -13,16 +13,16 @@ class GpuSphFluid;
 class ScreenSpaceFluidRenderer {
 public:
     struct Settings {
-        float depthThickness = 0.026f;
-        int32_t blurRadius = 18;
-        float blurSigma = 8.0f;
-        float blurDepthSigma = 0.08f;
+        float depthThickness = 0.055f;
+        int32_t blurRadius = 34;
+        float blurSigma = 16.0f;
+        float blurDepthSigma = 0.12f;
 
-        Vector3 slimeColor = { 0.03f, 0.68f, 0.32f };
-        float refractionStrength = 0.045f;
-        float translucency = 0.72f;
-        float specularStrength = 1.9f;
-        float fresnelStrength = 0.62f;
+        Vector3 slimeColor = { 0.02f, 0.72f, 0.35f };
+        float refractionStrength = 0.082f;
+        float translucency = 0.88f;
+        float specularStrength = 2.85f;
+        float fresnelStrength = 0.92f;
     };
 
     void Initialize(
@@ -35,7 +35,10 @@ public:
 
     void RenderDepth(const GpuSphFluid& fluid, const Camera& camera);
     void SmoothDepth();
-    void Composite(D3D12_GPU_DESCRIPTOR_HANDLE sceneColorHandle);
+    void Composite(
+        const GpuSphFluid& fluid,
+        const Camera& camera,
+        D3D12_GPU_DESCRIPTOR_HANDLE sceneColorHandle);
     void Render(
         const GpuSphFluid& fluid,
         const Camera& camera,
@@ -79,6 +82,7 @@ private:
         D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU_ {};
         uint32_t srvIndex_ = kInvalidDescriptorIndex;
         D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
+
         D3D12_VIEWPORT viewport_ {};
         D3D12_RECT scissorRect_ {};
         DXGI_FORMAT format_ = DXGI_FORMAT_R32_FLOAT;
@@ -113,9 +117,9 @@ private:
         Vector3 slimeColor;
         float specularStrength;
         float fresnelStrength;
-        float padding0;
-        float padding1;
-        float padding2;
+        float floorHeightWorld;
+        Vector2 padding0;
+        Matrix4x4 invViewProj;
     };
 
     static constexpr uint32_t kDefaultFirstRtvIndex = 8;
@@ -130,7 +134,7 @@ private:
     void CreateConstantBuffers();
     void UpdatePerViewParameter(const GpuSphFluid& fluid, const Camera& camera);
     void UpdateBlurParameter(int32_t direction);
-    void UpdateCompositeParameter();
+    void UpdateCompositeParameter(const GpuSphFluid& fluid, const Camera& camera);
     void DrawFullScreen(
         ID3D12RootSignature* rootSignature,
         ID3D12PipelineState* pipelineState,

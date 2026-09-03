@@ -4,6 +4,7 @@
 #include "Engine/Camera/Camera.h"
 #include "Engine/Fluid/GpuSphFluid.h"
 #include "Engine/Fluid/ScreenSpaceFluidRenderer.h"
+#include "Engine/Logger/Logger.h"
 #include "Engine/PostEffect/Bloom/BloomRenderer.h"
 #include "Engine/PostEffect/Fog/FogManager.h"
 #include "Engine/PostEffect/Fog/FogRenderer.h"
@@ -381,6 +382,10 @@ void PostEffectManager::ApplyAfterParticleDraw(
             .GetSrvHandleGPU();
 
     if (sceneManager == nullptr) {
+        if (screenSpaceFluidDiagnosticState_ != 0) {
+            Logger::Log("[PostEffectManager] Screen-space fluid state: no scene manager.");
+            screenSpaceFluidDiagnosticState_ = 0;
+        }
         SetBackBufferRenderTarget();
         ApplyPostEffectToCurrentTarget(
             PostEffectType::Copy,
@@ -389,6 +394,20 @@ void PostEffectManager::ApplyAfterParticleDraw(
     }
 
     GpuSphFluid* screenSpaceFluid = sceneManager->GetScreenSpaceFluid();
+    int diagnosticState = 3;
+    const char* diagnosticText = "active.";
+    if (screenSpaceFluid == nullptr) {
+        diagnosticState = 1;
+        diagnosticText = "no fluid.";
+    } else if (camera_ == nullptr) {
+        diagnosticState = 2;
+        diagnosticText = "no camera.";
+    }
+    if (screenSpaceFluidDiagnosticState_ != diagnosticState) {
+        Logger::Log(std::string("[PostEffectManager] Screen-space fluid state: ") + diagnosticText);
+        screenSpaceFluidDiagnosticState_ = diagnosticState;
+    }
+
     if (screenSpaceFluid != nullptr && camera_ != nullptr) {
         uint32_t fluidCompositionTargetIndex =
             GetNextPingPongIndex(particleCompositionTargetIndex_);
@@ -399,7 +418,7 @@ void PostEffectManager::ApplyAfterParticleDraw(
         screenSpaceFluidRenderer_->SmoothDepth();
 
         fluidCompositionTarget.BeginRender();
-        screenSpaceFluidRenderer_->Composite(inputHandle);
+        screenSpaceFluidRenderer_->Composite(*screenSpaceFluid, *camera_, inputHandle);
         fluidCompositionTarget.EndRender();
 
         inputHandle = fluidCompositionTarget.GetSrvHandleGPU();

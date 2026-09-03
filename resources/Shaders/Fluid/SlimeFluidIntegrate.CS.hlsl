@@ -1,5 +1,7 @@
 #include "SlimeFluidCommon.hlsli"
 
+StructuredBuffer<SlimeFluidObstacle> gObstacles : register(t0);
+
 void ResolveBoundary(inout SlimeFluidParticle particle)
 {
     float32_t3 minPosition = boundsMin + particleRadius + boundaryPadding;
@@ -40,7 +42,106 @@ void ResolveBoundary(inout SlimeFluidParticle particle)
     }
 }
 
-void ResolveSlimeEnvelope(inout SlimeFluidParticle particle)
+bool IsEmittedThisFrame(uint32_t index)
+{
+    if (emitCount == 0)
+    {
+        return false;
+    }
+
+    uint32_t relativeIndex =
+        index >= emitStartIndex
+            ? index - emitStartIndex
+            : index + particleCount - emitStartIndex;
+    return relativeIndex < emitCount;
+}
+
+void SpawnLiquidParticle(inout SlimeFluidParticle particle, uint32_t index)
+{
+    float32_t angle = HashIndex(index, 17.0f + particleLifetime) * kPi * 2.0f;
+    float32_t radius = sqrt(HashIndex(index, 29.0f + particleLifetime)) * emitterRadius;
+    float32_t heightJitter = (HashIndex(index, 41.0f + particleLifetime) - 0.5f) * emitterRadius;
+
+    float32_t3 randomOffset = float32_t3(
+        cos(angle) * radius,
+        heightJitter,
+        sin(angle) * radius * 0.45f);
+
+    float32_t fan = HashIndex(index, 53.0f + particleLifetime) - 0.5f;
+    float32_t upward = lerp(0.55f, 1.25f, HashIndex(index, 67.0f + particleLifetime));
+    particle.position = emitterPosition + randomOffset;
+    particle.velocity =
+        emitterVelocity +
+        float32_t3(fan * emitterSpeed * 0.75f, emitterSpeed * upward, fan * emitterSpeed * 0.18f);
+    particle.density = restDensity;
+    particle.pressure = 0.0f;
+    particle.padding = particleLifetime;
+}
+
+void DeactivateParticle(inout SlimeFluidParticle particle)
+{
+    particle.position = float32_t3(0.0f, -10000.0f, 0.0f);
+    particle.velocity = float32_t3(0.0f, 0.0f, 0.0f);
+    particle.density = restDensity;
+    particle.pressure = 0.0f;
+    particle.padding = -1.0f;
+}
+
+void ResolveObstacleCollision(inout SlimeFluidParticle particle)
+{
+    float32_t contactRadius = particleRadius * 1.05f;
+
+    [loop]
+    for (uint32_t obstacleIndex = 0; obstacleIndex < obstacleCount; ++obstacleIndex)
+    {
+        SlimeFluidObstacle obstacle = gObstacles[obstacleIndex];
+        float32_t3 expandedHalfSize = obstacle.halfSize + contactRadius;
+        float32_t3 delta = particle.position - obstacle.center;
+        float32_t3 overlap = expandedHalfSize - abs(delta);
+        if (overlap.x <= 0.0f || overlap.y <= 0.0f || overlap.z <= 0.0f)
+        {
+            continue;
+        }
+
+        float32_t3 normal = float32_t3(0.0f, 0.0f, 0.0f);
+        float32_t penetration = overlap.x;
+        normal.x = delta.x < 0.0f ? -1.0f : 1.0f;
+
+        if (overlap.y < penetration)
+        {
+            penetration = overlap.y;
+            normal = float32_t3(0.0f, delta.y < 0.0f ? -1.0f : 1.0f, 0.0f);
+        }
+        if (overlap.z < penetration)
+        {
+            penetration = overlap.z;
+            normal = float32_t3(0.0f, 0.0f, delta.z < 0.0f ? -1.0f : 1.0f);
+        }
+
+        particle.position += normal * penetration;
+
+        float32_t3 relativeVelocity = particle.velocity - obstacle.velocity;
+        float32_t normalSpeed = dot(relativeVelocity, normal);
+        if (normalSpeed < 0.0f)
+        {
+            relativeVelocity -= normal * normalSpeed * (1.0f + collisionBounce);
+        }
+
+        float32_t3 normalVelocity = normal * dot(relativeVelocity, normal);
+        float32_t3 tangentVelocity = relativeVelocity - normalVelocity;
+        particle.velocity =
+            obstacle.velocity +
+            normalVelocity +
+            tangentVelocity * collisionFriction;
+    }
+}
+
+void ResolveLiquidPuddle(inout SlimeFluidParticle particle)
+{
+    particle.velocity.xz *= lerp(horizontalFriction, 0.995f, liquidBlend);
+}
+
+void ResolveSlimeEnvelope(inout SlimeFluidParticle particle, float32_t envelopeBlend)
 {
     float32_t3 forward = normalize(coreForward);
     float32_t3 up = float32_t3(0.0f, 1.0f, 0.0f);
@@ -56,30 +157,107 @@ void ResolveSlimeEnvelope(inout SlimeFluidParticle particle)
     float32_t localY = dot(toParticle, up);
     float32_t localZ = dot(toParticle, forward);
 
-    float32_t y01 = saturate(localY / max(blobRadii.y, 0.001f));
-    float32_t allowedRadius =
-        lerp(blobRadii.x * 1.08f, blobRadii.x * 0.36f, pow(y01, 1.15f));
-    float32_t2 horizontal = float32_t2(localX, localZ / max(blobRadii.z / blobRadii.x, 0.001f));
-    float32_t horizontalLength = length(horizontal);
-    if (horizontalLength > allowedRadius)
+    // 2. 水風船アプローチ (楕円体範囲 maxRadiusScale = 1.2f の強制クランプ・水風船膜セーフティー)
+    float32_t maxRadiusScale = 1.20f;
+    float32_t normX = localX / max(blobRadii.x * maxRadiusScale, 0.001f);
+    float32_t normY = localY / max(blobRadii.y * maxRadiusScale, 0.001f);
+    float32_t normZ = localZ / max(blobRadii.z * maxRadiusScale, 0.001f);
+    float32_t ellipsoidDist = sqrt(normX * normX + normY * normY + normZ * normZ);
+
+    if (ellipsoidDist > 1.0f)
     {
-        float32_t2 clamped = horizontal / max(horizontalLength, kEpsilon) * allowedRadius;
-        float32_t targetX = clamped.x;
-        float32_t targetZ = clamped.y * max(blobRadii.z / blobRadii.x, 0.001f);
+        float32_t scale = 1.0f / ellipsoidDist;
+        float32_t targetX = localX * scale;
+        float32_t targetY = localY * scale;
+        float32_t targetZ = localZ * scale;
+
         float32_t3 target =
             corePosition +
             right * targetX +
-            up * localY +
+            up * targetY +
             forward * targetZ;
-        particle.position = lerp(particle.position, target, saturate(deltaTime * 10.0f));
-        particle.velocity.xz *= 0.94f;
+            
+        // 水風船のゴム膜による表面への滑らかな固定
+        particle.position = lerp(particle.position, target, saturate(deltaTime * 18.0f * envelopeBlend));
+
+        // 膜を突き破ろうとする外向き速度のキャンセリング
+        float32_t3 outwardNormal = normalize(particle.position - corePosition);
+        float32_t outwardSpeed = dot(particle.velocity, outwardNormal);
+        if (outwardSpeed > 0.0f)
+        {
+            particle.velocity -= outwardNormal * outwardSpeed * 0.85f;
+        }
+    }
+    ResolveObstacleCollision(particle);
+}
+
+void ResolveWallAndFloorCollision(inout SlimeFluidParticle particle)
+{
+    // メタボール描画半径(particleRadius * 1.35f)を考慮し、地面上面(floorHeight)の下へ垂れ下がらない粒子限界高度
+    float32_t minFloorY = floorHeight + particleRadius * 1.35f;
+    if (particle.position.y < minFloorY)
+    {
+        particle.position.y = minFloorY;
+        
+        // 落下・接地エネルギーを左右のペタン潰れ運動(Squash Spreading)に物理変換！
+        float32_t pushOut = particle.position.x - corePosition.x;
+        float32_t dirX = (abs(pushOut) > 0.001f) ? sign(pushOut) : 1.0f;
+        
+        if (particle.velocity.y < 0.0f)
+        {
+            particle.velocity.x += dirX * abs(particle.velocity.y) * 0.45f;
+            particle.velocity.y *= -collisionBounce;
+        }
+        particle.velocity.xz *= collisionFriction;
     }
 
-    if (particle.position.y < floorHeight + particleRadius * 0.55f)
+    float32_t minWallX = wallMinX + particleRadius;
+    float32_t maxWallX = wallMaxX - particleRadius;
+    if (particle.position.x < minWallX)
     {
-        particle.position.y = floorHeight + particleRadius * 0.55f;
-        particle.velocity.y = max(particle.velocity.y * -damping, 0.0f);
-        particle.velocity.xz *= horizontalFriction;
+        particle.position.x = minWallX;
+        if (particle.velocity.x < 0.0f)
+        {
+            particle.velocity.x *= -collisionBounce;
+        }
+    }
+    else if (particle.position.x > maxWallX)
+    {
+        particle.position.x = maxWallX;
+        if (particle.velocity.x > 0.0f)
+        {
+            particle.velocity.x *= -collisionBounce;
+        }
+    }
+
+    // 手前と奥の見えない壁(Z軸バウンダリ)への衝突・閉じ込め処理
+    float32_t minWallZ = wallMinZ + particleRadius;
+    float32_t maxWallZ = wallMaxZ - particleRadius;
+    if (particle.position.z < minWallZ)
+    {
+        particle.position.z = minWallZ;
+        if (particle.velocity.z < 0.0f)
+        {
+            particle.velocity.z *= -collisionBounce;
+        }
+    }
+    else if (particle.position.z > maxWallZ)
+    {
+        particle.position.z = maxWallZ;
+        if (particle.velocity.z > 0.0f)
+        {
+            particle.velocity.z *= -collisionBounce;
+        }
+    }
+
+    float32_t maxCeilingY = wallMaxY - particleRadius;
+    if (particle.position.y > maxCeilingY)
+    {
+        particle.position.y = maxCeilingY;
+        if (particle.velocity.y > 0.0f)
+        {
+            particle.velocity.y *= -collisionBounce;
+        }
     }
 }
 
@@ -93,24 +271,77 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     }
 
     SlimeFluidParticle particle = gParticles[index];
+    if (IsEmittedThisFrame(index))
+    {
+        SpawnLiquidParticle(particle, index);
+        ResolveObstacleCollision(particle);
+        ResolveWallAndFloorCollision(particle);
+        ResolveBoundary(particle);
+        gParticles[index] = particle;
+        return;
+    }
+
+    if (particle.padding <= 0.0f && liquidBlend > 0.5f)
+    {
+        DeactivateParticle(particle);
+        gParticles[index] = particle;
+        return;
+    }
+
+    if (liquidBlend > 0.5f)
+    {
+        particle.padding -= deltaTime;
+        if (particle.padding <= 0.0f)
+        {
+            DeactivateParticle(particle);
+            gParticles[index] = particle;
+            return;
+        }
+    }
+    else
+    {
+        particle.padding = 9999.0f;
+    }
+
     float32_t3 acceleration =
         gForces[index].xyz / max(particle.density, kEpsilon);
 
     particle.velocity += acceleration * deltaTime;
-    particle.velocity *= 0.999f;
+
+    if (liquidationBurstStrength > kEpsilon)
+    {
+        float32_t angle = HashIndex(index, 71.3f) * kPi * 2.0f;
+        float32_t speed01 = lerp(0.45f, 1.0f, HashIndex(index, 97.9f));
+        particle.velocity.x += cos(angle) * liquidationBurstStrength * speed01;
+        particle.velocity.z += sin(angle) * liquidationBurstStrength * speed01 * 0.20f;
+        particle.velocity.y = min(particle.velocity.y, 0.0f);
+    }
+    
+    float32_t quietDamping = lerp(0.985f, 0.996f, liquidBlend);
+    float32_t movingDamping = lerp(0.995f, 0.999f, liquidBlend);
+    if (length(targetVelocity) < 0.1f) {
+        particle.velocity *= quietDamping;
+    } else {
+        particle.velocity *= movingDamping;
+    }
+
+    float32_t maxSpeed = lerp(18.0f, 30.0f, liquidBlend);
+    float32_t speed = length(particle.velocity);
+    if (speed > maxSpeed)
+    {
+        particle.velocity *= maxSpeed / speed;
+    }
+
     particle.position += particle.velocity * deltaTime;
 
-    // 液状化中（shapeAttraction == 0）はエンベロープ制限を無効化し、自由に流れさせる
-    if (shapeAttraction > kEpsilon) {
-        ResolveSlimeEnvelope(particle);
+    float32_t envelopeBlend = saturate(1.0f - liquidBlend * 1.35f);
+    if (envelopeBlend > 0.001f) {
+        ResolveSlimeEnvelope(particle, envelopeBlend);
     } else {
-        // 液状化中でも床との衝突だけは保持
-        if (particle.position.y < floorHeight + particleRadius * 0.55f) {
-            particle.position.y = floorHeight + particleRadius * 0.55f;
-            particle.velocity.y = max(particle.velocity.y * -damping, 0.0f);
-            particle.velocity.xz *= 0.85f; // 床上で水のように広がる
-        }
+        ResolveLiquidPuddle(particle);
     }
+    ResolveObstacleCollision(particle);
+    ResolveWallAndFloorCollision(particle);
     ResolveBoundary(particle);
     gParticles[index] = particle;
 }

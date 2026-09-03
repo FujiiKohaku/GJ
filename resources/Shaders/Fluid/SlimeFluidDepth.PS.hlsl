@@ -18,10 +18,7 @@ PSOutput main(SlimeDepthVertexOutput input)
     PSOutput output;
     output.depth = saturate(input.centerDepth - sphereNormalZ * depthThickness);
     
-    float32_t len = sqrt(radiusSquared);
-    float32_t alpha = saturate(1.0f - len);
-    alpha = alpha * alpha * (3.0f - 2.0f * alpha);
-    output.thickness = alpha * 1.2f;
+    output.thickness = sphereNormalZ * 0.72f;
     
     return output;
 }

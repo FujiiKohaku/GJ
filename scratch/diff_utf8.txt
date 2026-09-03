@@ -1,0 +1,75 @@
+﻿diff --git a/App/Game/Player/MapChipPlayer.cpp b/App/Game/Player/MapChipPlayer.cpp
+index 47a12ca..c0ade6e 100644
+--- a/App/Game/Player/MapChipPlayer.cpp
++++ b/App/Game/Player/MapChipPlayer.cpp
+@@ -17,27 +17,29 @@ constexpr float kJumpSpeed = 8.0f;
+ constexpr float kGravity = -20.0f;
+ constexpr float kMaximumDeltaTime = 1.0f / 30.0f;
+ constexpr float kCollisionEpsilon = 0.0001f;
++constexpr float kPlayerHalfHeight = kPlayerSize * 0.5f;
++constexpr float kSlimeCoreLift = 0.10f;
++constexpr Vector3 kSlimeBaseRadii = { 0.40f, 0.30f, 0.40f };
++
++float Saturate(float value)
++{
++    return std::clamp(value, 0.0f, 1.0f);
++}
+ }
+ 
+ MapChipPlayer::~MapChipPlayer() = default;
+ 
+-void MapChipPlayer::Initialize(Model* model, const MapChipField* mapChipField, const Vector3& startPosition)
++void MapChipPlayer::Initialize(const MapChipField* mapChipField, const Vector3& startPosition)
+ {
+     position_ = startPosition;
+     mapChipField_ = mapChipField;
+-    object_ = std::make_unique<Object3d>();
+-    object_->Initialize(Object3dManager::GetInstance());
+-    object_->SetModel(model);
+-    object_->SetScale({ kPlayerSize, kPlayerSize, 1.0f });
+-    object_->SetTranslate(position_);
+-    object_->SetColor({ 0.1f, 0.65f, 1.0f, 1.0f });
+-    object_->SetEnableLighting(false);
+-    object_->Update();
++    baseScale_ = kSlimeBaseRadii;
++    visualScale_ = kSlimeBaseRadii;
+ }
+ 
+ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmicks)
+ {
+-    if (!object_ || !mapChipField_) {
++    if (!mapChipField_) {
+         return;
+     }
+ 
+@@ -48,11 +50,9 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
+         position_.y += delta.y;
+         position_.z += delta.z;
+         
+-        // 霑ｽ蠕灘ｾ後↓螢√↓繧√ｊ霎ｼ繧薙〒縺・ｋ縺九メ繧ｧ繝・け縺励，rush蛻､螳夲ｼ・繝励Λ繝ｳ: 繝ｭ繧ｰ蜃ｺ蜉帙・縺ｿ・・         Vector3 checkPos = position_;
+         if (ResolveHorizontalCollision(checkPos) || ResolveVerticalCollision(checkPos)) {
+             Logger::Log("Crush! (Player squished between moving block and wall)\n");
+-            // C繝励Λ繝ｳ: 繧ｲ繝ｼ繝騾ｲ陦後ｒ豁｢繧√↑縺・◆繧√√Ο繧ｰ縺ｮ縺ｿ縺ｧ螳滄圀縺ｫ縺ｯ螢√°繧画款縺怜・縺輔ｌ縺滉ｽ咲ｽｮ繧帝←逕ｨ縺吶ｋ
+             position_ = checkPos;
+         }
+     }
+@@ -89,15 +89,11 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
+     MoveHorizontal(deltaTime, dynamicGimmicks);
+     MoveVertical(deltaTime, dynamicGimmicks);
+ 
+-    object_->SetTranslate(position_);
+-    object_->Update();
+-}
+-
+-void MapChipPlayer::Draw()
+-{
+-    if (object_) {
+-        object_->Draw();
++    if (std::abs(velocity_.x) > 0.1f) {
++        forward_ = { velocity_.x > 0.0f ? 1.0f : -1.0f, 0.0f, 0.0f };
+     }
++
++    UpdateVisualShape(deltaTime);
+ }
+ 
+ const Vector3& MapChipPlayer::GetPosition() const
