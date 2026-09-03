@@ -18,6 +18,7 @@ struct SlimeParticle {
     Vector4 color = { 0.2f, 0.7f, 1.0f, 1.0f };
     float lifeTime = 12.0f;
     float age = 0.0f;
+    float spawnDelay = 0.0f;
     bool isActive = false;
     bool isGrounded = false;
     
@@ -26,6 +27,11 @@ struct SlimeParticle {
 
 class DeathSlimeShower {
 public:
+    struct CollisionBox {
+        Vector3 center {};
+        Vector3 halfExtent {};
+    };
+
     DeathSlimeShower();
     ~DeathSlimeShower();
 
@@ -34,6 +40,7 @@ public:
     void Update(float deltaTime);
     void Draw();
     void Clear();
+    void SetCollisionBoxes(const std::vector<CollisionBox>& boxes) { collisionBoxes_ = boxes; }
 
     // 物理・ぽよぽよパラメータ
     float gravity = -20.0f;          // 重力
@@ -43,10 +50,14 @@ public:
     float springDamping = 10.0f;     // ぽよぽよバネの減衰
     float floorY = 0.0f;             // 地面の高さ
     float boundaryExtent = 9.0f;     // 壁の範囲 (X, Z)
+    float spawnStaggerDuration = 3.0f; // 雨が全て出揃うまでの時間
+    float centerExclusionHalfWidth = 0.0f; // 中央の土台を避ける横幅（0なら無効）
+    float centerExclusionHalfDepth = 0.0f; // 中央の土台を避ける奥行き（0なら無効）
 
     uint32_t GetActiveCount() const;
 
 private:
     std::vector<SlimeParticle> slimes_;
+    std::vector<CollisionBox> collisionBoxes_;
     uint32_t maxCapacity_ = 120;
 };

@@ -10,7 +10,6 @@
 #include "Engine/PostEffect/PostEffectType.h"
 #include "PageTransition.h"
 #include "App/Effect/DeathSlimeShower.h"
-#include "App/Effect/DeathFluidSlime.h"
 
 #include <memory>
 #include <vector>
@@ -41,9 +40,7 @@ private:
 private:
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
-    std::unique_ptr<Object3d> floor_;
-    std::unique_ptr<Object3d> shipObject_;
-    float shipRotationY_ = 0.0f;
+    std::unique_ptr<Object3d> backdrop_;
     std::unique_ptr<Text> titleText_;
     std::unique_ptr<Text> instructionText_;
     std::vector<PostEffectToggle> postEffectToggles_;
@@ -58,6 +55,5 @@ private:
     bool isSmokeEnabled_ = false;
     Vector3 fireworkLaunchPosition_ = { 0.0f, 4.0f, 0.0f };
     std::unique_ptr<DeathSlimeShower> deathSlimeShower_;
-    std::unique_ptr<DeathFluidSlime> deathFluidSlime_;
     PageTransition::RevealOverlay pageReveal_;
 };

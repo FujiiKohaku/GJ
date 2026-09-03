@@ -18,8 +18,7 @@
 namespace {
 constexpr const char* kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
-constexpr const char* kFloorTexture = "resources/Textures/checkerboard.png";
-constexpr const char* kShipModelPath = "sailing_ship.obj";
+constexpr const char* kArchiveRoomModel = "StageSelectBook/ArchiveRoom.obj";
 constexpr int32_t kGridHalfExtent = 10;
 constexpr float kGridSpacing = 1.0f;
 constexpr Vector3 kSmokePreviewPosition = { 3.0f, 0.05f, 2.0f };
@@ -82,7 +81,8 @@ void GameLabScene::Initialize()
     previousSonicBoomProgress_ = sceneManager->GetSonicBoomProgress();
     postEffectPreviewProgress_ = 0.05f;
     sceneManager->ClearPostEffects();
-    sceneManager->SetPostEffectType(PostEffectType::Copy);
+    sceneManager->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
+    sceneManager->SetArchiveApproach(0.0f);
     sceneManager->SetPostEffectKickStrength(1.0f);
     sceneManager->SetPaintIntensity(1.0f);
     UpdatePostEffectPreviewParameters();
@@ -90,7 +90,7 @@ void GameLabScene::Initialize()
 
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
-    camera_->LookAt({ 0.0f, 4.0f, -12.0f }, { 0.0f, 0.0f, 0.0f });
+    camera_->LookAt({ 0.0f, 3.8f, -35.0f }, { 0.0f, -1.0f, 1.0f });
     camera_->Update();
     Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
 
@@ -103,41 +103,25 @@ void GameLabScene::Initialize()
 
     InitializePostEffectList();
 
-    floor_ = std::make_unique<Object3d>();
-    floor_->Initialize(Object3dManager::GetInstance());
-    floor_->SetModel(ModelManager::GetInstance()->CreateCube(kFloorTexture));
-    floor_->SetScale({ 20.0f, 0.5f, 20.0f });
-    floor_->SetTranslate({ 0.0f, -0.25f, 0.0f });
-    floor_->SetColor({ 0.30f, 0.36f, 0.42f, 1.0f });
-    floor_->SetEnableLighting(false);
-    floor_->Update();
-
-    // 帆船モデルの初期化
-    ModelManager::GetInstance()->Load(kShipModelPath);
-    shipObject_ = std::make_unique<Object3d>();
-    shipObject_->Initialize(Object3dManager::GetInstance());
-    shipObject_->SetModel(kShipModelPath);
-    shipObject_->SetTranslate({ 0.0f, 1.2f, 0.0f });
-    shipObject_->SetScale({ 0.6f, 0.6f, 0.6f });
-    shipObject_->SetEnableLighting(true);
-    shipObject_->Update();
+    backdrop_ = std::make_unique<Object3d>();
+    backdrop_->Initialize(Object3dManager::GetInstance());
+    backdrop_->SetModel(ModelManager::GetInstance()->Load(kArchiveRoomModel));
+    backdrop_->SetEnableLighting(false);
+    backdrop_->SetColor({ 0.58f, 0.61f, 0.65f, 1.0f });
+    backdrop_->Update();
 
     // 死亡ぽよぽよスライムシャワーの初期化
     deathSlimeShower_ = std::make_unique<DeathSlimeShower>();
     deathSlimeShower_->Initialize(120);
 
-    // 死亡GPU流体スライムの初期化
-    deathFluidSlime_ = std::make_unique<DeathFluidSlime>();
-    deathFluidSlime_->Initialize(DirectXCommon::GetInstance(), SrvManager::GetInstance());
-    SceneManager::GetInstance()->SetScreenSpaceFluid(deathFluidSlime_->GetFluid());
-
     titleText_ = std::make_unique<Text>();
     titleText_->Initialize(kDefaultFont);
     titleText_->SetText("STAGE 03  GAMELAB");
-    titleText_->SetPosition({ 32.0f, 32.0f });
-    titleText_->SetFontSize(30.0f);
-    titleText_->SetColor({ 0.45f, 1.0f, 0.72f, 1.0f });
-    titleText_->SetOutlineColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+    titleText_->SetPosition({ 640.0f, 68.0f });
+    titleText_->SetAnchorPoint({ 0.5f, 0.5f });
+    titleText_->SetFontSize(48.0f);
+    titleText_->SetColor({ 0.35f, 0.85f, 1.0f, 1.0f });
+    titleText_->SetOutlineColor({ 0.02f, 0.03f, 0.06f, 1.0f });
     titleText_->SetOutlineWidth(2.0f);
 
     instructionText_ = std::make_unique<Text>();
@@ -145,9 +129,10 @@ void GameLabScene::Initialize()
     instructionText_->SetText(
         "WASD : MOVE   Q : DOWN   E : UP   ARROWS / LEFT DRAG : LOOK   "
         "BACKSPACE : STAGE SELECT");
-    instructionText_->SetPosition({ 32.0f, 72.0f });
-    instructionText_->SetFontSize(18.0f);
-    instructionText_->SetColor({ 0.82f, 0.90f, 1.0f, 1.0f });
+    instructionText_->SetPosition({ 640.0f, 660.0f });
+    instructionText_->SetAnchorPoint({ 0.5f, 0.5f });
+    instructionText_->SetFontSize(16.0f);
+    instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, 1.0f });
     instructionText_->SetOutlineColor({ 0.0f, 0.0f, 0.0f, 1.0f });
     instructionText_->SetOutlineWidth(2.0f);
 
@@ -156,10 +141,6 @@ void GameLabScene::Initialize()
 
 void GameLabScene::Finalize()
 {
-    SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
-    if (deathFluidSlime_) {
-        deathFluidSlime_->Finalize();
-    }
     if (EffectManager::GetInstance()->IsEffectAlive(smokeEffectHandle_)) {
         EffectManager::GetInstance()->StopEffect(smokeEffectHandle_);
     }
@@ -199,27 +180,11 @@ void GameLabScene::Update()
     camera_->Update();
     EffectManager::GetInstance()->SetCamera(camera_.get());
     EffectManager::GetInstance()->UpdatePerView();
-    floor_->Update();
-
-    // 帆船のアニメーション（ゆっくり回転＋波揺れ）
-    if (shipObject_) {
-        float dt = TimeManager::GetInstance()->GetDeltaTime();
-        shipRotationY_ += 0.3f * dt;
-        float waveY = 1.2f + std::sin(shipRotationY_ * 2.5f) * 0.08f;
-        float tiltZ = std::sin(shipRotationY_ * 1.8f) * 0.06f;
-        float pitchX = std::cos(shipRotationY_ * 1.8f) * 0.04f;
-        shipObject_->SetTranslate({ 0.0f, waveY, 0.0f });
-        shipObject_->SetRotate({ pitchX, shipRotationY_, tiltZ });
-        shipObject_->Update();
-    }
+    backdrop_->Update();
 
     if (deathSlimeShower_) {
         deathSlimeShower_->Update(TimeManager::GetInstance()->GetDeltaTime());
     }
-    if (deathFluidSlime_) {
-        deathFluidSlime_->Update(TimeManager::GetInstance()->GetDeltaTime());
-    }
-
     titleText_->Update();
     instructionText_->Update();
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
@@ -236,17 +201,10 @@ void GameLabScene::Draw2D()
 void GameLabScene::Draw3D()
 {
     Object3dManager::GetInstance()->PreDraw();
-    floor_->Draw();
-    if (shipObject_) {
-        shipObject_->Draw();
-    }
+    backdrop_->Draw();
     if (deathSlimeShower_) {
         deathSlimeShower_->Draw();
     }
-    if (deathFluidSlime_) {
-        deathFluidSlime_->Draw3D(*camera_);
-    }
-    DrawDebugGrid();
 }
 
 void GameLabScene::DrawParticle()
@@ -310,41 +268,6 @@ void GameLabScene::DrawImGui()
         ImGui::SliderFloat("Bounce Restitution", &deathSlimeShower_->restitution, 0.1f, 0.95f);
         ImGui::SliderFloat("Poyo Stiffness (Spring)", &deathSlimeShower_->springStiffness, 30.0f, 400.0f);
         ImGui::SliderFloat("Poyo Damping", &deathSlimeShower_->springDamping, 1.0f, 30.0f);
-    }
-
-    if (deathFluidSlime_) {
-        ImGui::Separator();
-        ImGui::TextColored(ImVec4(0.35f, 0.75f, 1.0f, 1.0f), "--- GPU FLUID SLIME (SPH) ---");
-
-        if (ImGui::Button("DROP FLUID SLIME (FROM SKY)")) {
-            SceneManager::GetInstance()->SetScreenSpaceFluid(deathFluidSlime_->GetFluid());
-            deathFluidSlime_->SpawnFromSky({ 0.0f, 7.5f, -2.5f }, false);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("RESET FLUID")) {
-            deathFluidSlime_->Reset();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("SHOW FLUID")) {
-            SceneManager::GetInstance()->SetScreenSpaceFluid(deathFluidSlime_->GetFluid());
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("HIDE FLUID")) {
-            SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
-        }
-
-        bool liquidated = deathFluidSlime_->IsLiquidated();
-        if (ImGui::Checkbox("Liquidate (Melt to liquid)", &liquidated)) {
-            deathFluidSlime_->SetLiquidated(liquidated);
-        }
-        ImGui::SameLine();
-        ImGui::Checkbox("3D Spheres Mode", &deathFluidSlime_->useDirectSphereDraw);
-
-        ImGui::DragFloat3("Fluid Position", &deathFluidSlime_->corePosition_.x, 0.05f, -15.0f, 15.0f);
-        ImGui::SliderFloat("Viscosity", &deathFluidSlime_->settings.viscosity, 1.0f, 50.0f);
-        ImGui::SliderFloat("Stiffness", &deathFluidSlime_->settings.stiffness, 10.0f, 150.0f);
-        ImGui::SliderFloat("Surface Tension", &deathFluidSlime_->settings.surfaceTension, 1.0f, 50.0f);
-        ImGui::SliderFloat("Gravity Y", &deathFluidSlime_->settings.gravity.y, -40.0f, -2.0f);
     }
 
     ImGui::Separator();
