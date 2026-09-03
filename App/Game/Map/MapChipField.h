@@ -11,6 +11,10 @@ enum class MapChipType {
     Block = 1,
     MovingBlock = 2,
     Goal = 4,
+    PressurePlate = 5,
+    GasEmitter = 6,
+    Bonfire = 7,
+    DestructibleWall = 8,
 };
 
 class MapChipField {

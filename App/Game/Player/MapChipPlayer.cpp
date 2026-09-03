@@ -138,6 +138,14 @@ bool MapChipPlayer::IsCrushed() const
     return isCrushed_;
 }
 
+AABB MapChipPlayer::GetAABB() const
+{
+    return {
+        position_,
+        { kPlayerSize, kPlayerSize, 0.2f }
+    };
+}
+
 void MapChipPlayer::MoveHorizontal(float deltaTime, const std::vector<BaseMapChipGimmick*>& dynamicGimmicks)
 {
     Vector3 nextPosition = position_;
@@ -281,6 +289,11 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
             return true;
         }
         
+        // 物理的な衝突（壁や床としての機能）を持たないギミックは押し出し判定をスキップする
+        if (!gimmick->IsSolid()) {
+            continue;
+        }
+        
         if (isHorizontal) {
             if (std::abs(hit.normal.x) > 0.0f) {
                 // ブロックの方向（hit.normal）の逆へ押し出す
@@ -363,6 +376,7 @@ void MapChipPlayer::GetWallBoundaries(float& outMinX, float& outMaxX, float& out
     }
 
     for (BaseMapChipGimmick* gimmick : dynamicGimmicks) {
+        if (!gimmick->IsSolid()) continue;
         AABB box = gimmick->GetAABB();
         checkBoundary(box.center.x - box.size.x * 0.5f, box.center.x + box.size.x * 0.5f,
                       box.center.y - box.size.y * 0.5f, box.center.y + box.size.y * 0.5f);
@@ -406,6 +420,7 @@ void MapChipPlayer::UpdateVerticalConfinement(const std::vector<BaseMapChipGimmi
     }
 
     for (BaseMapChipGimmick* gimmick : dynamicGimmicks) {
+        if (!gimmick->IsSolid()) continue;
         const AABB box = gimmick->GetAABB();
         checkObstacle(
             box.center.x - box.size.x * 0.5f,

@@ -164,8 +164,20 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="App\Game\Gimmick\GoalGimmick.cpp" />
+    <ClCompile Include="Engine\Event\EventManager.cpp" />
+    <ClCompile Include="App\Game\Gimmick\Interaction\SwitchParam.cpp" />
+    <ClCompile Include="App\Game\Gimmick\Interaction\SwitchGimmick.cpp" />
+    <ClCompile Include="App\Game\Gimmick\Interaction\GasEmitterParam.cpp" />
+    <ClCompile Include="App\Game\Gimmick\Interaction\GasEmitterGimmick.cpp" />
+    <ClCompile Include="App\Game\Gimmick\Interaction\DestructibleWallGimmick.cpp" />
     <ClCompile Include="Engine\Event\EventDispatcher.cpp" />
     <ClInclude Include="App\Game\Gimmick\GoalGimmick.h" />
+    <ClInclude Include="Engine\Event\EventManager.h" />
+    <ClInclude Include="App\Game\Gimmick\Interaction\SwitchParam.h" />
+    <ClInclude Include="App\Game\Gimmick\Interaction\SwitchGimmick.h" />
+    <ClInclude Include="App\Game\Gimmick\Interaction\GasEmitterParam.h" />
+    <ClInclude Include="App\Game\Gimmick\Interaction\GasEmitterGimmick.h" />
+    <ClInclude Include="App\Game\Gimmick\Interaction\DestructibleWallGimmick.h" />
     <ClInclude Include="Engine\CollisionManager\CollisionLayer.h" />
     <ClCompile Include="App\SlimePlayer.cpp" />
     <ClCompile Include="App\Scene\EditorScene.cpp" />

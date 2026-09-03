@@ -58,6 +58,10 @@ class EditorTool(tk.Tk):
             (2, "Moving Block (Gimmick)"),
             (3, "Spike"),
             (4, "Goal"),
+            (5, "Switch (Pressure Plate)"),
+            (6, "Gas Emitter"),
+            (7, "Switch (Bonfire)"),
+            (8, "Destructible Wall"),
             (99, "Player Spawn"),
         ]
         

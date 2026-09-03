@@ -2,6 +2,9 @@
 
 #include "App/Game/Gimmick/MapChipGimmickFactory.h"
 #include "App/Game/Gimmick/GoalGimmick.h"
+#include "App/Game/Gimmick/Interaction/SwitchGimmick.h"
+#include "App/Game/Gimmick/Interaction/GasEmitterGimmick.h"
+#include "App/Game/Gimmick/Interaction/DestructibleWallGimmick.h"
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3d.h"
 #include "Engine/3D/Object3dManager.h"
@@ -14,6 +17,7 @@ void MapChipStage::Initialize(
 {
     // ギミックは数が少ないので毎回作り直す
     gimmicks_.clear();
+    eventManager_.Clear();
     
     if (levelData.tileMaps.empty()) return;
     field_.Initialize(levelData.tileMaps[0]);
@@ -54,6 +58,7 @@ void MapChipStage::Initialize(
                         texturePath,
                         gimmickParam);
                 if (gimmick) {
+                    gimmick->SetStage(this);
                     gimmicks_.push_back(std::move(gimmick));
                 }
                 continue;
@@ -84,11 +89,23 @@ void MapChipStage::Initialize(
 
     // objects 配列に独立して存在するギミック（例: Goal）を追加で作成
     for (const auto& obj : levelData.objects) {
+        std::unique_ptr<BaseMapChipGimmick> gimmick = nullptr;
+        std::string modelFile;
+
         if (obj.type == "Goal") {
-            std::unique_ptr<BaseMapChipGimmick> gimmick = std::make_unique<GoalGimmick>();
-            // fileName が指定されていればモデルファイルとして渡す。古いデータ等で空の場合はデフォルトを設定
-            const std::string modelFile = obj.fileName.empty() ? "GoalPost/GoalPost.obj" : obj.fileName;
+            gimmick = std::make_unique<GoalGimmick>();
+            modelFile = obj.fileName.empty() ? "GoalPost/GoalPost.obj" : obj.fileName;
+        } else if (obj.type == "Switch") {
+            gimmick = std::make_unique<SwitchGimmick>();
+        } else if (obj.type == "GasEmitter") {
+            gimmick = std::make_unique<GasEmitterGimmick>();
+        } else if (obj.type == "DestructibleWall") {
+            gimmick = std::make_unique<DestructibleWallGimmick>();
+        }
+
+        if (gimmick) {
             if (gimmick->Initialize(obj.translation, modelFile, obj.gimmickParam.get())) {
+                gimmick->SetStage(this);
                 gimmicks_.push_back(std::move(gimmick));
             }
         }
@@ -135,4 +152,36 @@ std::vector<BaseMapChipGimmick*> MapChipStage::GetGimmicks() const
         result.push_back(gimmick.get());
     }
     return result;
+}
+
+std::vector<BaseMapChipGimmick*> MapChipStage::GetGimmicksInSphere(const Vector3& center, float radius)
+{
+    std::vector<BaseMapChipGimmick*> result;
+    float radiusSq = radius * radius;
+    for (const auto& gimmick : gimmicks_) {
+        AABB aabb = gimmick->GetAABB();
+        Vector3 diff = aabb.center - center;
+        if (Vector3LengthSquared(diff) <= radiusSq) {
+            result.push_back(gimmick.get());
+        }
+    }
+    return result;
+}
+
+void MapChipStage::CreateSpark(const Vector3& origin)
+{
+    // 全ギミックにスパークが発生したことを通知する
+    // ガス発生装置などがこれを受け取って引火判定を行う
+    for (const auto& gimmick : gimmicks_) {
+        gimmick->OnSpark(origin);
+    }
+}
+
+void MapChipStage::CreateExplosion(const Vector3& origin, float radius)
+{
+    // 範囲内の全ギミックに爆発の被害を与える
+    auto targets = GetGimmicksInSphere(origin, radius);
+    for (auto* target : targets) {
+        target->OnExplosion(origin, radius);
+    }
 }

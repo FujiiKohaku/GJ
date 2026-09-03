@@ -103,6 +103,7 @@ std::vector<GpuSphFluid::CollisionObstacle> BuildFluidObstacles(
 
     const float safeDeltaTime = (std::max)(deltaTime, 0.0001f);
     for (BaseMapChipGimmick* gimmick : gimmicks) {
+        if (!gimmick->IsSolid()) continue;
         const AABB box = gimmick->GetAABB();
         const Vector3 delta = gimmick->GetDeltaPosition();
         obstacles.push_back(MakeFluidObstacle(
@@ -140,6 +141,7 @@ void GamePlayScene::Initialize()
 
     player_ = std::make_unique<MapChipPlayer>();
     player_->Initialize(&mapChipStage_.GetField(), playerStartPos);
+    mapChipStage_.SetPlayer(player_.get());
     
     gpuSphFluid_ = std::make_unique<GpuSphFluid>();
     GpuSphFluid::Settings fluidSettings;

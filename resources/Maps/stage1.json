@@ -96,12 +96,95 @@
       "name": "Goal",
       "transform": {
         "translation": [
-          7.0,
+          17.0,
           0.0,
           1.0
         ]
       },
       "type": "Goal"
+    },
+    {
+      "file_name": "StoneBlock/StoneBlock.obj",
+      "name": "DestructibleWall",
+      "transform": {
+        "translation": [
+          14.0,
+          0.0,
+          2.0
+        ]
+      },
+      "type": "DestructibleWall"
+    },
+    {
+      "file_name": "StoneBlock/StoneBlock.obj",
+      "name": "DestructibleWall",
+      "transform": {
+        "translation": [
+          14.0,
+          0.0,
+          1.0
+        ]
+      },
+      "type": "DestructibleWall"
+    },
+    {
+      "file_name": "Vent/Venct.obj",
+      "gimmick": {
+        "downBlocks": 0,
+        "exists": true,
+        "leftBlocks": 1,
+        "listenEventName": "Event_1",
+        "rightBlocks": 1,
+        "type": "GasEmitter",
+        "upBlocks": 1
+      },
+      "name": "GasEmitter",
+      "transform": {
+        "translation": [
+          12.0,
+          0.0,
+          1.0
+        ]
+      },
+      "type": "GasEmitter"
+    },
+    {
+      "file_name": "PressurePlate.obj",
+      "gimmick": {
+        "exists": true,
+        "fireEventName": "Event_1",
+        "requiredWeight": 1,
+        "switchType": 0,
+        "type": "Switch"
+      },
+      "name": "Switch",
+      "transform": {
+        "translation": [
+          8.0,
+          0.0,
+          1.0
+        ]
+      },
+      "type": "Switch"
+    },
+    {
+      "file_name": "Bonfire/Bonfire.obj",
+      "gimmick": {
+        "exists": true,
+        "fireEventName": "EventName",
+        "requiredWeight": 1,
+        "switchType": 2,
+        "type": "Switch"
+      },
+      "name": "Switch",
+      "transform": {
+        "translation": [
+          13.0,
+          0.0,
+          1.0
+        ]
+      },
+      "type": "Switch"
     }
   ],
   "tileMaps": [
@@ -1821,7 +1904,7 @@
         0,
         0,
         0,
-        0,
+        8,
         0,
         0,
         0,
@@ -1915,13 +1998,13 @@
         0,
         0,
         0,
+        5,
         0,
         0,
         0,
-        0,
-        0,
-        0,
-        0,
+        6,
+        7,
+        8,
         0,
         0,
         0,

@@ -10,6 +10,9 @@
 #include "Engine/LevelEditor/LevelDataLoader.h"
 #include "Engine/LevelEditor/GimmickParamFactory.h"
 #include "App/Game/Gimmick/MovingBlockParam.h"
+#include "App/Game/Gimmick/Interaction/SwitchParam.h"
+#include "App/Game/Gimmick/Interaction/SwitchGimmick.h"
+#include "App/Game/Gimmick/Interaction/GasEmitterParam.h"
 #include "Engine/Logger/Logger.h"
 #include "Engine/ImGuiManager/ImGuiManager.h"
 #include "Engine/3D/ModelManager.h"
@@ -20,6 +23,7 @@
 #include "GamePlayScene.h"
 #include <iostream>
 #include <Windows.h> // ShellExecute用
+#include "Engine/Winapp/WinApp.h" // GetHwnd用
 #include <thread>
 #include <cstdlib>
 #include <cmath>
@@ -347,6 +351,69 @@ void EditorScene::Draw3D()
             {1.0f, 1.0f, 0.0f, 1.0f}, 1.0f);
     }
     
+    if (selectedGimmick && selectedGimmick->type == "GasEmitter") {
+        if (selectedGimmick->gimmickParam) {
+            GasEmitterParam* param = dynamic_cast<GasEmitterParam*>(selectedGimmick->gimmickParam.get());
+            if (param) {
+                float sizeX = (param->leftBlocks_ + param->rightBlocks_ + 1) * 1.0f;
+                float sizeY = (param->downBlocks_ + param->upBlocks_ + 1) * 1.0f;
+                float sizeZ = 1.0f;
+                
+                float centerX = selectedGimmick->translation.x + (static_cast<float>(param->rightBlocks_) - static_cast<float>(param->leftBlocks_)) * 0.5f;
+                float centerY = selectedGimmick->translation.y + (static_cast<float>(param->upBlocks_) - static_cast<float>(param->downBlocks_)) * 0.5f;
+                Vector3 center = { centerX, centerY, selectedGimmick->translation.z };
+                
+                Vector3 size = { sizeX, sizeY, sizeZ };
+                
+                DebugRenderer::GetInstance()->AddWireOBB(
+                    center, size,
+                    {1,0,0}, {0,1,0}, {0,0,1},
+                    {0.0f, 1.0f, 0.0f, 1.0f}, 2.0f); // 緑色
+            }
+        }
+    }
+    
+    // 感圧盤の共通AABBの視覚化
+    if (selectedGimmick && selectedGimmick->type == "Switch") {
+        if (selectedGimmick->gimmickParam) {
+            SwitchParam* param = dynamic_cast<SwitchParam*>(selectedGimmick->gimmickParam.get());
+            // switchType_ == 0 が感圧盤
+            if (param && param->switchType_ == 0) {
+                Vector3 center = selectedGimmick->translation + SwitchGimmick::s_pressurePlateAABBOffset;
+                Vector3 size = SwitchGimmick::s_pressurePlateAABBSize;
+                
+                DebugRenderer::GetInstance()->AddWireOBB(
+                    center, size,
+                    {1,0,0}, {0,1,0}, {0,0,1},
+                    {1.0f, 1.0f, 0.0f, 1.0f}, 2.0f); // 黄色
+            }
+        }
+    }
+    
+    // イベント連携の視覚化（オレンジ色の線）
+    for (const auto& emitter : currentLevelData_.objects) {
+        if (!emitter.gimmickParam) continue;
+        std::string fireName;
+        if (auto* switchParam = dynamic_cast<SwitchParam*>(emitter.gimmickParam.get())) {
+            fireName = switchParam->fireEventName_;
+        }
+        if (fireName.empty()) continue;
+
+        for (const auto& receiver : currentLevelData_.objects) {
+            if (!receiver.gimmickParam) continue;
+            std::string listenName;
+            if (auto* gasParam = dynamic_cast<GasEmitterParam*>(receiver.gimmickParam.get())) {
+                listenName = gasParam->listenEventName_;
+            }
+            
+            if (!listenName.empty() && fireName == listenName) {
+                DebugRenderer::GetInstance()->AddLine(
+                    emitter.translation, receiver.translation,
+                    {1.0f, 0.5f, 0.0f, 1.0f}, 2.0f); // オレンジ色
+            }
+        }
+    }
+    
     // 自機のプレビュー描画
     if (playerPreview_ && !currentLevelData_.playerSpawns.empty()) {
         playerPreview_->Draw();
@@ -430,6 +497,10 @@ void EditorScene::ProcessUdpCommand(const std::string& command)
 
 void EditorScene::UpdateCamera()
 {
+    if (GetForegroundWindow() != WinApp::GetInstance()->GetHwnd()) {
+        return; // ウィンドウがアクティブでなければカメラ操作を無視
+    }
+
     auto input = Input::GetInstance();
     Vector3 translation = camera_->GetTranslate();
 
@@ -463,6 +534,10 @@ void EditorScene::UpdateRaycastEdit()
         return; // ImGuiのUI（ウィンドウやスライダー等）を操作中の場合はエディタのクリック処理を行わない
     }
 #endif
+
+    if (GetForegroundWindow() != WinApp::GetInstance()->GetHwnd()) {
+        return; // 別のウィンドウ（ツール等）を操作中の場合はクリック処理を行わない
+    }
 
     auto input = Input::GetInstance();
     
@@ -649,16 +724,61 @@ void EditorScene::UpdateRaycastEdit()
                                     }
                                     
                                     // ギミック（MovingBlock など）なら ObjectData を追加する
-                                    if (type == MapChipType::MovingBlock) {
+                                    if (type == MapChipType::MovingBlock ||
+                                        type == MapChipType::PressurePlate ||
+                                        type == MapChipType::GasEmitter ||
+                                        type == MapChipType::Bonfire ||
+                                        type == MapChipType::DestructibleWall) {
+                                        
                                         LevelData::ObjectData newData;
                                         newData.translation = newPos;
                                         newData.rotation = {0,0,0};
                                         newData.scale = {1,1,1};
                                         
-                                        newData.name = "MovingBlock";
-                                        newData.type = "MovingBlock";
-                                        newData.fileName = "cube";
-                                        newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("MovingBlock");
+                                        if (type == MapChipType::MovingBlock) {
+                                            newData.name = "MovingBlock";
+                                            newData.type = "MovingBlock";
+                                            newData.fileName = "cube";
+                                            newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("MovingBlock");
+                                        }
+                                        else if (type == MapChipType::PressurePlate) {
+                                            newData.name = "Switch";
+                                            newData.type = "Switch";
+                                            newData.fileName = "PressurePlate.obj";
+                                            newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Switch");
+                                            if (auto* param = dynamic_cast<SwitchParam*>(newData.gimmickParam.get())) {
+                                                param->switchType_ = 0; // 感圧盤
+                                                param->fireEventName_ = "Event_1"; // デフォルト
+                                            }
+                                        }
+                                        else if (type == MapChipType::Bonfire) {
+                                            newData.name = "Switch";
+                                            newData.type = "Switch";
+                                            newData.fileName = "Bonfire/Bonfire.obj";
+                                            newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Switch");
+                                            if (auto* param = dynamic_cast<SwitchParam*>(newData.gimmickParam.get())) {
+                                                param->switchType_ = 2; // 篝火
+                                            }
+                                        }
+                                        else if (type == MapChipType::GasEmitter) {
+                                            newData.name = "GasEmitter";
+                                            newData.type = "GasEmitter";
+                                            newData.fileName = "Vent/Venct.obj";
+                                            newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("GasEmitter");
+                                            if (auto* param = dynamic_cast<GasEmitterParam*>(newData.gimmickParam.get())) {
+                                                param->listenEventName_ = "Event_1"; // デフォルト
+                                                param->leftBlocks_ = 1;
+                                                param->rightBlocks_ = 1;
+                                                param->upBlocks_ = 1;
+                                                param->downBlocks_ = 1;
+                                            }
+                                        }
+                                        else if (type == MapChipType::DestructibleWall) {
+                                            newData.name = "DestructibleWall";
+                                            newData.type = "DestructibleWall";
+                                            newData.fileName = "StoneBlock/StoneBlock.obj";
+                                            // DestructibleWallGimmick は Param を持たず、DestructibleWall 側の Factory ロジック等に任せるか Param を作る
+                                        }
                                         
                                         currentLevelData_.objects.push_back(newData);
                                     }
