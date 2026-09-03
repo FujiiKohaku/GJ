@@ -49,8 +49,8 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
     dx_analytic /= wSum;
     dy_analytic /= wSum;
 
-    float32_t threshold = 0.04f;
-    float32_t edgeAA = smoothstep(threshold - 0.015f, threshold + 0.015f, density);
+    float32_t threshold = 0.005f;
+    float32_t edgeAA = smoothstep(threshold - 0.003f, threshold + 0.003f, density);
     if (edgeAA <= 0.0f) {
         return gSceneColor.SampleLevel(gSampler, input.texcoord, 0);
     }
@@ -82,42 +82,42 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
     float32_t blendFactor = smoothstep(0.2f, 0.6f, density);
     float32_t3 normal = normalize(lerp(alphaNormal, farNormal, blendFactor));
 
-    // NeoEngine Lighting style
+    // Lighting setup
     float32_t3 viewDir = float32_t3(0.0f, 0.0f, -1.0f);
-    float32_t3 lightDir = normalize(float32_t3(0.4f, 0.6f, -1.0f));
+    float32_t3 lightDir = normalize(float32_t3(0.35f, 0.75f, -0.8f));
     float32_t NdotV = max(dot(normal, viewDir), 0.0f);
-    float32_t fresnel = pow(1.0f - NdotV, 2.5f);
+    float32_t fresnel = pow(1.0f - NdotV, 2.2f);
 
-    // 屈折
-    float32_t2 refractOffset = normal.xy * (0.04f + fresnel * 0.02f);
+    // 鮮烈なエメラルドグリーンスライムカラー
+    float32_t3 brightGreen = float32_t3(0.15f, 0.96f, 0.32f); // 発光感のあるライムグリーン
+    float32_t3 deepGreen   = float32_t3(0.02f, 0.52f, 0.18f); // 陰影用の深いグリーン
+    float32_t3 jellyColor  = lerp(deepGreen, brightGreen, pow(NdotV, 0.7f));
+
+    // ハイライト (ツヤツヤ感)
+    float32_t3 halfVec = normalize(lightDir + viewDir);
+    float32_t spec = pow(max(dot(normal, halfVec), 0.0f), 180.0f);
+
+    // わずかな屈折
+    float32_t2 refractOffset = normal.xy * 0.025f;
     float32_t3 refracted = gSceneColor.SampleLevel(gSampler, input.texcoord + refractOffset, 0).rgb;
 
-    float32_t thickness = NdotV; // 中心のほうが厚いと仮定
-    float32_t3 slimeBase = float32_t3(0.05f, 0.8f, 0.2f);
-    float32_t3 jellyColor = slimeBase * (0.8f - thickness * 0.3f);
+    // 濃厚で不透明なゼリー合成 (不透明度 92%〜100%)
+    float32_t3 finalColor = lerp(jellyColor, refracted * brightGreen, 0.08f);
+    
+    // リムライト (光沢フチ)
+    float32_t3 rimColor = float32_t3(0.6f, 1.0f, 0.75f);
+    finalColor += rimColor * fresnel * 0.9f;
 
-    float32_t3 halfVec = normalize(lightDir + viewDir);
-    float32_t spec = pow(max(dot(normal, halfVec), 0.0f), 400.0f); // 鋭いハイライト
+    // 鋭いハイライト
+    finalColor += float32_t3(1.0f, 1.0f, 1.0f) * spec * 2.2f;
 
-    // ベースカラーと屈折の合成
-    float32_t3 finalColor = refracted * lerp(float32_t3(1.0f, 1.0f, 1.0f), jellyColor, 0.5f);
-    finalColor += jellyColor * 0.6f;
+    // アウトライン (濃い緑色の輪郭線で存在感を際立たせる)
+    float32_t outlineWidth = 0.06f;
+    float32_t outlineFactor = smoothstep(threshold + outlineWidth, threshold + 0.005f, density);
+    finalColor = lerp(finalColor, float32_t3(0.01f, 0.22f, 0.06f), outlineFactor * 0.85f);
 
-    // リムライト
-    float32_t3 rimColor = float32_t3(0.8f, 1.0f, 0.9f);
-    finalColor += rimColor * fresnel * 0.8f;
-
-    // ハイライト
-    finalColor += float32_t3(1.0f, 1.0f, 1.0f) * spec * 2.0f;
-
-    // アルファ
-    float32_t alpha = saturate(0.4f + fresnel * 0.4f + spec);
-
-    // 黒いアウトラインの追加
-    float32_t outlineWidth = 0.12f; // アウトラインの太さ（遷移幅を広げて滑らかに）
-    float32_t outlineFactor = smoothstep(threshold + outlineWidth, threshold + 0.01f, density);
-    finalColor = lerp(finalColor, float32_t3(0.0f, 0.1f, 0.05f), outlineFactor * 0.8f); // 濃い緑黒で縁取る
-    alpha = lerp(alpha, 0.95f, outlineFactor); // 縁は不透明に
+    // ほぼ完全不透明にしてクッキリ見せる
+    float32_t alpha = saturate(0.92f + fresnel * 0.08f + spec);
 
     float32_t3 background = gSceneColor.SampleLevel(gSampler, input.texcoord, 0).rgb;
     float32_t3 result = lerp(background, finalColor, alpha * edgeAA);

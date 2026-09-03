@@ -6,8 +6,11 @@
 #include "Engine/Camera/Camera.h"
 #include "Engine/debugcamera/DebugCameraController.h"
 #include "Engine/Effect/EffectManager.h"
+#include "Engine/Time/TimeManager.h"
 #include "Engine/PostEffect/PostEffectType.h"
 #include "PageTransition.h"
+#include "App/Effect/DeathSlimeShower.h"
+#include "App/Effect/DeathFluidSlime.h"
 
 #include <memory>
 #include <vector>
@@ -54,5 +57,7 @@ private:
     EffectHandle smokeEffectHandle_ = kInvalidEffectHandle;
     bool isSmokeEnabled_ = false;
     Vector3 fireworkLaunchPosition_ = { 0.0f, 4.0f, 0.0f };
+    std::unique_ptr<DeathSlimeShower> deathSlimeShower_;
+    std::unique_ptr<DeathFluidSlime> deathFluidSlime_;
     PageTransition::RevealOverlay pageReveal_;
 };

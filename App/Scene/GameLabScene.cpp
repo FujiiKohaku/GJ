@@ -82,9 +82,7 @@ void GameLabScene::Initialize()
     previousSonicBoomProgress_ = sceneManager->GetSonicBoomProgress();
     postEffectPreviewProgress_ = 0.05f;
     sceneManager->ClearPostEffects();
-    sceneManager->AddPostEffect(
-        PostEffectType::Copy,
-        PostEffectStage::AfterParticle);
+    sceneManager->SetPostEffectType(PostEffectType::Copy);
     sceneManager->SetPostEffectKickStrength(1.0f);
     sceneManager->SetPaintIntensity(1.0f);
     UpdatePostEffectPreviewParameters();
@@ -124,6 +122,15 @@ void GameLabScene::Initialize()
     shipObject_->SetEnableLighting(true);
     shipObject_->Update();
 
+    // 死亡ぽよぽよスライムシャワーの初期化
+    deathSlimeShower_ = std::make_unique<DeathSlimeShower>();
+    deathSlimeShower_->Initialize(120);
+
+    // 死亡GPU流体スライムの初期化
+    deathFluidSlime_ = std::make_unique<DeathFluidSlime>();
+    deathFluidSlime_->Initialize(DirectXCommon::GetInstance(), SrvManager::GetInstance());
+    SceneManager::GetInstance()->SetScreenSpaceFluid(deathFluidSlime_->GetFluid());
+
     titleText_ = std::make_unique<Text>();
     titleText_->Initialize(kDefaultFont);
     titleText_->SetText("STAGE 03  GAMELAB");
@@ -149,6 +156,10 @@ void GameLabScene::Initialize()
 
 void GameLabScene::Finalize()
 {
+    SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
+    if (deathFluidSlime_) {
+        deathFluidSlime_->Finalize();
+    }
     if (EffectManager::GetInstance()->IsEffectAlive(smokeEffectHandle_)) {
         EffectManager::GetInstance()->StopEffect(smokeEffectHandle_);
     }
@@ -202,6 +213,13 @@ void GameLabScene::Update()
         shipObject_->Update();
     }
 
+    if (deathSlimeShower_) {
+        deathSlimeShower_->Update(TimeManager::GetInstance()->GetDeltaTime());
+    }
+    if (deathFluidSlime_) {
+        deathFluidSlime_->Update(TimeManager::GetInstance()->GetDeltaTime());
+    }
+
     titleText_->Update();
     instructionText_->Update();
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
@@ -221,6 +239,12 @@ void GameLabScene::Draw3D()
     floor_->Draw();
     if (shipObject_) {
         shipObject_->Draw();
+    }
+    if (deathSlimeShower_) {
+        deathSlimeShower_->Draw();
+    }
+    if (deathFluidSlime_) {
+        deathFluidSlime_->Draw3D(*camera_);
     }
     DrawDebugGrid();
 }
@@ -264,6 +288,63 @@ void GameLabScene::DrawImGui()
     if (ImGui::Button("LAUNCH COMBO FIREWORK")) {
         EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks", fireworkLaunchPosition_);
         EffectManager::GetInstance()->PlayEffect("SixDirectionFireworkTrails", fireworkLaunchPosition_);
+    }
+
+    if (deathSlimeShower_) {
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.5f, 1.0f), "--- POYO POYO SLIME SHOWER ---");
+        ImGui::Text("Active Slimes: %u", deathSlimeShower_->GetActiveCount());
+
+        if (ImGui::Button("DROP SLIME RAIN (30)")) {
+            deathSlimeShower_->SpawnRain(30, { 0.0f, 10.0f, 0.0f }, 5.0f);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("DROP SHOWER (80)")) {
+            deathSlimeShower_->SpawnRain(80, { 0.0f, 12.0f, 0.0f }, 6.0f);
+        }
+        if (ImGui::Button("CLEAR SLIMES")) {
+            deathSlimeShower_->Clear();
+        }
+
+        ImGui::SliderFloat("Slime Gravity", &deathSlimeShower_->gravity, -40.0f, -5.0f);
+        ImGui::SliderFloat("Bounce Restitution", &deathSlimeShower_->restitution, 0.1f, 0.95f);
+        ImGui::SliderFloat("Poyo Stiffness (Spring)", &deathSlimeShower_->springStiffness, 30.0f, 400.0f);
+        ImGui::SliderFloat("Poyo Damping", &deathSlimeShower_->springDamping, 1.0f, 30.0f);
+    }
+
+    if (deathFluidSlime_) {
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(0.35f, 0.75f, 1.0f, 1.0f), "--- GPU FLUID SLIME (SPH) ---");
+
+        if (ImGui::Button("DROP FLUID SLIME (FROM SKY)")) {
+            SceneManager::GetInstance()->SetScreenSpaceFluid(deathFluidSlime_->GetFluid());
+            deathFluidSlime_->SpawnFromSky({ 0.0f, 7.5f, -2.5f }, false);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("RESET FLUID")) {
+            deathFluidSlime_->Reset();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("SHOW FLUID")) {
+            SceneManager::GetInstance()->SetScreenSpaceFluid(deathFluidSlime_->GetFluid());
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("HIDE FLUID")) {
+            SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
+        }
+
+        bool liquidated = deathFluidSlime_->IsLiquidated();
+        if (ImGui::Checkbox("Liquidate (Melt to liquid)", &liquidated)) {
+            deathFluidSlime_->SetLiquidated(liquidated);
+        }
+        ImGui::SameLine();
+        ImGui::Checkbox("3D Spheres Mode", &deathFluidSlime_->useDirectSphereDraw);
+
+        ImGui::DragFloat3("Fluid Position", &deathFluidSlime_->corePosition_.x, 0.05f, -15.0f, 15.0f);
+        ImGui::SliderFloat("Viscosity", &deathFluidSlime_->settings.viscosity, 1.0f, 50.0f);
+        ImGui::SliderFloat("Stiffness", &deathFluidSlime_->settings.stiffness, 10.0f, 150.0f);
+        ImGui::SliderFloat("Surface Tension", &deathFluidSlime_->settings.surfaceTension, 1.0f, 50.0f);
+        ImGui::SliderFloat("Gravity Y", &deathFluidSlime_->settings.gravity.y, -40.0f, -2.0f);
     }
 
     ImGui::Separator();

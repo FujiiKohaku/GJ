@@ -29,11 +29,14 @@ void GpuSphFluid::Initialize(
 void GpuSphFluid::Reset(const Settings& settings)
 {
     assert(IsInitialized());
+    uint32_t oldParticleCount = settings_.particleCount;
     settings_ = settings;
     settings_.particleCount = (std::max<uint32_t>)(1, settings_.particleCount);
 
-    CreateResources();
-    CreateDescriptors();
+    if (oldParticleCount != settings_.particleCount || !particleResource_) {
+        CreateResources();
+        CreateDescriptors();
+    }
     needsReset_ = true;
 }
 

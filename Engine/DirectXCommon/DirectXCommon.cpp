@@ -227,8 +227,8 @@ void DirectXCommon::InitializeDevice()
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
         // エラー時に止まる
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-        // 警告時に止まる//これ消すとデバッグできる
-        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+        // 警告時はブレークしない (開発中の軽微な警告でのクラッシュを防ぐ)
+        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, false);
         // 抑制するメッセージのＩＤ
         D3D12_MESSAGE_ID denyIds[] = {
             // windows11でのDXGIデバックレイヤーとDX12デバックレイヤーの相互作用バグによるエラーメッセージ
