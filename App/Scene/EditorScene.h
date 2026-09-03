@@ -46,6 +46,7 @@ private:
     
     // 操作状態
     bool isDraggingPlayer_ = false;
+    bool isDraggingGoal_ = false;
 
     // 選択中のギミック
     int32_t selectedX_ = -1;
