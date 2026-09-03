@@ -17,12 +17,16 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <iterator>
 #include <numbers>
 
 namespace {
 constexpr const char* kWhiteTexture = "resources/Textures/white.png";
 constexpr const char* kSkyBoxTexture = "resources/Textures/skybox.dds";
 constexpr const char* kArchiveRoomModel = "StageSelectBook/ArchiveRoom.obj";
+constexpr const char* kMeadowTreeTrunkModel = "ClearMeadow/MeadowTreeTrunk.obj";
+constexpr const char* kMeadowTreeCanopyModel = "ClearMeadow/MeadowTreeCanopy.obj";
+constexpr const char* kMeadowMountainModel = "ClearMeadow/MeadowMountain.obj";
 constexpr const char* kBookLeather = "resources/Models/StageSelectBook/BookLeather.png";
 constexpr const char* kPrintedPage = "resources/Models/StageSelectBook/Pages/page_001.png";
 constexpr const char* kPrintedPageDirectory = "resources/Models/StageSelectBook/Pages";
@@ -88,6 +92,56 @@ void ClearScene::Initialize()
     grassGround_->SetEnableLighting(false);
     grassGround_->Update();
 
+    Model* treeTrunkModel = models->Load(kMeadowTreeTrunkModel);
+    Model* treeCanopyModel = models->Load(kMeadowTreeCanopyModel);
+    Model* mountainModel = models->Load(kMeadowMountainModel);
+    const Vector3 treePositions[] = {
+        { -12.0f, -6.8f, 3.0f }, { 11.0f, -6.8f, 5.0f },
+        { -16.0f, -6.8f, 11.0f }, { 15.5f, -6.8f, 13.0f },
+        { -10.0f, -6.8f, 19.0f }, { 9.0f, -6.8f, 22.0f },
+        { -20.0f, -6.8f, 26.0f }, { 19.0f, -6.8f, 29.0f },
+    };
+    for (uint32_t index = 0; index < std::size(treePositions); ++index) {
+        auto tree = std::make_unique<Object3d>();
+        tree->Initialize(objects);
+        tree->SetModel(treeTrunkModel);
+        const float scale = 0.85f + static_cast<float>(index % 3) * 0.18f;
+        tree->SetScale({ scale, scale, scale });
+        tree->SetTranslate(treePositions[index]);
+        tree->SetRotate({ 0.0f, 0.35f * static_cast<float>(index), 0.0f });
+        tree->SetColor({ 0.46f, 0.20f + 0.025f * (index % 2), 0.12f, 1.0f });
+        tree->SetEnableLighting(false);
+        tree->Update();
+        meadowTrees_.push_back(std::move(tree));
+
+        auto canopy = std::make_unique<Object3d>();
+        canopy->Initialize(objects);
+        canopy->SetModel(treeCanopyModel);
+        canopy->SetScale({ scale, scale, scale });
+        canopy->SetTranslate(treePositions[index]);
+        canopy->SetRotate({ 0.0f, 0.35f * static_cast<float>(index), 0.0f });
+        canopy->SetColor({ 0.28f + 0.025f * (index % 2), 0.72f, 0.12f, 1.0f });
+        canopy->SetEnableLighting(false);
+        canopy->Update();
+        meadowTreeCanopies_.push_back(std::move(canopy));
+    }
+    const Vector3 mountainPositions[] = {
+        { -18.0f, -7.0f, 43.0f }, { 0.0f, -7.0f, 49.0f },
+        { 19.0f, -7.0f, 44.0f },
+    };
+    for (uint32_t index = 0; index < std::size(mountainPositions); ++index) {
+        auto mountain = std::make_unique<Object3d>();
+        mountain->Initialize(objects);
+        mountain->SetModel(mountainModel);
+        const float scale = 1.7f + static_cast<float>(index) * 0.18f;
+        mountain->SetScale({ scale, scale, scale });
+        mountain->SetTranslate(mountainPositions[index]);
+        mountain->SetColor({ 0.20f, 0.34f + index * 0.025f, 0.19f, 1.0f });
+        mountain->SetEnableLighting(false);
+        mountain->Update();
+        meadowMountains_.push_back(std::move(mountain));
+    }
+
     InitializeArchiveBook();
 
     flashSprite_ = std::make_unique<Sprite>();
@@ -139,8 +193,8 @@ void ClearScene::Update()
     } else {
         const float meadowMove = SmoothStep((sceneTime_ - 3.7f) / 1.5f);
         camera_->LookAt(
-            { 0.0f, 3.5f, -18.0f + meadowMove * 3.0f },
-            { 0.0f, 0.5f + meadowMove, 17.0f });
+            { 0.0f, 5.2f, -30.0f + meadowMove * 3.0f },
+            { 0.0f, 1.0f + meadowMove * 0.6f, 16.0f });
     }
 
     UpdateArchiveBook((sceneTime_ - 1.75f) / 1.55f);
@@ -181,6 +235,9 @@ void ClearScene::Update()
     skyBox_->Update(camera_.get());
     archiveRoom_->Update();
     grassGround_->Update();
+    for (auto& tree : meadowTrees_) tree->Update();
+    for (auto& canopy : meadowTreeCanopies_) canopy->Update();
+    for (auto& mountain : meadowMountains_) mountain->Update();
     EffectManager::GetInstance()->Update();
     EffectManager::GetInstance()->SetCamera(camera_.get());
     EffectManager::GetInstance()->UpdatePerView();
@@ -207,6 +264,9 @@ void ClearScene::Draw3D()
     Object3dManager::GetInstance()->PreDraw();
     if (meadowRevealed_) {
         grassGround_->Draw();
+        for (const auto& mountain : meadowMountains_) mountain->Draw();
+        for (const auto& tree : meadowTrees_) tree->Draw();
+        for (const auto& canopy : meadowTreeCanopies_) canopy->Draw();
     } else {
         archiveRoom_->Draw();
         leftBookCover_->Draw();
