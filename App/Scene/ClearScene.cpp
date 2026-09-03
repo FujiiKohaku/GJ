@@ -390,6 +390,13 @@ void ClearScene::SetPrintedPage(Object3d* object, uint32_t page)
 
 void ClearScene::LaunchFirework()
 {
+    static constexpr const char* kFireworkTypes[] = {
+        "BlueFireworkSparks",
+        "SixDirectionFireworkTrails",
+        "RainbowRingFirework",
+        "GoldenWillowFirework",
+        "CrownFirework",
+    };
     static constexpr float kX[] = {
         -10.0f, 7.0f, -4.0f, 11.0f, 1.0f, -8.0f,
         5.0f, -12.0f, 9.0f, -1.0f, 13.0f, -6.0f
@@ -402,11 +409,12 @@ void ClearScene::LaunchFirework()
     const Vector3 position = {
         kX[i], kY[i], 13.0f + static_cast<float>(fireworkIndex_ % 3) * 4.0f
     };
-    EffectManager::GetInstance()->PlayEffect(
-        fireworkIndex_ % 3 == 0 ? "SixDirectionFireworkTrails" : "BlueFireworkSparks",
-        position);
-    if (fireworkIndex_ % 4 == 0) {
-        EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks", position);
+    const int typeIndex = (fireworkIndex_ * 3 + fireworkIndex_ / 2) % 5;
+    EffectManager::GetInstance()->PlayEffect(kFireworkTypes[typeIndex], position);
+    if (fireworkIndex_ % 5 == 4) {
+        EffectManager::GetInstance()->PlayEffect(
+            kFireworkTypes[(typeIndex + 2) % 5],
+            { position.x + 0.35f, position.y + 0.2f, position.z });
     }
     ++fireworkIndex_;
 }
