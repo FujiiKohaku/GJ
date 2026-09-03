@@ -12,6 +12,8 @@
 #include "App/Game/Gimmick/MovingBlockParam.h"
 #include "App/Game/Gimmick/Interaction/SwitchParam.h"
 #include "App/Game/Gimmick/Interaction/SwitchGimmick.h"
+#include "App/Game/Gimmick/Trap/SpikeParam.h"
+#include "App/Game/Gimmick/Trap/SpikeGimmick.h"
 #include "App/Game/Gimmick/Interaction/GasEmitterParam.h"
 #include "Engine/Logger/Logger.h"
 #include "Engine/ImGuiManager/ImGuiManager.h"
@@ -390,6 +392,17 @@ void EditorScene::Draw3D()
         }
     }
     
+    // Spikeの共通AABBの視覚化
+    if (selectedGimmick && selectedGimmick->type == "Spike") {
+        Vector3 center = selectedGimmick->translation + SpikeGimmick::s_spikeAABBOffset;
+        Vector3 size = SpikeGimmick::s_spikeAABBSize;
+        
+        DebugRenderer::GetInstance()->AddWireOBB(
+            center, size,
+            {1,0,0}, {0,1,0}, {0,0,1},
+            {1.0f, 0.0f, 0.0f, 1.0f}, 2.0f); // 赤色
+    }
+    
     // イベント連携の視覚化（オレンジ色の線）
     for (const auto& emitter : currentLevelData_.objects) {
         if (!emitter.gimmickParam) continue;
@@ -728,7 +741,8 @@ void EditorScene::UpdateRaycastEdit()
                                         type == MapChipType::PressurePlate ||
                                         type == MapChipType::GasEmitter ||
                                         type == MapChipType::Bonfire ||
-                                        type == MapChipType::DestructibleWall) {
+                                        type == MapChipType::DestructibleWall ||
+                                        type == MapChipType::Spike) {
                                         
                                         LevelData::ObjectData newData;
                                         newData.translation = newPos;
@@ -778,6 +792,12 @@ void EditorScene::UpdateRaycastEdit()
                                             newData.type = "DestructibleWall";
                                             newData.fileName = "StoneBlock/StoneBlock.obj";
                                             // DestructibleWallGimmick は Param を持たず、DestructibleWall 側の Factory ロジック等に任せるか Param を作る
+                                        }
+                                        else if (type == MapChipType::Spike) {
+                                            newData.name = "Spike";
+                                            newData.type = "Spike";
+                                            newData.fileName = "Thorn/Thorn.obj";
+                                            newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Spike");
                                         }
                                         
                                         currentLevelData_.objects.push_back(newData);

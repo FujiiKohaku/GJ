@@ -5,6 +5,7 @@
 #include "App/Game/Gimmick/Interaction/SwitchGimmick.h"
 #include "App/Game/Gimmick/Interaction/GasEmitterGimmick.h"
 #include "App/Game/Gimmick/Interaction/DestructibleWallGimmick.h"
+#include "App/Game/Gimmick/Trap/SpikeGimmick.h"
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3d.h"
 #include "Engine/3D/Object3dManager.h"
@@ -101,6 +102,9 @@ void MapChipStage::Initialize(
             gimmick = std::make_unique<GasEmitterGimmick>();
         } else if (obj.type == "DestructibleWall") {
             gimmick = std::make_unique<DestructibleWallGimmick>();
+        } else if (obj.type == "Spike") {
+            gimmick = std::make_unique<SpikeGimmick>();
+            modelFile = obj.fileName.empty() ? "Thorn/Thorn.obj" : obj.fileName;
         }
 
         if (gimmick) {
