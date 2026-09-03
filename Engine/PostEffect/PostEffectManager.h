@@ -87,4 +87,5 @@ private:
     uint32_t particleCompositionTargetIndex_ = 0;
     Camera* camera_ = nullptr;
     bool isAnimationEnabled_ = true;
+    int screenSpaceFluidDiagnosticState_ = -1;
 };

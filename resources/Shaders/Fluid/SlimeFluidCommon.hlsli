@@ -14,6 +14,16 @@ struct SlimeFluidParticle
     float32_t padding;
 };
 
+struct SlimeFluidObstacle
+{
+    float32_t3 center;
+    float32_t padding0;
+    float32_t3 halfSize;
+    float32_t padding1;
+    float32_t3 velocity;
+    float32_t padding2;
+};
+
 cbuffer SlimeFluidSimulationParameter : register(b0)
 {
     uint32_t particleCount;
@@ -57,6 +67,40 @@ cbuffer SlimeFluidSimulationParameter : register(b0)
 
     float32_t3 blobRadii;
     float32_t padding2;
+
+    float32_t3 coreDelta;
+    float32_t padding3;
+
+    float32_t wallMinX;
+    float32_t wallMaxX;
+    float32_t wallMinY;
+    float32_t wallMaxY;
+
+    float32_t wallMinZ;
+    float32_t wallMaxZ;
+    float32_t paddingWall0;
+    float32_t paddingWall1;
+
+    float32_t liquidationBurstStrength;
+    float32_t liquidBlend;
+    float32_t sloshStrength;
+    float32_t puddleSpread;
+
+    uint32_t emitStartIndex;
+    uint32_t emitCount;
+    uint32_t obstacleCount;
+    float32_t particleLifetime;
+
+    float32_t3 emitterPosition;
+    float32_t emitterRadius;
+
+    float32_t3 emitterVelocity;
+    float32_t emitterSpeed;
+
+    float32_t collisionFriction;
+    float32_t collisionBounce;
+    float32_t padding4;
+    float32_t padding5;
 };
 
 RWStructuredBuffer<SlimeFluidParticle> gParticles : register(u0);

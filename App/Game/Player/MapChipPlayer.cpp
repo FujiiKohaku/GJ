@@ -9,6 +9,7 @@
 #include "Engine/Input/Input.h"
 #include "Engine/Time/TimeManager.h"
 #include <algorithm>
+#include <cmath>
 
 namespace {
 constexpr float kPlayerSize = 1.0f;
@@ -17,29 +18,47 @@ constexpr float kJumpSpeed = 8.0f;
 constexpr float kGravity = -20.0f;
 constexpr float kMaximumDeltaTime = 1.0f / 30.0f;
 constexpr float kCollisionEpsilon = 0.0001f;
+constexpr float kPlayerHalfHeight = kPlayerSize * 0.5f;
+constexpr float kSlimeFluidGroundClearance = 0.14f;
+constexpr float kSlimeCoreLift = 0.22f;
+constexpr float kSlimeCeilingVisualPadding = 0.24f;
+constexpr float kSlimeMinimumVisualHeight = 0.12f;
+constexpr float kSlimeCeilingFollowSpeed = 3.0f;
+constexpr Vector3 kSlimeBaseRadii = { 0.50f, 0.50f, 0.50f };
+
+float Saturate(float value)
+{
+    return std::clamp(value, 0.0f, 1.0f);
+}
+
+float MoveTowards(float current, float target, float maxDelta)
+{
+    const float delta = target - current;
+    if (std::abs(delta) <= maxDelta) {
+        return target;
+    }
+    return current + (delta > 0.0f ? maxDelta : -maxDelta);
+}
 }
 
 MapChipPlayer::~MapChipPlayer() = default;
 
-void MapChipPlayer::Initialize(Model* model, const MapChipField* mapChipField, const Vector3& startPosition)
+void MapChipPlayer::Initialize(const MapChipField* mapChipField, const Vector3& startPosition)
 {
     position_ = startPosition;
     mapChipField_ = mapChipField;
-    object_ = std::make_unique<Object3d>();
-    object_->Initialize(Object3dManager::GetInstance());
-    object_->SetModel(model);
-    object_->SetScale({ kPlayerSize, kPlayerSize, 1.0f });
-    object_->SetTranslate(position_);
-    object_->SetColor({ 0.1f, 0.65f, 1.0f, 1.0f });
-    object_->SetEnableLighting(false);
-    object_->Update();
+    baseScale_ = kSlimeBaseRadii;
+    visualScale_ = kSlimeBaseRadii;
+    fluidFloorHeight_ = position_.y - kPlayerHalfHeight + kSlimeFluidGroundClearance;
 }
 
 void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmicks)
 {
-    if (!object_ || !mapChipField_) {
+    if (!mapChipField_) {
         return;
     }
+
+    isCrushed_ = false;
 
     // フェーズ1: Base Movement (足場の追従)
     if (baseGimmick_) {
@@ -48,12 +67,11 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
         position_.y += delta.y;
         position_.z += delta.z;
         
-        // 追従後に壁にめり込んでいるかチェックし、Crush判定（Cプラン: ログ出力のみ）
         Vector3 checkPos = position_;
         if (ResolveHorizontalCollision(checkPos) || ResolveVerticalCollision(checkPos)) {
             Logger::Log("Crush! (Player squished between moving block and wall)\n");
-            // Cプラン: ゲーム進行を止めないため、ログのみで実際には壁から押し出された位置を適用する
             position_ = checkPos;
+            isCrushed_ = true;
         }
     }
 
@@ -88,16 +106,13 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
     
     MoveHorizontal(deltaTime, dynamicGimmicks);
     MoveVertical(deltaTime, dynamicGimmicks);
+    UpdateVerticalConfinement(dynamicGimmicks);
 
-    object_->SetTranslate(position_);
-    object_->Update();
-}
-
-void MapChipPlayer::Draw()
-{
-    if (object_) {
-        object_->Draw();
+    if (std::abs(velocity_.x) > 0.1f) {
+        forward_ = { velocity_.x > 0.0f ? 1.0f : -1.0f, 0.0f, 0.0f };
     }
+
+    UpdateVisualShape(deltaTime);
 }
 
 const Vector3& MapChipPlayer::GetPosition() const
@@ -113,6 +128,11 @@ bool MapChipPlayer::IsGrounded() const
 bool MapChipPlayer::IsColliding() const
 {
     return isColliding_;
+}
+
+bool MapChipPlayer::IsCrushed() const
+{
+    return isCrushed_;
 }
 
 void MapChipPlayer::MoveHorizontal(float deltaTime, const std::vector<BaseMapChipGimmick*>& dynamicGimmicks)
@@ -225,6 +245,8 @@ bool MapChipPlayer::ResolveVerticalCollision(Vector3& nextPosition)
                 resolved = true;
                 if (hit.normal.y < 0.0f && velocity_.y <= 0.0f) {
                     isGrounded_ = true;
+                } else if (hit.normal.y > 0.0f) {
+                    ceilingSquash_ = (std::max)(ceilingSquash_, 0.35f);
                 }
             }
             // 連続する衝突のため更新
@@ -264,6 +286,8 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
                 if (hit.normal.y < 0.0f && velocity_.y <= 0.0f) {
                     isGrounded_ = true;
                     baseGimmick_ = gimmick;
+                } else if (hit.normal.y > 0.0f) {
+                    ceilingSquash_ = (std::max)(ceilingSquash_, 0.35f);
                 }
             }
         }
@@ -272,4 +296,152 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
     }
     
     return resolved;
+}
+
+const Vector3& MapChipPlayer::GetVelocity() const { return velocity_; }
+const Vector3& MapChipPlayer::GetForward() const { return forward_; }
+const Vector3& MapChipPlayer::GetVisualScale() const { return visualScale_; }
+
+Vector3 MapChipPlayer::GetFluidCorePosition() const
+{
+    return position_ + Vector3{0.0f, kSlimeCoreLift, 0.0f};
+}
+
+float MapChipPlayer::GetFluidFloorHeight() const
+{
+    return fluidFloorHeight_;
+}
+
+float MapChipPlayer::GetFluidCeilingHeight() const
+{
+    return fluidCeilingHeight_;
+}
+
+void MapChipPlayer::GetWallBoundaries(float& outMinX, float& outMaxX, float& outMaxY, const std::vector<BaseMapChipGimmick*>& dynamicGimmicks) const
+{
+    outMinX = -1000.0f;
+    outMaxX = 1000.0f;
+    outMaxY = fluidCeilingHeight_;
+    
+    const float pMinY = position_.y - kPlayerHalfHeight + 0.1f;
+    const float pMaxY = position_.y + kPlayerHalfHeight - 0.1f;
+    const float pMinX = position_.x - kPlayerHalfHeight + 0.1f;
+    const float pMaxX = position_.x + kPlayerHalfHeight - 0.1f;
+
+    auto checkBoundary = [&](float bMinX, float bMaxX, float bMinY, float bMaxY) {
+        if (bMinY < pMaxY && bMaxY > pMinY) {
+            if (bMaxX <= position_.x && bMaxX > outMinX) outMinX = bMaxX;
+            if (bMinX >= position_.x && bMinX < outMaxX) outMaxX = bMinX;
+        }
+        if (bMinX < pMaxX && bMaxX > pMinX) {
+            if (bMinY >= position_.y && bMinY < outMaxY) outMaxY = bMinY;
+        }
+    };
+
+    if (mapChipField_) {
+        const uint32_t width = mapChipField_->GetBlockWidth();
+        const uint32_t height = mapChipField_->GetBlockHeight();
+
+        for (uint32_t y = 0; y < height; ++y) {
+            for (uint32_t x = 0; x < width; ++x) {
+                if (mapChipField_->GetMapChipTypeByIndex(x, y) != MapChipType::Block) continue;
+                
+                Vector3 blockPos = mapChipField_->GetMapChipPositionByIndex(x, y);
+                checkBoundary(blockPos.x - 0.5f, blockPos.x + 0.5f, blockPos.y - 0.5f, blockPos.y + 0.5f);
+            }
+        }
+    }
+
+    for (BaseMapChipGimmick* gimmick : dynamicGimmicks) {
+        AABB box = gimmick->GetAABB();
+        checkBoundary(box.center.x - box.size.x * 0.5f, box.center.x + box.size.x * 0.5f,
+                      box.center.y - box.size.y * 0.5f, box.center.y + box.size.y * 0.5f);
+    }
+}
+
+void MapChipPlayer::UpdateVerticalConfinement(const std::vector<BaseMapChipGimmick*>& dynamicGimmicks)
+{
+    float floorTop = -1000.0f;
+    float ceilingBottom = 1000.0f;
+
+    const float pMinX = position_.x - kPlayerHalfHeight + 0.08f;
+    const float pMaxX = position_.x + kPlayerHalfHeight - 0.08f;
+
+    auto checkObstacle = [&](float bMinX, float bMaxX, float bMinY, float bMaxY) {
+        if (bMaxX <= pMinX || bMinX >= pMaxX) {
+            return;
+        }
+        if (bMaxY <= position_.y && bMaxY > floorTop) {
+            floorTop = bMaxY;
+        }
+        if (bMinY >= position_.y && bMinY < ceilingBottom) {
+            ceilingBottom = bMinY;
+        }
+    };
+
+    const uint32_t width = mapChipField_->GetBlockWidth();
+    const uint32_t height = mapChipField_->GetBlockHeight();
+    for (uint32_t y = 0; y < height; ++y) {
+        for (uint32_t x = 0; x < width; ++x) {
+            if (mapChipField_->GetMapChipTypeByIndex(x, y) != MapChipType::Block) {
+                continue;
+            }
+            const Vector3 blockPos = mapChipField_->GetMapChipPositionByIndex(x, y);
+            checkObstacle(
+                blockPos.x - 0.5f,
+                blockPos.x + 0.5f,
+                blockPos.y - 0.5f,
+                blockPos.y + 0.5f);
+        }
+    }
+
+    for (BaseMapChipGimmick* gimmick : dynamicGimmicks) {
+        const AABB box = gimmick->GetAABB();
+        checkObstacle(
+            box.center.x - box.size.x * 0.5f,
+            box.center.x + box.size.x * 0.5f,
+            box.center.y - box.size.y * 0.5f,
+            box.center.y + box.size.y * 0.5f);
+    }
+
+    fluidCeilingHeight_ = ceilingBottom;
+    fluidFloorHeight_ =
+        floorTop > -999.0f
+            ? floorTop
+            : position_.y - kPlayerHalfHeight;
+    verticalCompression01_ = 0.0f;
+    if (floorTop > -999.0f && ceilingBottom < 999.0f) {
+        const float gap = ceilingBottom - floorTop;
+        verticalCompression01_ = Saturate((kPlayerSize - gap) / kPlayerSize);
+        if (gap <= kPlayerSize - kCollisionEpsilon) {
+            isCrushed_ = true;
+        }
+    }
+}
+
+void MapChipPlayer::UpdateVisualShape(float deltaTime)
+{
+    time_ += deltaTime;
+
+    const float horizontalSpeed01 = Saturate(std::abs(velocity_.x) / kMoveSpeed);
+
+    wobble_ = std::sin(time_ * 15.0f) * 0.1f * horizontalSpeed01;
+
+    wallSquash_ = (std::max)(0.0f, wallSquash_ - deltaTime * 5.0f);
+    landSquash_ = (std::max)(0.0f, landSquash_ - deltaTime * 5.0f);
+    ceilingSquash_ = (std::max)(0.0f, ceilingSquash_ - deltaTime * 5.0f);
+
+    const float speedStretch = horizontalSpeed01 * 0.15f;
+    const float compressedHeight =
+        fluidCeilingHeight_ < 999.0f
+            ? fluidCeilingHeight_ - GetFluidCorePosition().y - kSlimeCeilingVisualPadding
+            : baseScale_.y;
+    const float ceilingLimitedHeight =
+        std::clamp(compressedHeight, kSlimeMinimumVisualHeight, baseScale_.y);
+    const float desiredHeight =
+        ceilingLimitedHeight - ceilingSquash_ * 0.08f - verticalCompression01_ * 0.10f;
+
+    visualScale_.x = baseScale_.x - (wallSquash_ * 0.2f) + (landSquash_ * 0.2f) + wobble_ + speedStretch;
+    visualScale_.y = std::clamp(desiredHeight, kSlimeMinimumVisualHeight, baseScale_.y);
+    visualScale_.z = baseScale_.z;
 }

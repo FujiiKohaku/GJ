@@ -4,6 +4,24 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <cstring>
+
+namespace {
+float MoveTowards(float current, float target, float maxDelta)
+{
+    const float delta = target - current;
+    if (std::abs(delta) <= maxDelta) {
+        return target;
+    }
+    return current + (delta > 0.0f ? maxDelta : -maxDelta);
+}
+
+float Lerp(float a, float b, float t)
+{
+    return a + (b - a) * t;
+}
+}
 
 void GpuSphFluid::Initialize(
     DirectXCommon* dxCommon,
@@ -17,6 +35,16 @@ void GpuSphFluid::Initialize(
     srvManager_ = srvManager;
     settings_ = settings;
     settings_.particleCount = (std::max<uint32_t>)(1, settings_.particleCount);
+    settings_.maxObstacleCount = (std::max<uint32_t>)(1, settings_.maxObstacleCount);
+    previousCorePosition_ = settings_.corePosition;
+    hasPreviousCorePosition_ = false;
+    coreVelocity_ = { 0.0f, 0.0f, 0.0f };
+    liquidBlend_ = isLiquidated_ ? 1.0f : 0.0f;
+    emitCursor_ = 0;
+    pendingEmitCount_ = 0;
+    emitAccumulator_ = 0.0f;
+    burstEmitCount_ = 0;
+    obstacleCount_ = 0;
 
     CreateResources();
     CreateDescriptors();
@@ -31,6 +59,17 @@ void GpuSphFluid::Reset(const Settings& settings)
     assert(IsInitialized());
     settings_ = settings;
     settings_.particleCount = (std::max<uint32_t>)(1, settings_.particleCount);
+    settings_.maxObstacleCount = (std::max<uint32_t>)(1, settings_.maxObstacleCount);
+    previousCorePosition_ = settings_.corePosition;
+    hasPreviousCorePosition_ = false;
+    coreVelocity_ = { 0.0f, 0.0f, 0.0f };
+    liquidBlend_ = isLiquidated_ ? 1.0f : 0.0f;
+    liquidationBurstStrength_ = 0.0f;
+    emitCursor_ = 0;
+    pendingEmitCount_ = 0;
+    emitAccumulator_ = 0.0f;
+    burstEmitCount_ = 0;
+    obstacleCount_ = 0;
 
     CreateResources();
     CreateDescriptors();
@@ -47,10 +86,48 @@ void GpuSphFluid::SetControlState(
     settings_.coreForward = NormalizeSafe(coreForward);
 }
 
+void GpuSphFluid::SetEmitter(
+    bool enabled,
+    const Vector3& position,
+    const Vector3& velocity)
+{
+    emitterEnabled_ = enabled;
+    emitterPosition_ = position;
+    emitterVelocity_ = velocity;
+}
+
+void GpuSphFluid::TriggerEmitBurst(uint32_t count)
+{
+    burstEmitCount_ =
+        (std::min<uint32_t>)(
+            settings_.particleCount,
+            burstEmitCount_ + count);
+}
+
+void GpuSphFluid::SetObstacles(
+    const std::vector<CollisionObstacle>& obstacles)
+{
+    if (obstacleData_ == nullptr) {
+        obstacleCount_ = 0;
+        return;
+    }
+
+    obstacleCount_ =
+        (std::min<uint32_t>)(
+            static_cast<uint32_t>(obstacles.size()),
+            settings_.maxObstacleCount);
+    if (obstacleCount_ > 0) {
+        std::memcpy(
+            obstacleData_,
+            obstacles.data(),
+            sizeof(CollisionObstacle) * static_cast<size_t>(obstacleCount_));
+    }
+}
+
 void GpuSphFluid::Update(float deltaTime)
 {
     assert(IsInitialized());
-    UpdateSimulationParameter(deltaTime);
+    UpdateFrameState(deltaTime);
 
     ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
     ID3D12DescriptorHeap* descriptorHeaps[] = {
@@ -63,6 +140,7 @@ void GpuSphFluid::Update(float deltaTime)
     commandList->SetComputeRootConstantBufferView(
         2,
         simulationParameterResource_->GetGPUVirtualAddress());
+    commandList->SetComputeRootDescriptorTable(3, obstacleSrvHandleGPU_);
 
     TransitionResource(
         particleResource_.Get(),
@@ -71,20 +149,27 @@ void GpuSphFluid::Update(float deltaTime)
     TransitionResource(
         forceResource_.Get(),
         forceState_,
-        D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
     if (needsReset_) {
+        UpdateSimulationParameter(0.0f, false);
         Dispatch(initializePipelineState_.Get());
         InsertUavBarrier(particleResource_.Get());
         needsReset_ = false;
     }
 
-    Dispatch(densityPressurePipelineState_.Get());
-    InsertUavBarrier(particleResource_.Get());
-    Dispatch(forcePipelineState_.Get());
-    InsertUavBarrier(forceResource_.Get());
-    Dispatch(integratePipelineState_.Get());
-    InsertUavBarrier(particleResource_.Get());
+    const uint32_t substeps =
+        (std::max<uint32_t>)(1, settings_.simulationSubsteps);
+    const float substepDelta = deltaTime / static_cast<float>(substeps);
+    for (uint32_t substep = 0; substep < substeps; ++substep) {
+        UpdateSimulationParameter(substepDelta, substep == 0);
+        Dispatch(densityPressurePipelineState_.Get());
+        InsertUavBarrier(particleResource_.Get());
+        Dispatch(forcePipelineState_.Get());
+        InsertUavBarrier(forceResource_.Get());
+        Dispatch(integratePipelineState_.Get());
+        InsertUavBarrier(particleResource_.Get());
+    }
 
     TransitionResource(
         particleResource_.Get(),
@@ -99,13 +184,20 @@ void GpuSphFluid::Finalize()
         simulationParameterResource_->Unmap(0, nullptr);
         simulationParameterData_ = nullptr;
     }
+    if (obstacleResource_ && obstacleData_ != nullptr) {
+        obstacleResource_->Unmap(0, nullptr);
+        obstacleData_ = nullptr;
+    }
 
     ReleaseDescriptor(particleSrvIndex_);
+    ReleaseDescriptor(forceSrvIndex_);
     ReleaseDescriptor(particleUavIndex_);
     ReleaseDescriptor(forceUavIndex_);
+    ReleaseDescriptor(obstacleSrvIndex_);
 
     particleResource_.Reset();
     forceResource_.Reset();
+    obstacleResource_.Reset();
     simulationParameterResource_.Reset();
     rootSignature_.Reset();
     initializePipelineState_.Reset();
@@ -126,6 +218,8 @@ void GpuSphFluid::CreateResources()
         sizeof(Particle) * static_cast<UINT64>(settings_.particleCount);
     const UINT64 forceBufferSize =
         sizeof(Vector4) * static_cast<UINT64>(settings_.particleCount);
+    const UINT64 obstacleBufferSize =
+        sizeof(CollisionObstacle) * static_cast<UINT64>(settings_.maxObstacleCount);
 
     D3D12_HEAP_PROPERTIES heapProperties {};
     heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -163,12 +257,30 @@ void GpuSphFluid::CreateResources()
     assert(SUCCEEDED(result));
     forceResource_->SetName(L"GpuSphFluid::ForceBuffer");
     forceState_ = D3D12_RESOURCE_STATE_COMMON;
+
+    if (obstacleResource_ && obstacleData_ != nullptr) {
+        obstacleResource_->Unmap(0, nullptr);
+        obstacleData_ = nullptr;
+    }
+    obstacleResource_ = dxCommon_->CreateBufferResource(static_cast<size_t>(obstacleBufferSize));
+    obstacleResource_->SetName(L"GpuSphFluid::ObstacleBuffer");
+    HRESULT mapResult = obstacleResource_->Map(
+        0,
+        nullptr,
+        reinterpret_cast<void**>(&obstacleData_));
+    assert(SUCCEEDED(mapResult));
+    assert(obstacleData_ != nullptr);
+    std::memset(
+        obstacleData_,
+        0,
+        sizeof(CollisionObstacle) * static_cast<size_t>(settings_.maxObstacleCount));
 }
 
 void GpuSphFluid::CreateDescriptors()
 {
     ReleaseDescriptor(particleSrvIndex_);
     ReleaseDescriptor(forceSrvIndex_);
+    ReleaseDescriptor(obstacleSrvIndex_);
     ReleaseDescriptor(particleUavIndex_);
     ReleaseDescriptor(forceUavIndex_);
 
@@ -201,6 +313,20 @@ void GpuSphFluid::CreateDescriptors()
         forceResource_.Get(),
         &forceSrvDesc,
         srvManager_->GetCPUDescriptorHandle(forceSrvIndex_));
+
+    obstacleSrvIndex_ = srvManager_->Allocate();
+    obstacleSrvHandleGPU_ = srvManager_->GetGPUDescriptorHandle(obstacleSrvIndex_);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC obstacleSrvDesc {};
+    obstacleSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    obstacleSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    obstacleSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    obstacleSrvDesc.Buffer.NumElements = settings_.maxObstacleCount;
+    obstacleSrvDesc.Buffer.StructureByteStride = sizeof(CollisionObstacle);
+    device->CreateShaderResourceView(
+        obstacleResource_.Get(),
+        &obstacleSrvDesc,
+        srvManager_->GetCPUDescriptorHandle(obstacleSrvIndex_));
 
     particleUavIndex_ = srvManager_->Allocate();
     particleUavHandleGPU_ = srvManager_->GetGPUDescriptorHandle(particleUavIndex_);
@@ -249,7 +375,7 @@ void GpuSphFluid::CreateRootSignature()
 {
     ID3D12Device* device = dxCommon_->GetDevice();
 
-    D3D12_DESCRIPTOR_RANGE descriptorRanges[2] {};
+    D3D12_DESCRIPTOR_RANGE descriptorRanges[3] {};
     descriptorRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
     descriptorRanges[0].NumDescriptors = 1;
     descriptorRanges[0].BaseShaderRegister = 0;
@@ -262,7 +388,13 @@ void GpuSphFluid::CreateRootSignature()
     descriptorRanges[1].OffsetInDescriptorsFromTableStart =
         D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-    D3D12_ROOT_PARAMETER rootParameters[3] {};
+    descriptorRanges[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRanges[2].NumDescriptors = 1;
+    descriptorRanges[2].BaseShaderRegister = 0;
+    descriptorRanges[2].OffsetInDescriptorsFromTableStart =
+        D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    D3D12_ROOT_PARAMETER rootParameters[4] {};
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
@@ -276,6 +408,12 @@ void GpuSphFluid::CreateRootSignature()
     rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     rootParameters[2].Descriptor.ShaderRegister = 0;
+
+    rootParameters[3].ParameterType =
+        D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    rootParameters[3].DescriptorTable.NumDescriptorRanges = 1;
+    rootParameters[3].DescriptorTable.pDescriptorRanges = &descriptorRanges[2];
 
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc {};
     rootSignatureDesc.NumParameters = _countof(rootParameters);
@@ -336,19 +474,25 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuSphFluid::CreateComputePipeline(
     return pipelineState;
 }
 
-void GpuSphFluid::UpdateSimulationParameter(float deltaTime)
+void GpuSphFluid::UpdateSimulationParameter(float deltaTime, bool includeEmission)
 {
     assert(simulationParameterData_ != nullptr);
+    const float liquid = std::clamp(liquidBlend_, 0.0f, 1.0f);
+
     simulationParameterData_->particleCount = settings_.particleCount;
     simulationParameterData_->deltaTime = std::clamp(deltaTime, 0.0f, 1.0f / 20.0f);
     simulationParameterData_->smoothingRadius = settings_.smoothingRadius;
     simulationParameterData_->particleMass = settings_.particleMass;
     simulationParameterData_->restDensity = settings_.restDensity;
-    simulationParameterData_->stiffness = settings_.stiffness;
-    simulationParameterData_->viscosity = settings_.viscosity;
-    simulationParameterData_->surfaceTension = settings_.surfaceTension;
-    simulationParameterData_->gravity = settings_.gravity;
-    simulationParameterData_->damping = settings_.damping;
+    simulationParameterData_->stiffness =
+        Lerp(settings_.stiffness, settings_.stiffness * 0.38f, liquid);
+    simulationParameterData_->viscosity =
+        Lerp(settings_.viscosity, settings_.liquidViscosity, liquid);
+    simulationParameterData_->surfaceTension =
+        Lerp(settings_.surfaceTension, settings_.liquidSurfaceTension, liquid);
+    simulationParameterData_->gravity = settings_.gravity * Lerp(1.0f, settings_.liquidGravityScale, liquid);
+    simulationParameterData_->damping =
+        Lerp(settings_.damping, settings_.liquidDamping, liquid);
     simulationParameterData_->boundsMin = settings_.boundsMin;
     simulationParameterData_->particleRadius = settings_.particleRadius;
     simulationParameterData_->boundsMax = settings_.boundsMax;
@@ -358,9 +502,12 @@ void GpuSphFluid::UpdateSimulationParameter(float deltaTime)
     simulationParameterData_->spawnSpacing = settings_.spawnSpacing;
     simulationParameterData_->spawnRows = (std::max<uint32_t>)(1, settings_.spawnRows);
     simulationParameterData_->spawnLayers = (std::max<uint32_t>)(1, settings_.spawnLayers);
-    simulationParameterData_->shapeAttraction = isLiquidated_ ? 0.0f : settings_.shapeAttraction;
-    simulationParameterData_->velocityAttraction = isLiquidated_ ? 0.0f : settings_.velocityAttraction;
-    simulationParameterData_->horizontalFriction = settings_.horizontalFriction;
+    simulationParameterData_->shapeAttraction =
+        Lerp(settings_.shapeAttraction, settings_.liquidShapeAttraction, liquid);
+    simulationParameterData_->velocityAttraction =
+        Lerp(settings_.velocityAttraction, settings_.liquidVelocityAttraction, liquid);
+    simulationParameterData_->horizontalFriction =
+        Lerp(settings_.horizontalFriction, settings_.liquidHorizontalFriction, liquid);
     simulationParameterData_->corePosition = settings_.corePosition;
     simulationParameterData_->floorHeight = settings_.floorHeight;
     simulationParameterData_->coreForward = NormalizeSafe(settings_.coreForward);
@@ -369,6 +516,93 @@ void GpuSphFluid::UpdateSimulationParameter(float deltaTime)
     simulationParameterData_->padding0 = 0.0f;
     simulationParameterData_->padding1 = 0.0f;
     simulationParameterData_->padding2 = 0.0f;
+    simulationParameterData_->coreDelta = coreVelocity_;
+    simulationParameterData_->padding3 = 0.0f;
+    simulationParameterData_->wallMinX = settings_.wallMinX;
+    simulationParameterData_->wallMaxX = settings_.wallMaxX;
+    simulationParameterData_->wallMinY = settings_.wallMinY;
+    simulationParameterData_->wallMaxY = settings_.wallMaxY;
+    simulationParameterData_->wallMinZ = wallMinZ_;
+    simulationParameterData_->wallMaxZ = wallMaxZ_;
+    simulationParameterData_->paddingWall0 = 0.0f;
+    simulationParameterData_->paddingWall1 = 0.0f;
+    simulationParameterData_->liquidationBurstStrength = liquidationBurstStrength_;
+    simulationParameterData_->liquidBlend = liquid;
+    simulationParameterData_->sloshStrength = settings_.sloshStrength;
+    simulationParameterData_->puddleSpread = settings_.puddleSpread;
+    simulationParameterData_->emitStartIndex = emitCursor_;
+    simulationParameterData_->emitCount = includeEmission ? pendingEmitCount_ : 0;
+    simulationParameterData_->obstacleCount = obstacleCount_;
+    simulationParameterData_->particleLifetime = settings_.particleLifetime;
+    simulationParameterData_->emitterPosition = emitterPosition_;
+    simulationParameterData_->emitterRadius = settings_.emitterRadius;
+    simulationParameterData_->emitterVelocity = emitterVelocity_;
+    simulationParameterData_->emitterSpeed = settings_.emitterSpeed;
+    simulationParameterData_->collisionFriction = settings_.collisionFriction;
+    simulationParameterData_->collisionBounce = settings_.collisionBounce;
+    simulationParameterData_->padding4 = 0.0f;
+    simulationParameterData_->padding5 = 0.0f;
+
+    if (includeEmission) {
+        emitCursor_ = (emitCursor_ + pendingEmitCount_) % settings_.particleCount;
+        pendingEmitCount_ = 0;
+        liquidationBurstStrength_ = 0.0f;
+    }
+}
+
+void GpuSphFluid::UpdateFrameState(float deltaTime)
+{
+    const float safeDeltaTime = std::clamp(deltaTime, 0.0f, 1.0f / 20.0f);
+    const float targetLiquidBlend = isLiquidated_ ? 1.0f : 0.0f;
+    const float transitionSpeed =
+        isLiquidated_ ? settings_.liquidTransitionSpeed : settings_.gatherTransitionSpeed;
+    liquidBlend_ = MoveTowards(
+        liquidBlend_,
+        targetLiquidBlend,
+        transitionSpeed * safeDeltaTime);
+
+    if (!hasPreviousCorePosition_ || safeDeltaTime <= 0.0f) {
+        coreVelocity_ = settings_.targetVelocity;
+        hasPreviousCorePosition_ = true;
+    } else {
+        const Vector3 coreDelta = settings_.corePosition - previousCorePosition_;
+        coreVelocity_ = {
+            coreDelta.x / safeDeltaTime,
+            coreDelta.y / safeDeltaTime,
+            coreDelta.z / safeDeltaTime
+        };
+    }
+    previousCorePosition_ = settings_.corePosition;
+
+    pendingEmitCount_ = 0;
+    if (emitterEnabled_ && safeDeltaTime > 0.0f) {
+        emitAccumulator_ += settings_.emitterRate * safeDeltaTime;
+        pendingEmitCount_ =
+            (std::min<uint32_t>)(
+                static_cast<uint32_t>(emitAccumulator_),
+                settings_.particleCount);
+        emitAccumulator_ -= static_cast<float>(pendingEmitCount_);
+    }
+    pendingEmitCount_ =
+        (std::min<uint32_t>)(
+            settings_.particleCount,
+            pendingEmitCount_ + burstEmitCount_);
+    burstEmitCount_ = 0;
+}
+
+void GpuSphFluid::SetWallBoundaries(float wallMinX, float wallMaxX, float wallMinZ, float wallMaxZ, float wallMinY, float wallMaxY)
+{
+    settings_.wallMinX = wallMinX;
+    settings_.wallMaxX = wallMaxX;
+    settings_.wallMinY = wallMinY;
+    settings_.wallMaxY = wallMaxY;
+    wallMinZ_ = wallMinZ;
+    wallMaxZ_ = wallMaxZ;
+}
+
+void GpuSphFluid::TriggerLiquidationBurst(float strength)
+{
+    liquidationBurstStrength_ = (std::max)(liquidationBurstStrength_, strength);
 }
 
 void GpuSphFluid::Dispatch(ID3D12PipelineState* pipelineState)

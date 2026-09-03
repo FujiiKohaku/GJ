@@ -6,6 +6,9 @@
 #ifdef USE_IMGUI
 #include "Engine/LevelEditor/MapEditor.h"
 #endif
+#include "Engine/Fluid/GpuSphFluid.h"
+#include "Engine/Fluid/FluidForceRenderer.h"
+#include "Engine/Fluid/GpuSphFluidRenderer.h"
 #include "Engine/2D/Text/Text.h"
 #include "Engine/3D/SkyBox/SkyBox.h"
 #include "Engine/Camera/Camera.h"
@@ -32,5 +35,12 @@ private:
     std::unique_ptr<Text> collisionText_;
     MapChipStage mapChipStage_;
     std::unique_ptr<MapChipPlayer> player_;
+    std::unique_ptr<GpuSphFluid> gpuSphFluid_;
+    std::unique_ptr<FluidForceRenderer> fluidForceRenderer_;
+    std::unique_ptr<GpuSphFluidRenderer> gpuSphFluidRenderer_;
     PageTransition::RevealOverlay pageReveal_;
+    bool wasPlayerCrushed_ = false;
+    bool wasLeftMousePressed_ = false;
+    uint32_t emittedParticleTotal_ = 0;
+    bool showForces_ = false;
 };

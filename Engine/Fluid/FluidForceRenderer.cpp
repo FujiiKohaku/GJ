@@ -30,7 +30,7 @@ void FluidForceRenderer::CreateRootSignature()
     // ViewProjection matrix
     parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
     parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-    parameters[0].Constants.Num32BitValues = 20; // 16 for Matrix4x4 + 4 for Vector3 + pad
+    parameters[0].Constants.Num32BitValues = 24; // 16 for Matrix4x4 + 4 for CamPos + 4 for CorePos
     parameters[0].Constants.ShaderRegister = 0;
     parameters[0].Constants.RegisterSpace = 0;
 
@@ -76,8 +76,8 @@ void FluidForceRenderer::CreatePipelineState()
     psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     
     psoDesc.DepthStencilState.DepthEnable = TRUE;
-    psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-    psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
     
     psoDesc.InputLayout.NumElements = 0;
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
@@ -104,13 +104,17 @@ void FluidForceRenderer::Draw(const GpuSphFluid& fluid, const Camera& camera)
         Matrix4x4 viewProj;
         Vector3 camPos;
         float pad;
+        Vector3 corePos;
+        float pad2;
     };
     VSConstants constants;
     constants.viewProj = camera.GetViewProjectionMatrix();
     constants.camPos = camera.GetTranslate();
     constants.pad = 0.0f;
+    constants.corePos = fluid.GetSettings().corePosition;
+    constants.pad2 = 0.0f;
 
-    commandList->SetGraphicsRoot32BitConstants(0, 20, &constants, 0);
+    commandList->SetGraphicsRoot32BitConstants(0, 24, &constants, 0);
     commandList->SetGraphicsRootDescriptorTable(1, fluid.GetParticleSrvHandleGPU());
     commandList->SetGraphicsRootDescriptorTable(2, fluid.GetForceSrvHandleGPU());
 
