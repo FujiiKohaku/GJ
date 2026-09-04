@@ -258,3 +258,27 @@ float Input::GetGamepadLeftStickY() const
         gamepadState_.Gamepad.sThumbLX,
         XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
 }
+
+float Input::GetGamepadRightStickX() const
+{
+    if (!isGamepadConnected_) {
+        return 0.0f;
+    }
+
+    return NormalizeStickAxis(
+        gamepadState_.Gamepad.sThumbRX,
+        gamepadState_.Gamepad.sThumbRY,
+        XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
+}
+
+float Input::GetGamepadRightStickY() const
+{
+    if (!isGamepadConnected_) {
+        return 0.0f;
+    }
+
+    return NormalizeStickAxis(
+        gamepadState_.Gamepad.sThumbRY,
+        gamepadState_.Gamepad.sThumbRX,
+        XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
+}

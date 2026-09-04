@@ -17,6 +17,7 @@ public:
     const Vector3& GetVelocity() const;
     const Vector3& GetForward() const;
     const Vector3& GetVisualScale() const;
+    Vector2 GetSelfDestructEyeOffset() const;
     Vector3 GetFluidCorePosition() const;
     float GetFluidFloorHeight() const;
     float GetFluidCeilingHeight() const;
@@ -24,11 +25,14 @@ public:
     bool IsGrounded() const;
     bool IsColliding() const;
     bool IsCrushed() const;
+    bool IsShapingSelfDestruct() const { return isShapingSelfDestruct_; }
+    bool ConsumeHardenedBody(AABB& outBody);
     
     AABB GetAABB() const;
 
 private:
     void UpdateVisualShape(float deltaTime);
+    void UpdateSelfDestructShape(float unscaledDeltaTime);
     void UpdateVerticalConfinement(const std::vector<BaseMapChipGimmick*>& dynamicGimmicks);
     void MoveHorizontal(float deltaTime, const std::vector<BaseMapChipGimmick*>& dynamicGimmicks);
     void MoveVertical(float deltaTime, const std::vector<BaseMapChipGimmick*>& dynamicGimmicks);
@@ -54,6 +58,11 @@ private:
     bool isColliding_ = false;
     bool isCrushed_ = false;
     bool wasGrounded_ = false;  // 前フレームの接地状態（着地の瞬間を検知）
+    bool isShapingSelfDestruct_ = false;
+    bool hardenedBodyReady_ = false;
+    Vector2 selfDestructRawPull_ = { 0.0f, 0.0f };
+    Vector2 selfDestructPull_ = { 0.0f, 0.0f };
+    AABB hardenedBody_ = {};
     
     BaseMapChipGimmick* baseGimmick_ = nullptr;
 };

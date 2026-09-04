@@ -102,6 +102,8 @@ public:
     bool IsGrounded() const { return isGrounded_; }
     void SetEyeOffsetX(float offset) { eyeOffsetX_ = offset; }
     float GetEyeOffsetX() const { return eyeOffsetX_; }
+    void SetEyeOffsetY(float offset) { eyeOffsetY_ = offset; }
+    float GetEyeOffsetY() const { return eyeOffsetY_; }
     void SetWallBoundaries(float wallMinX, float wallMaxX, float wallMinZ = -0.3f, float wallMaxZ = 0.3f, float wallMinY = -1000.0f, float wallMaxY = 1000.0f);
     void TriggerLiquidationBurst(float strength = 8.0f);
     void SetLiquidated(bool liquidated) { isLiquidated_ = liquidated; }
@@ -115,6 +117,9 @@ public:
     const Settings& GetSettings() const { return settings_; }
     D3D12_GPU_DESCRIPTOR_HANDLE GetParticleSrvHandleGPU() const { return particleSrvHandleGPU_; }
     D3D12_GPU_DESCRIPTOR_HANDLE GetForceSrvHandleGPU() const { return forceSrvHandleGPU_; }
+
+    std::vector<Particle> GetParticlesCPU() const;
+    void SetParticlesCPU(const std::vector<Particle>& particles);
 
 private:
     struct SimulationParameter {
@@ -226,6 +231,7 @@ private:
     bool emitterEnabled_ = false;
     float liquidBlend_ = 0.0f;
     float eyeOffsetX_ = 0.0f;
+    float eyeOffsetY_ = 0.0f;
     float liquidationBurstStrength_ = 0.0f;
     float emitAccumulator_ = 0.0f;
     uint32_t emitCursor_ = 0;

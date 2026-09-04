@@ -32,6 +32,7 @@ public:
     MapChipPlayer* GetPlayer() const { return player_; }
     
     std::vector<BaseMapChipGimmick*> GetGimmicks() const;
+    void AddGimmick(std::unique_ptr<BaseMapChipGimmick> gimmick);
 
     /**
      * @brief イベントマネージャを取得する
