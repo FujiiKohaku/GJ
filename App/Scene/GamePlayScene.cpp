@@ -144,7 +144,7 @@ void GamePlayScene::Initialize()
     LevelData levelData = loader.Load(kStage1Json);
 
     mapChipStage_.Initialize(levelData);
-    mapChipStage_.EnableToonLighting();
+    mapChipStage_.EnableMossTerrain();
 
     Vector3 playerStartPos = { 0.0f, 0.0f, 0.0f };
     if (!levelData.playerSpawns.empty()) {
@@ -163,10 +163,7 @@ void GamePlayScene::Initialize()
     fluidSettings.particleMass =
         kNeoWorldScale * kNeoWorldScale * kNeoWorldScale;
     fluidSettings.restDensity = 3.0f;
-    fluidSettings.blobRadii = {
-        1.2f * kNeoWorldScale,
-        0.85f * kNeoWorldScale,
-        1.2f * kNeoWorldScale };
+    fluidSettings.blobRadii = {1.2f * kNeoWorldScale,0.85f * kNeoWorldScale,1.2f * kNeoWorldScale };
     fluidSettings.stiffness = 50.0f;
     fluidSettings.shapeAttraction = 80.0f;
     fluidSettings.velocityAttraction = 0.0f;

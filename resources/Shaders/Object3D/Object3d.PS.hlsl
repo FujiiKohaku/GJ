@@ -52,6 +52,26 @@ float3 ToonIllumination(float3 normal, float3 worldPosition)
     }
 
     float brightness = dot(light, float3(0.2126f, 0.7152f, 0.0722f));
+    // Terrain uses painted shadow colors and a stable face value so its shape
+    // remains readable even under broad ambient lighting.
+    if (gMaterial.enableLighting == 7) {
+        brightness += saturate(N.y) * 0.20f;
+        float3 terrainBand = float3(0.58f, 0.53f, 0.72f);
+        if (brightness >= 0.95f) {
+            terrainBand = float3(1.08f, 1.01f, 0.88f);
+        } else if (brightness >= 0.45f) {
+            terrainBand = float3(0.84f, 0.80f, 0.83f);
+        }
+        float faceValue = 0.88f;
+        if (N.y > 0.5f) {
+            faceValue = 1.08f;
+        } else if (N.y < -0.5f) {
+            faceValue = 0.72f;
+        }
+        float terrainPeak = max(max(light.r, light.g), light.b);
+        float3 terrainTint = light / max(terrainPeak, 0.0001f);
+        return terrainBand * faceValue * lerp(float3(1, 1, 1), terrainTint, 0.15f);
+    }
     float3 band = float3(0.40f, 0.53f, 0.55f);
     if (brightness >= 0.95f) {
         band = float3(1.0f, 0.92f, 0.78f);
@@ -62,6 +82,65 @@ float3 ToonIllumination(float3 normal, float3 worldPosition)
     float peak = max(max(light.r, light.g), light.b);
     float3 tint = light / max(peak, 0.0001f);
     return band * lerp(float3(1.0f, 1.0f, 1.0f), tint, 0.30f);
+}
+
+float TerrainNoise(float2 position)
+{
+    float2 cell = floor(position);
+    float2 blend = frac(position);
+    blend = blend * blend * (3.0f - 2.0f * blend);
+    float4 seeds = float4(dot(cell, float2(127.1f, 311.7f)),
+        dot(cell + float2(1, 0), float2(127.1f, 311.7f)),
+        dot(cell + float2(0, 1), float2(127.1f, 311.7f)),
+        dot(cell + 1.0f, float2(127.1f, 311.7f)));
+    float4 values = frac(sin(seeds) * 43758.5453f);
+    return lerp(lerp(values.x, values.y, blend.x), lerp(values.z, values.w, blend.x), blend.y);
+}
+
+float TerrainWorldNoise(float3 position, float3 normal)
+{
+    float3 weights = pow(abs(normal), 4.0f);
+    weights /= max(weights.x + weights.y + weights.z, 0.0001f);
+    return TerrainNoise(position.zy) * weights.x +
+        TerrainNoise(position.xz) * weights.y + TerrainNoise(position.xy) * weights.z;
+}
+
+float3 MossTerrainColor(float3 worldPosition, float3 normal)
+{
+    // World-space samples continue across tile boundaries. Small stepped texels
+    // give the surface a voxel-like grain without outlining individual blocks.
+    float3 position = floor(worldPosition * 64.0f) / 64.0f;
+    float broad = TerrainWorldNoise(position * 0.65f, normal);
+    float grain = TerrainWorldNoise(position * 18.0f + 23.7f, normal);
+    // One texture spans four map units. Wrap sampling and world-space UVs
+    // keep adjacent blocks on the same continuous pattern.
+    float3 weights = pow(abs(normal), 4.0f);
+    weights /= max(weights.x + weights.y + weights.z, 0.0001f);
+    float3 texturePosition = worldPosition * 0.25f;
+    float3 dirt = gTexture.Sample(gSampler, float2(texturePosition.z, -texturePosition.y)).rgb * weights.x;
+    dirt += gTexture.Sample(gSampler, texturePosition.xz).rgb * weights.y;
+    dirt += gTexture.Sample(gSampler, float2(texturePosition.x, -texturePosition.y)).rgb * weights.z;
+    // Keep the hand-painted dirt palette free of additional cloudy shading.
+
+    float depth = max(gMaterial.environmentCoefficient - worldPosition.y, 0.0f);
+    // Roughly 0.12-0.30 units of moss hang down from the actual ground surface.
+    float mossDepth = 0.12f + TerrainNoise(position.xz * 4.0f + 8.3f) * 0.18f;
+    mossDepth += (TerrainNoise(position.xz * 16.0f + 41.2f) - 0.5f) * 0.04f;
+    // A narrow antialiased edge keeps the moss painted rather than airbrushed.
+    float edgeWidth = max(fwidth(depth - mossDepth), 0.001f);
+    float moss = 1.0f - smoothstep(mossDepth - edgeWidth, mossDepth + edgeWidth, depth);
+    // No moss on the underside of floating platforms.
+    if (normal.y < -0.5f) {
+        moss = 0.0f;
+    }
+    float mossTone = broad * 0.65f + grain * 0.35f;
+    float3 green = float3(0.26f, 0.38f, 0.13f);
+    if (mossTone >= 0.62f) {
+        green = float3(0.49f, 0.62f, 0.25f);
+    } else if (mossTone >= 0.38f) {
+        green = float3(0.37f, 0.50f, 0.18f);
+    }
+    return lerp(dirt, green, moss);
 }
 
 PixelShaderOutput main(VertexShaderOutput input)
@@ -119,6 +198,14 @@ PixelShaderOutput main(VertexShaderOutput input)
         }
         output.color = float4(base * illumination * saturate(occlusion) +
             float3(1.0f, 0.78f, 0.42f) * specular, gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 7)
+    {
+        float3 normal = normalize(input.normal);
+        output.color = float4(
+            gMaterial.color.rgb * MossTerrainColor(input.worldPosition, normal) *
+                ToonIllumination(normal, input.worldPosition),
+            gMaterial.color.a);
     }
     else if (gMaterial.enableLighting == 6)
     {
@@ -206,7 +293,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color = gMaterial.color * textureColor;
     }
 
-    if (gMaterial.enableEnvironmentMap != 0 && gMaterial.enableLighting != 6)
+    if (gMaterial.enableEnvironmentMap != 0 && gMaterial.enableLighting != 6 && gMaterial.enableLighting != 7)
     {
         float3 N = normalize(input.normal);
         float3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);

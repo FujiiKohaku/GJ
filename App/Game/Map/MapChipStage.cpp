@@ -126,6 +126,35 @@ void MapChipStage::EnableToonLighting()
     }
 }
 
+void MapChipStage::EnableMossTerrain()
+{
+    EnableToonLighting();
+    Model* terrainModel = ModelManager::GetInstance()->CreateCube(
+        "resources/Textures/Terrain/MossSoil.png");
+    const uint32_t width = field_.GetBlockWidth();
+    const uint32_t height = field_.GetBlockHeight();
+    std::vector<float> surfaceHeights(width, 0.0f);
+    size_t blockIndex = 0;
+    for (uint32_t y = 0; y < height; ++y) {
+        for (uint32_t x = 0; x < width; ++x) {
+            if (field_.GetMapChipTypeByIndex(x, y) != MapChipType::Block) {
+                continue;
+            }
+            // Each uninterrupted column shares its exposed surface height.
+            // Underground blocks therefore do not repeat the moss edge.
+            if (y == 0 || field_.GetMapChipTypeByIndex(x, y - 1) != MapChipType::Block) {
+                surfaceHeights[x] = field_.GetMapChipPositionByIndex(x, y).y + 0.5f;
+            }
+            blockObjects_[blockIndex]->SetModel(terrainModel);
+            Material* material = blockObjects_[blockIndex]->GetMaterial();
+            material->enableLighting = 7;
+            // In terrain mode this slot carries height, not reflectivity.
+            material->environmentCoefficient = surfaceHeights[x];
+            ++blockIndex;
+        }
+    }
+}
+
 void MapChipStage::Update()
 {
     for (std::unique_ptr<Object3d>& block : blockObjects_) {

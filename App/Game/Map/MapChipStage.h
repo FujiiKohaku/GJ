@@ -21,6 +21,7 @@ public:
     void Update();
     void Draw();
     void EnableToonLighting();
+    void EnableMossTerrain();
 
     const MapChipField& GetField() const;
     MapChipField& GetField();
