@@ -4,6 +4,7 @@
 #include "MovingBlockGimmick.h"
 #include "Trap/SpikeGimmick.h"
 #include "Trap/LaserGimmick.h"
+#include "SwingingBridgeGimmick.h"
 
 std::unique_ptr<BaseMapChipGimmick> MapChipGimmickFactory::Create(
     MapChipType type,
@@ -22,6 +23,9 @@ std::unique_ptr<BaseMapChipGimmick> MapChipGimmickFactory::Create(
         break;
     case MapChipType::LaserEmitter:
         gimmick = std::make_unique<LaserGimmick>();
+        break;
+    case MapChipType::SwingingBridge:
+        gimmick = std::make_unique<SwingingBridgeGimmick>();
         break;
     default:
         return nullptr;

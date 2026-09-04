@@ -63,6 +63,7 @@ class EditorTool(tk.Tk):
             (7, "Switch (Bonfire)"),
             (8, "Destructible Wall"),
             (9, "Laser Emitter"),
+            (10, "Swinging Bridge"),
             (99, "Player Spawn"),
         ]
         
