@@ -101,3 +101,48 @@ LevelData::TileMapData MapChipField::GetTileMapData() const
     }
     return tileData;
 }
+
+std::unordered_map<MapChipType, MapChipConfig> MapChipRegistry::configs_;
+
+void MapChipRegistry::Initialize()
+{
+    configs_.clear();
+
+    auto Register = [](MapChipType type, const std::string& name, bool isSolid, bool isGimmick, const std::string& modelPath) {
+        configs_[type] = { type, name, isSolid, isGimmick, modelPath };
+    };
+
+    // ----------------------------------------------------
+    // レジストリ（ここで地形ブロックの仕様を一元管理します）
+    // ----------------------------------------------------
+    
+    // 基本的な地形（当たり判定あり、静的描画）
+    Register(MapChipType::Block, "Floor", true, false, ""); // 空パスで標準キューブを使用
+    Register(MapChipType::Wall,  "Wall",  true, false, ""); // 空パスで標準キューブを使用
+    
+    // 【拡張例】もし氷の床を作りたくなったら、ここに1行追加するだけ！
+    // Register(MapChipType::IceFloor, "Ice Floor", true, "IceBlock/IceBlock.obj");
+    
+    // 特殊な壁（ギミックとして処理される）
+    Register(MapChipType::DestructibleWall, "DestructibleWall", true, true, "");
+}
+
+const MapChipConfig& MapChipRegistry::GetConfig(MapChipType type)
+{
+    static const MapChipConfig defaultConfig = { MapChipType::Blank, "Unknown", false, false, "" };
+    auto it = configs_.find(type);
+    if (it != configs_.end()) {
+        return it->second;
+    }
+    return defaultConfig;
+}
+
+bool MapChipRegistry::IsSolidBlock(MapChipType type)
+{
+    return GetConfig(type).isSolid;
+}
+
+const char* MapChipRegistry::GetName(MapChipType type)
+{
+    return GetConfig(type).name.c_str();
+}

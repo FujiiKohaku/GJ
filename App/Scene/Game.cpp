@@ -3,6 +3,7 @@
 #include "Engine/Debug/Profiler/BootProfiler.h"
 #include "Engine/Debug/Profiler/ProfilerScope.h"
 #include "Engine/CollisionManager/CollisionManager.h"
+#include "App/Game/Map/MapChipField.h"
 
 #include <format>
 
@@ -111,6 +112,9 @@ void Game::Initialize()
     ModelManager::GetInstance()->Initialize(DirectXCommon::GetInstance());
     GetBootProfilerForGame()->End("Model");
     CheckInitializeTime("ModelManager", prevTime);
+
+    MapChipRegistry::Initialize();
+    CheckInitializeTime("MapChipRegistry", prevTime);
 
     DirectXCommon* dxCommon = DirectXCommon::GetInstance();
     Object3dManager::GetInstance()->Initialize(dxCommon);

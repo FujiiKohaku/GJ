@@ -217,8 +217,7 @@ bool MapChipPlayer::ResolveHorizontalCollision(Vector3& nextPosition)
 
     for (int32_t yIndex = startY; yIndex <= endY; ++yIndex) {
         for (int32_t xIndex = startX; xIndex <= endX; ++xIndex) {
-            if (mapChipField_->GetMapChipTypeByIndex(xIndex, yIndex) !=
-                MapChipType::Block) {
+            if (!MapChipRegistry::IsSolidBlock(mapChipField_->GetMapChipTypeByIndex(xIndex, yIndex))) {
                 continue;
             }
 
@@ -260,8 +259,7 @@ bool MapChipPlayer::ResolveVerticalCollision(Vector3& nextPosition)
 
     for (int32_t yIndex = startY; yIndex <= endY; ++yIndex) {
         for (int32_t xIndex = startX; xIndex <= endX; ++xIndex) {
-            if (mapChipField_->GetMapChipTypeByIndex(xIndex, yIndex) !=
-                MapChipType::Block) {
+            if (!MapChipRegistry::IsSolidBlock(mapChipField_->GetMapChipTypeByIndex(xIndex, yIndex))) {
                 continue;
             }
 
@@ -400,7 +398,7 @@ void MapChipPlayer::GetWallBoundaries(float& outMinX, float& outMaxX, float& out
 
         for (int32_t y = startY; y <= endY; ++y) {
             for (int32_t x = startX; x <= endX; ++x) {
-                if (mapChipField_->GetMapChipTypeByIndex(x, y) != MapChipType::Block) continue;
+                if (!MapChipRegistry::IsSolidBlock(mapChipField_->GetMapChipTypeByIndex(x, y))) continue;
                 
                 Vector3 blockPos = mapChipField_->GetMapChipPositionByIndex(x, y);
                 checkBoundary(blockPos.x - 0.5f, blockPos.x + 0.5f, blockPos.y - 0.5f, blockPos.y + 0.5f);
@@ -444,7 +442,7 @@ void MapChipPlayer::UpdateVerticalConfinement(const std::vector<BaseMapChipGimmi
     
     for (int32_t y = startY; y <= endY; ++y) {
         for (int32_t x = startX; x <= endX; ++x) {
-            if (mapChipField_->GetMapChipTypeByIndex(x, y) != MapChipType::Block) {
+            if (!MapChipRegistry::IsSolidBlock(mapChipField_->GetMapChipTypeByIndex(x, y))) {
                 continue;
             }
             const Vector3 blockPos = mapChipField_->GetMapChipPositionByIndex(x, y);

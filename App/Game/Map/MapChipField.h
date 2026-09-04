@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 enum class MapChipType {
     Blank = 0,
@@ -18,6 +19,26 @@ enum class MapChipType {
     DestructibleWall = 8,
     LaserEmitter = 9,
     SwingingBridge = 10,
+    Wall = 11,
+};
+
+struct MapChipConfig {
+    MapChipType type;
+    std::string name;        // エディタ表示名
+    bool isSolid;            // 当たり判定を持つ固定地形か
+    bool isGimmick;          // ギミック（動的オブジェクト）として処理するか
+    std::string modelPath;   // 3Dモデルパス（空の場合は基本キューブを使用）
+};
+
+class MapChipRegistry {
+public:
+    static void Initialize();
+    static const MapChipConfig& GetConfig(MapChipType type);
+    static bool IsSolidBlock(MapChipType type);
+    static const char* GetName(MapChipType type);
+
+private:
+    static std::unordered_map<MapChipType, MapChipConfig> configs_;
 };
 
 class MapChipField {

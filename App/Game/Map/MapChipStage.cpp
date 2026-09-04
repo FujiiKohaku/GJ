@@ -41,7 +41,7 @@ void MapChipStage::Initialize(
             const Vector3 position =
                 field_.GetMapChipPositionByIndex(xIndex, yIndex);
 
-            if (type != MapChipType::Block) {
+            if (!MapChipRegistry::IsSolidBlock(type) || MapChipRegistry::GetConfig(type).isGimmick) {
                 // 同じ座標の ObjectData を探す
                 const BaseGimmickParam* gimmickParam = nullptr;
                 for (const auto& obj : levelData.objects) {
@@ -65,15 +65,24 @@ void MapChipStage::Initialize(
                 continue;
             }
 
+            const auto& config = MapChipRegistry::GetConfig(type);
+            Model* model = blockModel;
+            // "Cube" などの特別な識別子を判定するか、既存のLoadを使う
+            // 今回は "StoneBlock/StoneBlock.obj" が設定されているはずなのでそれをロードする
+            if (!config.modelPath.empty()) {
+                model = ModelManager::GetInstance()->Load(config.modelPath);
+            }
+
             // GPUメモリ枯渇(VRAMリーク)を防ぐため、既存の Object3d を再利用する
             if (currentBlockIndex < blockObjects_.size()) {
+                blockObjects_[currentBlockIndex]->SetModel(model); // 追加: 正しいモデルを設定
                 blockObjects_[currentBlockIndex]->SetTranslate(position);
                 blockObjects_[currentBlockIndex]->Update();
             } else {
                 std::unique_ptr<Object3d> block =
                     std::make_unique<Object3d>();
                 block->Initialize(Object3dManager::GetInstance());
-                block->SetModel(blockModel);
+                block->SetModel(model);
                 block->SetTranslate(position);
                 block->SetEnableLighting(true);
                 block->Update();

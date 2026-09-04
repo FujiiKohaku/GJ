@@ -109,7 +109,7 @@ void LaserGimmick::Update()
 
         MapChipType type = field.GetMapChipTypeByIndex(checkX, checkY);
         // 壁とみなすブロック
-        if (type == MapChipType::Block || type == MapChipType::DestructibleWall) {
+        if (MapChipRegistry::IsSolidBlock(type)) {
             break; // 障害物に当たったのでストップ
         }
         distance = i;

@@ -54,7 +54,7 @@ class EditorTool(tk.Tk):
         # 仮のパレットリスト（※実際のマップチップIDに合わせる）
         palettes = [
             (0, "Air (Delete)"),
-            (1, "Block (Normal)"),
+            (1, "Floor (Block)"),
             (2, "Moving Block (Gimmick)"),
             (3, "Spike"),
             (4, "Goal"),
@@ -64,6 +64,7 @@ class EditorTool(tk.Tk):
             (8, "Destructible Wall"),
             (9, "Laser Emitter"),
             (10, "Swinging Bridge"),
+            (11, "Wall"),
             (99, "Player Spawn"),
         ]
         

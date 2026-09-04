@@ -281,7 +281,7 @@ bool SwingingBridgeGimmick::CheckCollision(const AABB& aabb, SwingingBridgeGimmi
     for (uint32_t y = 0; y < height; ++y) {
         for (uint32_t x = 0; x < width; ++x) {
             MapChipType type = field.GetMapChipTypeByIndex(x, y);
-            if (type == MapChipType::Block || type == MapChipType::DestructibleWall) {
+            if (MapChipRegistry::IsSolidBlock(type)) {
                 Vector3 blockPos = field.GetMapChipPositionByIndex(x, y);
                 AABB blockAABB;
                 blockAABB.center = blockPos;
