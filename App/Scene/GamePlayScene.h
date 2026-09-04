@@ -13,6 +13,7 @@
 #include "Engine/2D/Text/Text.h"
 #include "Engine/3D/SkyBox/SkyBox.h"
 #include "Engine/Camera/Camera.h"
+#include "Engine/debugcamera/DebugCameraController.h"
 #include "PageTransition.h"
 #include <memory>
 
@@ -33,6 +34,7 @@ private:
     void UpdateDeathTransition(float deltaTime);
 
     std::unique_ptr<Camera> camera_;
+    DebugCameraController debugCameraController_;
     std::unique_ptr<SkyBox> skyBox_;
     std::unique_ptr<Text> instructionText_;
     std::unique_ptr<Text> collisionText_;
@@ -54,4 +56,5 @@ private:
     bool wasLeftMousePressed_ = false;
     uint32_t emittedParticleTotal_ = 0;
     bool showForces_ = false;
+    float eyeOffsetX_ = 0.0f;
 };

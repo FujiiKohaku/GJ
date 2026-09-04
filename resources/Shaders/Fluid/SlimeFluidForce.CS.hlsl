@@ -45,17 +45,19 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
         }
 
         float32_t otherDensity = max(other.density, kEpsilon);
+        float32_t3 direction = offset / distance;
+        float32_t kernelDistance = smoothingRadius - distance;
+        float32_t spikyCoefficient =
+            45.0f / (kPi * pow(smoothingRadius, 6.0f));
         float32_t pressureTerm =
-            particle.pressure / (selfDensity * selfDensity) +
-            other.pressure / (otherDensity * otherDensity);
+            (particle.pressure + other.pressure) * 0.5f / otherDensity;
         pressureForce +=
-            -particleMass * selfDensity * pressureTerm *
-            SpikyGradientScale(distance, smoothingRadius) * offset;
+            direction * particleMass * pressureTerm *
+            spikyCoefficient * kernelDistance * kernelDistance;
 
         viscosityForce +=
-            viscosity * particleMass *
-            (other.velocity - particle.velocity) / otherDensity *
-            ViscosityLaplacian(distance, smoothingRadius);
+            (other.velocity - particle.velocity) * particleMass / otherDensity *
+            viscosity * ViscosityLaplacian(distance, smoothingRadius);
 
         float32_t surfaceWeight =
             saturate(1.0f - distance / smoothingRadius);
@@ -94,35 +96,34 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     float32_t3 right = normalize(cross(up, forward));
     up = normalize(cross(forward, right));
 
-    // 1. Shape Matching (記憶された初期球体相対位置 restPosition からの目標位置計算)
+    // neo_Engine FluidSimCS と同じ Shape Matching。
     float32_t3 localTarget = particle.restPosition * blobRadii;
     float32_t3 targetWorld = corePosition + right * localTarget.x + up * localTarget.y + forward * localTarget.z;
     float32_t3 toTarget = targetWorld - particle.position;
 
-    // 滑らかなドーム球弧を保つバネ復元力（Y軸1.35倍の自然な張り）
-    float32_t3 springStiffness = float32_t3(1.1f, 1.35f, 1.1f) * shapeAttraction * 14.0f * (1.0f - liquidBlend * 0.9f);
-    float32_t3 springForce = toTarget * springStiffness;
+    float32_t3 localPullStrength = float32_t3(
+        max(1.0f, 1.0f / max(blobRadii.x, 0.1f)) * 3.0f,
+        max(1.0f, 1.0f / max(blobRadii.y, 0.1f)) * 6.0f,
+        max(1.0f, 1.0f / max(blobRadii.z, 0.1f)) * 3.0f) *
+        (shapeAttraction * particleMass) * (1.0f - liquidBlend);
+    float32_t3 toTargetLocal = float32_t3(
+        dot(toTarget, right),
+        dot(toTarget, up),
+        dot(toTarget, forward));
+    float32_t3 springForceLocal = toTargetLocal * localPullStrength;
+    float32_t3 shapeForce =
+        right * springForceLocal.x +
+        up * springForceLocal.y +
+        forward * springForceLocal.z;
 
-    // 3. 速度ダンピング（過度な揺れ・バネ振動の減衰制御）
-    float32_t3 dampingForce = (particle.velocity - targetVelocity) * damping * 16.0f * (1.0f - liquidBlend * 0.8f);
-
-    float32_t3 shapeAcceleration = springForce - dampingForce;
-
-    // 地面（floorHeight）付近に達した粒子に対する下向き重力の相殺と床面平坦力
-    float32_t distToFloor = particle.position.y - floorHeight;
-    float32_t groundProximity = saturate(1.0f - distToFloor / max(particleRadius * 2.8f, 0.1f));
-    if (groundProximity > 0.0f)
+    // neo_Engine と同じ下半分の持ち上げと、attraction比例の速度減衰。
+    if (particle.position.y < corePosition.y)
     {
-        // 常時流れる下向き重力(gravity.y)の過度な押し下げを物理キャンセル
-        shapeAcceleration.y += abs(gravity.y) * groundProximity * 1.0f;
-        
-        // 地面に達した粒子を左右へ自然に押し潰す
-        float32_t pushDir = particle.position.x - corePosition.x;
-        float32_t signX = (abs(pushDir) > 0.001f) ? sign(pushDir) : 1.0f;
-        shapeAcceleration.x += signX * 16.0f * groundProximity;
+        shapeForce.y += 20.0f * particleMass * (1.0f - liquidBlend);
     }
-
-    shapeAcceleration += (targetVelocity - particle.velocity) * velocityAttraction;
+    shapeForce -=
+        (particle.velocity - targetVelocity) *
+        (shapeAttraction * 0.15f) * (1.0f - liquidBlend);
 
     if (liquidBlend > 0.001f)
     {
@@ -136,17 +137,15 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
             float32_t3 radial =
                 right * (planar.x / planarDistance) +
                 forward * (planar.y / planarDistance);
-            shapeAcceleration +=
+            shapeForce +=
                 radial * spread01 * spread01 * puddleSpread * liquidBlend;
         }
 
         float32_t shallowHeight =
             saturate(1.0f - abs(particle.position.y - (floorHeight + particleRadius * 1.05f)) / max(blobRadii.y, 0.001f));
-        shapeAcceleration +=
+        shapeForce +=
             (targetVelocity - particle.velocity) * shallowHeight * liquidBlend * velocityAttraction * 0.35f;
     }
-
-    float32_t3 shapeForce = shapeAcceleration * max(particle.density, restDensity);
 
     float32_t3 totalForce =
         pressureForce + viscosityForce + cohesionForce + gravityForce + shapeForce;

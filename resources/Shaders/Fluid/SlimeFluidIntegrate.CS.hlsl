@@ -157,28 +157,19 @@ void ResolveSlimeEnvelope(inout SlimeFluidParticle particle, float32_t envelopeB
     float32_t localY = dot(toParticle, up);
     float32_t localZ = dot(toParticle, forward);
 
-    // 2. 水風船アプローチ (楕円体範囲 maxRadiusScale = 1.2f の強制クランプ・水風船膜セーフティー)
-    float32_t maxRadiusScale = 1.20f;
-    float32_t normX = localX / max(blobRadii.x * maxRadiusScale, 0.001f);
-    float32_t normY = localY / max(blobRadii.y * maxRadiusScale, 0.001f);
-    float32_t normZ = localZ / max(blobRadii.z * maxRadiusScale, 0.001f);
-    float32_t ellipsoidDist = sqrt(normX * normX + normY * normY + normZ * normZ);
+    float32_t3 localToCore = float32_t3(localX, localY, localZ);
+    float32_t3 scaledToCore = localToCore / max(blobRadii, float32_t3(0.01f, 0.01f, 0.01f));
+    float32_t distC = length(scaledToCore);
+    float32_t maxRadiusC = 1.2f; // neo_Engine FluidSimCS.hlsl の基本クランプ半径
 
-    if (ellipsoidDist > 1.0f)
+    if (distC > maxRadiusC)
     {
-        float32_t scale = 1.0f / ellipsoidDist;
-        float32_t targetX = localX * scale;
-        float32_t targetY = localY * scale;
-        float32_t targetZ = localZ * scale;
+        float32_t3 surfaceLocal = (scaledToCore / distC) * maxRadiusC;
+        float32_t3 targetLocal = surfaceLocal * blobRadii;
+        float32_t3 targetWorld = corePosition + right * targetLocal.x + up * targetLocal.y + forward * targetLocal.z;
 
-        float32_t3 target =
-            corePosition +
-            right * targetX +
-            up * targetY +
-            forward * targetZ;
-            
-        // 水風船のゴム膜による表面への滑らかな固定
-        particle.position = lerp(particle.position, target, saturate(deltaTime * 18.0f * envelopeBlend));
+        float32_t lerpFactor = saturate(10.0f * deltaTime * envelopeBlend);
+        particle.position = lerp(particle.position, targetWorld, lerpFactor);
 
         // 膜を突き破ろうとする外向き速度のキャンセリング
         float32_t3 outwardNormal = normalize(particle.position - corePosition);
@@ -188,24 +179,18 @@ void ResolveSlimeEnvelope(inout SlimeFluidParticle particle, float32_t envelopeB
             particle.velocity -= outwardNormal * outwardSpeed * 0.85f;
         }
     }
-    ResolveObstacleCollision(particle);
 }
 
 void ResolveWallAndFloorCollision(inout SlimeFluidParticle particle)
 {
-    // メタボール描画半径(particleRadius * 1.35f)を考慮し、地面上面(floorHeight)の下へ垂れ下がらない粒子限界高度
-    float32_t minFloorY = floorHeight + particleRadius * 1.35f;
+    // neo_Engineの床オフセットもワールド寸法と同じ36%へ縮小する。
+    float32_t minFloorY = floorHeight + 0.072f;
     if (particle.position.y < minFloorY)
     {
         particle.position.y = minFloorY;
         
-        // 落下・接地エネルギーを左右のペタン潰れ運動(Squash Spreading)に物理変換！
-        float32_t pushOut = particle.position.x - corePosition.x;
-        float32_t dirX = (abs(pushOut) > 0.001f) ? sign(pushOut) : 1.0f;
-        
         if (particle.velocity.y < 0.0f)
         {
-            particle.velocity.x += dirX * abs(particle.velocity.y) * 0.45f;
             particle.velocity.y *= -collisionBounce;
         }
         particle.velocity.xz *= collisionFriction;
@@ -317,15 +302,15 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
         particle.velocity.y = min(particle.velocity.y, 0.0f);
     }
     
-    float32_t quietDamping = lerp(0.985f, 0.996f, liquidBlend);
-    float32_t movingDamping = lerp(0.995f, 0.999f, liquidBlend);
+    float32_t quietDamping = lerp(1.0f, 0.996f, liquidBlend);
+    float32_t movingDamping = lerp(1.0f, 0.999f, liquidBlend);
     if (length(targetVelocity) < 0.1f) {
         particle.velocity *= quietDamping;
     } else {
         particle.velocity *= movingDamping;
     }
 
-    float32_t maxSpeed = lerp(18.0f, 30.0f, liquidBlend);
+    float32_t maxSpeed = 30.0f;
     float32_t speed = length(particle.velocity);
     if (speed > maxSpeed)
     {
