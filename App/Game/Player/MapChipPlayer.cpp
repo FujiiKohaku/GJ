@@ -42,6 +42,30 @@ float MoveTowards(float current, float target, float maxDelta)
     }
     return current + (delta > 0.0f ? maxDelta : -maxDelta);
 }
+
+void GetGridBounds(const Vector3& center, float extendX, float extendY, uint32_t width, uint32_t height, int32_t& startX, int32_t& endX, int32_t& startY, int32_t& endY) {
+    if (width == 0 || height == 0) {
+        startX = endX = startY = endY = 0;
+        return;
+    }
+    float minX = center.x - extendX;
+    float maxX = center.x + extendX;
+    float minY = center.y - extendY;
+    float maxY = center.y + extendY;
+
+    int32_t minGridX = static_cast<int32_t>(std::floor(minX + 0.5f));
+    int32_t maxGridX = static_cast<int32_t>(std::floor(maxX + 0.5f));
+    int32_t yValMin = static_cast<int32_t>(std::floor(minY + 0.5f));
+    int32_t yValMax = static_cast<int32_t>(std::floor(maxY + 0.5f));
+
+    int32_t startYIndex = static_cast<int32_t>(height) - 1 - yValMax;
+    int32_t endYIndex = static_cast<int32_t>(height) - 1 - yValMin;
+
+    startX = (std::max)(0, minGridX);
+    endX = (std::min)(static_cast<int32_t>(width) - 1, maxGridX);
+    startY = (std::max)(0, startYIndex);
+    endY = (std::min)(static_cast<int32_t>(height) - 1, endYIndex);
+}
 }
 
 MapChipPlayer::~MapChipPlayer() = default;
@@ -188,8 +212,11 @@ bool MapChipPlayer::ResolveHorizontalCollision(Vector3& nextPosition)
     const uint32_t height = mapChipField_->GetBlockHeight();
     const uint32_t width = mapChipField_->GetBlockWidth();
 
-    for (uint32_t yIndex = 0; yIndex < height; ++yIndex) {
-        for (uint32_t xIndex = 0; xIndex < width; ++xIndex) {
+    int32_t startX, endX, startY, endY;
+    GetGridBounds(nextPosition, kPlayerHalfHeight + 1.0f, kPlayerHalfHeight + 1.0f, width, height, startX, endX, startY, endY);
+
+    for (int32_t yIndex = startY; yIndex <= endY; ++yIndex) {
+        for (int32_t xIndex = startX; xIndex <= endX; ++xIndex) {
             if (mapChipField_->GetMapChipTypeByIndex(xIndex, yIndex) !=
                 MapChipType::Block) {
                 continue;
@@ -228,8 +255,11 @@ bool MapChipPlayer::ResolveVerticalCollision(Vector3& nextPosition)
     const uint32_t height = mapChipField_->GetBlockHeight();
     const uint32_t width = mapChipField_->GetBlockWidth();
 
-    for (uint32_t yIndex = 0; yIndex < height; ++yIndex) {
-        for (uint32_t xIndex = 0; xIndex < width; ++xIndex) {
+    int32_t startX, endX, startY, endY;
+    GetGridBounds(nextPosition, kPlayerHalfHeight + 1.0f, kPlayerHalfHeight + 1.0f, width, height, startX, endX, startY, endY);
+
+    for (int32_t yIndex = startY; yIndex <= endY; ++yIndex) {
+        for (int32_t xIndex = startX; xIndex <= endX; ++xIndex) {
             if (mapChipField_->GetMapChipTypeByIndex(xIndex, yIndex) !=
                 MapChipType::Block) {
                 continue;
@@ -365,8 +395,11 @@ void MapChipPlayer::GetWallBoundaries(float& outMinX, float& outMaxX, float& out
         const uint32_t width = mapChipField_->GetBlockWidth();
         const uint32_t height = mapChipField_->GetBlockHeight();
 
-        for (uint32_t y = 0; y < height; ++y) {
-            for (uint32_t x = 0; x < width; ++x) {
+        int32_t startX, endX, startY, endY;
+        GetGridBounds(position_, kPlayerHalfHeight + 1.0f, fluidCeilingHeight_ + 1.0f, width, height, startX, endX, startY, endY);
+
+        for (int32_t y = startY; y <= endY; ++y) {
+            for (int32_t x = startX; x <= endX; ++x) {
                 if (mapChipField_->GetMapChipTypeByIndex(x, y) != MapChipType::Block) continue;
                 
                 Vector3 blockPos = mapChipField_->GetMapChipPositionByIndex(x, y);
@@ -405,8 +438,12 @@ void MapChipPlayer::UpdateVerticalConfinement(const std::vector<BaseMapChipGimmi
 
     const uint32_t width = mapChipField_->GetBlockWidth();
     const uint32_t height = mapChipField_->GetBlockHeight();
-    for (uint32_t y = 0; y < height; ++y) {
-        for (uint32_t x = 0; x < width; ++x) {
+    
+    int32_t startX, endX, startY, endY;
+    GetGridBounds(position_, kPlayerHalfHeight + 1.0f, 5.0f, width, height, startX, endX, startY, endY);
+    
+    for (int32_t y = startY; y <= endY; ++y) {
+        for (int32_t x = startX; x <= endX; ++x) {
             if (mapChipField_->GetMapChipTypeByIndex(x, y) != MapChipType::Block) {
                 continue;
             }
