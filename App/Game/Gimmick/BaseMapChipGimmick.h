@@ -4,6 +4,7 @@
 #include "Engine/LevelEditor/LevelData.h"
 #include "Engine/CollisionManager/CollisionManager.h"
 #include <string>
+#include <vector>
 
 class BaseMapChipGimmick {
 public:
@@ -18,12 +19,16 @@ public:
     virtual void SetEditorMode(bool isEditorMode) {}
     
     virtual AABB GetAABB() const { return AABB(); }
+    virtual std::vector<AABB> GetCollisionBoxes() const { return { GetAABB() }; }
     virtual Vector3 GetDeltaPosition() const { return {0.0f, 0.0f, 0.0f}; }
     // ゴール判定用フラグ（デフォルトは偽）
     virtual bool IsGoal() const { return false; }
 
     // プレイヤーが衝突する（壁として働く）かどうか
     virtual bool IsSolid() const { return true; }
+
+    // 自爆で残った硬化スライム。感圧板などが死体を識別するために使う。
+    virtual bool IsHardenedSlime() const { return false; }
 
     /**
      * @brief マップチップステージ（イベントマネージャ等を持つ親）を設定する

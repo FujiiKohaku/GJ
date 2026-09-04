@@ -40,6 +40,12 @@
     <ClCompile Include="App\Game\Gimmick\MapChipGimmickFactory.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\GoalGimmick.cpp">
+      <Filter>App\Game\Gimmick</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\HardenedFluidSlimeCorpse.cpp">
+      <Filter>App\Game\Gimmick</Filter>
+    </ClCompile>
     <ClCompile Include="App\Game\Gimmick\Trap\SpikeGimmick.cpp">
       <Filter>App\Game\Gimmick\Trap</Filter>
     </ClCompile>
@@ -671,6 +677,12 @@
     </ClInclude>
     <ClInclude Include="App\Game\Gimmick\MapChipGimmickFactory.h">
       <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\GoalGimmick.h">
+      <Filter>App\Game\Gimmick</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\HardenedFluidSlimeCorpse.h">
+      <Filter>App\Game\Gimmick</Filter>
     </ClInclude>
     <ClInclude Include="App\Game\Gimmick\Trap\SpikeGimmick.h">
       <Filter>App\Game\Gimmick\Trap</Filter>

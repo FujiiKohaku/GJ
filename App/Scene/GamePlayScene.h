@@ -57,4 +57,7 @@ private:
     uint32_t emittedParticleTotal_ = 0;
     bool showForces_ = false;
     float eyeOffsetX_ = 0.0f;
+    Vector3 playerStartPosition_ = { 0.0f, 0.0f, 0.0f };
+    bool selfDestructSlowActive_ = false;
+    float timeScaleBeforeSelfDestruct_ = 1.0f;
 };

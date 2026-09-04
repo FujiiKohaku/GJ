@@ -158,6 +158,15 @@ std::vector<BaseMapChipGimmick*> MapChipStage::GetGimmicks() const
     return result;
 }
 
+void MapChipStage::AddGimmick(std::unique_ptr<BaseMapChipGimmick> gimmick)
+{
+    if (!gimmick) {
+        return;
+    }
+    gimmick->SetStage(this);
+    gimmicks_.push_back(std::move(gimmick));
+}
+
 std::vector<BaseMapChipGimmick*> MapChipStage::GetGimmicksInSphere(const Vector3& center, float radius)
 {
     std::vector<BaseMapChipGimmick*> result;

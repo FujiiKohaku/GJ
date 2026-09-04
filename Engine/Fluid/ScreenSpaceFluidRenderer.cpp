@@ -90,15 +90,13 @@ void ScreenSpaceFluidRenderer::SetSettings(const Settings& settings)
 }
 
 void ScreenSpaceFluidRenderer::RenderDepth(
-    const GpuSphFluid& fluid,
+    const std::vector<const GpuSphFluid*>& fluids,
     const Camera& camera)
 {
     assert(dxCommon_ != nullptr);
-    if (fluid.GetParticleCount() == 0) {
+    if (fluids.empty()) {
         return;
     }
-
-    UpdatePerViewParameter(fluid, camera);
 
     particleDepthTarget_.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET);
     particleThicknessTarget_.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -127,16 +125,32 @@ void ScreenSpaceFluidRenderer::RenderDepth(
     commandList->SetGraphicsRootSignature(depthRootSignature_.Get());
     commandList->SetPipelineState(depthPipelineState_.Get());
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    commandList->SetGraphicsRootDescriptorTable(
-        0,
-        fluid.GetParticleSrvHandleGPU());
-    commandList->SetGraphicsRootConstantBufferView(
-        1,
-        perViewResource_->GetGPUVirtualAddress());
-    commandList->DrawInstanced(6, fluid.GetParticleCount(), 0, 0);
+
+    for (const GpuSphFluid* fluid : fluids) {
+        if (fluid == nullptr || fluid->GetParticleCount() == 0) {
+            continue;
+        }
+
+        UpdatePerViewParameter(*fluid, camera);
+
+        commandList->SetGraphicsRootDescriptorTable(
+            0,
+            fluid->GetParticleSrvHandleGPU());
+        commandList->SetGraphicsRootConstantBufferView(
+            1,
+            perViewResource_->GetGPUVirtualAddress());
+        commandList->DrawInstanced(6, fluid->GetParticleCount(), 0, 0);
+    }
 
     particleDepthTarget_.Transition(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     particleThicknessTarget_.Transition(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+}
+
+void ScreenSpaceFluidRenderer::RenderDepth(
+    const GpuSphFluid& fluid,
+    const Camera& camera)
+{
+    RenderDepth(std::vector<const GpuSphFluid*>{ &fluid }, camera);
 }
 
 void ScreenSpaceFluidRenderer::SmoothDepth()
@@ -570,7 +584,7 @@ void ScreenSpaceFluidRenderer::UpdateCompositeParameter(
     compositeData_->viewProj = camera.GetViewProjectionMatrix();
     compositeData_->eyeWorldPosition = fluid.GetSettings().corePosition;
     compositeData_->eyeWorldPosition.x += fluid.GetEyeOffsetX();
-    compositeData_->eyeWorldPosition.y += 0.015f;
+    compositeData_->eyeWorldPosition.y += fluid.GetEyeOffsetY() + 0.015f;
     compositeData_->eyeWorldPosition.z = 0.0f;
     compositeData_->eyeHalfWidthPixels = 9.0f;
     compositeData_->eyeHalfHeightPixels = 22.0f;
