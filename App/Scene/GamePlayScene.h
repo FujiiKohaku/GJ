@@ -30,6 +30,8 @@ public:
 private:
     void UpdateFollowCamera();
     void UpdateCollisionText();
+    void StartDeathTransition();
+    void UpdateDeathTransition(float deltaTime);
 
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
@@ -49,7 +51,8 @@ private:
     std::unique_ptr<Sprite> menuPanelSprite_;
     std::unique_ptr<Text> menuTitleText_;
     std::unique_ptr<Text> menuInstructionText_;
-    bool wasPlayerCrushed_ = false;
+    bool isDeathTransitionActive_ = false;
+    float deathTransitionTime_ = 0.0f;
     bool wasLeftMousePressed_ = false;
     uint32_t emittedParticleTotal_ = 0;
     bool showForces_ = false;

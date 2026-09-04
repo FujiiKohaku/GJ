@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Math/MathStruct.h"
+#include "Engine/CollisionManager/CollisionManager.h"
 #include <vector>
 
 class MapChipField;
@@ -23,6 +24,8 @@ public:
     bool IsGrounded() const;
     bool IsColliding() const;
     bool IsCrushed() const;
+    
+    AABB GetAABB() const;
 
 private:
     void UpdateVisualShape(float deltaTime);

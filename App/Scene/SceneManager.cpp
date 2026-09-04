@@ -15,6 +15,7 @@ bool ChangeScene(
         scene->Finalize();
         scene.reset();
     }
+
     retiredScene.reset();
 
     scene = std::move(nextScene);
@@ -99,13 +100,8 @@ bool SceneManager::WantsImGuiAlways() const
 void SceneManager::SetPostEffectType(PostEffectType postEffectType)
 {
     ClearPostEffects();
-    AddPostEffect(
-        postEffectType,
-        PostEffectStage::BeforeParticle);
-    AddPostEffect(
-        PostEffectType::Fog,
-        PostEffectStage::BeforeParticle);
-    postEffectType_ = postEffectType;
+    AddPostEffect(postEffectType,PostEffectStage::BeforeParticle);
+    AddPostEffect(PostEffectType::Fog,PostEffectStage::BeforeParticle);postEffectType_ = postEffectType;
 }
 
 PostEffectType SceneManager::GetPostEffectType() const

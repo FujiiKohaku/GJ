@@ -40,6 +40,18 @@
     <ClCompile Include="App\Game\Gimmick\MapChipGimmickFactory.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Trap\SpikeGimmick.cpp">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Trap\SpikeParam.cpp">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Trap\LaserGimmick.cpp">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Trap\LaserParam.cpp">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClCompile>
     <ClCompile Include="App\Game\Gimmick\MovingBlockGimmick.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -543,6 +555,24 @@
     <ClCompile Include="App\Game\Gimmick\GoalGimmick.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\Event\EventManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Interaction\SwitchParam.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Interaction\SwitchGimmick.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Interaction\GasEmitterParam.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Interaction\GasEmitterGimmick.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Interaction\DestructibleWallGimmick.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="resources\Shaders\Object3D\Object3d.VS.hlsl" />
@@ -641,6 +671,18 @@
     </ClInclude>
     <ClInclude Include="App\Game\Gimmick\MapChipGimmickFactory.h">
       <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Trap\SpikeGimmick.h">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Trap\SpikeParam.h">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Trap\LaserGimmick.h">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Trap\LaserParam.h">
+      <Filter>App\Game\Gimmick\Trap</Filter>
     </ClInclude>
     <ClInclude Include="App\Game\Gimmick\MovingBlockGimmick.h">
       <Filter>ヘッダー ファイル</Filter>
@@ -898,6 +940,24 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="App\Game\Gimmick\GoalGimmick.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Event\EventManager.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Interaction\SwitchParam.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Interaction\SwitchGimmick.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Interaction\GasEmitterParam.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Interaction\GasEmitterGimmick.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Interaction\DestructibleWallGimmick.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

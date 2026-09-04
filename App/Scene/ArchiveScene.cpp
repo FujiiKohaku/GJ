@@ -88,14 +88,6 @@ void ArchiveScene::Initialize()
 {
     SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
     SceneManager::GetInstance()->SetArchiveApproach(0.0f);
-    slimeRevealActive_ = PageTransition::ConsumeSlimeReveal();
-    slimeRevealTime_ = 0.0f;
-    if (slimeRevealActive_) {
-        SceneManager::GetInstance()->SetSlimeScreenProgress(1.0f);
-        SceneManager::GetInstance()->AddPostEffect(
-            PostEffectType::SlimeScreen,
-            PostEffectStage::AfterParticle);
-    }
 
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
@@ -476,17 +468,6 @@ void ArchiveScene::Update()
 {//deltaTimeを取得
     const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
     pageReveal_.Update(deltaTime);
-    if (slimeRevealActive_) {
-        constexpr float kSlimeRevealDuration = 1.05f;
-        slimeRevealTime_ += deltaTime;
-        const float progress =
-            1.0f - (std::min)(slimeRevealTime_ / kSlimeRevealDuration, 1.0f);
-        SceneManager::GetInstance()->SetSlimeScreenProgress(progress);
-        if (progress <= 0.0f) {
-            slimeRevealActive_ = false;
-            SceneManager::GetInstance()->RemovePostEffect(PostEffectType::SlimeScreen);
-        }
-    }
     //埃を動かす
     UpdateDustMotes(deltaTime);
 

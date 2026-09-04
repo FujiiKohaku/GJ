@@ -107,6 +107,7 @@ std::vector<GpuSphFluid::CollisionObstacle> BuildFluidObstacles(
 
     const float safeDeltaTime = (std::max)(deltaTime, 0.0001f);
     for (BaseMapChipGimmick* gimmick : gimmicks) {
+        if (!gimmick->IsSolid()) continue;
         const AABB box = gimmick->GetAABB();
         const Vector3 delta = gimmick->GetDeltaPosition();
         obstacles.push_back(MakeFluidObstacle(
@@ -126,6 +127,9 @@ std::vector<GpuSphFluid::CollisionObstacle> BuildFluidObstacles(
 void GamePlayScene::Initialize()
 {
     SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
+    isDeathTransitionActive_ = false;
+    deathTransitionTime_ = 0.0f;
 
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
@@ -147,6 +151,7 @@ void GamePlayScene::Initialize()
 
     player_ = std::make_unique<MapChipPlayer>();
     player_->Initialize(&mapChipStage_.GetField(), playerStartPos);
+    mapChipStage_.SetPlayer(player_.get());
     
     gpuSphFluid_ = std::make_unique<GpuSphFluid>();
     GpuSphFluid::Settings fluidSettings;
@@ -290,6 +295,8 @@ void GamePlayScene::Initialize()
 
 void GamePlayScene::Finalize()
 {
+    SceneManager::GetInstance()->RemovePostEffect(PostEffectType::SlimeScreen);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     debugCameraController_.SetTargetCamera(nullptr);
     SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
     if (gpuSphFluid_) {
@@ -304,6 +311,11 @@ void GamePlayScene::Update()
     Input* input = Input::GetInstance();
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
 
+    if (isDeathTransitionActive_) {
+        UpdateDeathTransition(TimeManager::GetInstance()->GetDeltaTime());
+        return;
+    }
+
     // TABキーでメニュー開閉
     if (Input::GetInstance()->IsKeyTrigger(DIK_TAB)) {
         isMenuOpen_ = !isMenuOpen_;
@@ -312,8 +324,7 @@ void GamePlayScene::Update()
     // メニューが開いているときはゲーム内処理を行わずに早期リターン
     if (isMenuOpen_) {
         if (Input::GetInstance()->IsKeyTrigger(DIK_G)) {
-            SceneManager::GetInstance()->SetNextScene(
-                std::make_unique<GameOverScene>());
+            StartDeathTransition();
             return;
         }
         if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
@@ -343,8 +354,13 @@ void GamePlayScene::Update()
     const bool isFreeCameraMode = debugCameraController_.GetDebugMode();
 
     mapChipStage_.Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
+    //player_->Update(mapChipStage_.GetGimmicks());
     if (!isFreeCameraMode) {
         player_->Update(mapChipStage_.GetGimmicks());
+    }
+     if (player_->IsCrushed()) {
+      StartDeathTransition();
+      return;
     }
 
     if (gpuSphFluid_) {
@@ -417,6 +433,9 @@ void GamePlayScene::Update()
 
 void GamePlayScene::Draw2D()
 {
+    if (isDeathTransitionActive_) {
+        return;
+    }
     if (showForces_) {
         fluidForceRenderer_->Draw(*gpuSphFluid_, *camera_);
     }
@@ -456,6 +475,34 @@ void GamePlayScene::DrawParticle()
 
 void GamePlayScene::DrawImGui()
 {
+}
+
+void GamePlayScene::StartDeathTransition()
+{
+    if (isDeathTransitionActive_) {
+        return;
+    }
+    isDeathTransitionActive_ = true;
+    deathTransitionTime_ = 0.0f;
+    isMenuOpen_ = false;
+    SceneManager* sceneManager = SceneManager::GetInstance();
+    const Vector3 position = player_->GetPosition();
+    sceneManager->SetPaintSeed(position.x * 17.31f + position.y * 7.13f);
+    sceneManager->SetSlimeScreenProgress(0.0f);
+    sceneManager->AddPostEffect(
+        PostEffectType::SlimeScreen, PostEffectStage::AfterParticle);
+}
+
+void GamePlayScene::UpdateDeathTransition(float deltaTime)
+{
+    constexpr float kCoverDuration = 2.1f;
+    deathTransitionTime_ += deltaTime;
+    const float progress = std::clamp(deathTransitionTime_ / kCoverDuration, 0.0f, 1.0f);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(progress);
+    if (progress >= 1.0f) {
+        PageTransition::RequestSlimeReveal();
+        SceneManager::GetInstance()->SetNextScene(std::make_unique<GameOverScene>());
+    }
 }
 
 void GamePlayScene::UpdateFollowCamera()
