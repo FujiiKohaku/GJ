@@ -93,6 +93,21 @@ void SwitchGimmick::Update()
                 isStepped = true;
             }
         }
+
+        // プレイヤーが復帰した後も、硬化した死体の重さで感圧板を維持する。
+        if (!isStepped) {
+            for (BaseMapChipGimmick* gimmick : stage_->GetGimmicks()) {
+                if (gimmick != this && gimmick->IsHardenedSlime()) {
+                    for (const AABB& bodyBox : gimmick->GetCollisionBoxes()) {
+                        if (CollisionManager::Intersect(GetAABB(), bodyBox).isHit) {
+                            isStepped = true;
+                            break;
+                        }
+                    }
+                    if (isStepped) break;
+                }
+            }
+        }
         
         if (isStepped) { // TODO: 本来は param_->requiredWeight_ などを考慮する
             if (!isActive_) {

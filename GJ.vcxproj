@@ -164,6 +164,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="App\Game\Gimmick\GoalGimmick.cpp" />
+    <ClCompile Include="App\Game\Gimmick\HardenedFluidSlimeCorpse.cpp" />
     <ClCompile Include="App\Game\Gimmick\Trap\SpikeGimmick.cpp" />
     <ClCompile Include="App\Game\Gimmick\Trap\SpikeParam.cpp" />
     <ClCompile Include="App\Game\Gimmick\Trap\LaserGimmick.cpp" />
@@ -437,6 +438,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="App\Game\Map\MapChipField.h" />
     <ClInclude Include="App\Game\Map\MapChipStage.h" />
     <ClInclude Include="App\Game\Gimmick\BaseMapChipGimmick.h" />
+    <ClInclude Include="App\Game\Gimmick\HardenedFluidSlimeCorpse.h" />
     <ClInclude Include="App\Game\Gimmick\MapChipGimmickFactory.h" />
     <ClInclude Include="App\Game\Gimmick\MovingBlockGimmick.h" />
     <ClInclude Include="App\Game\Gimmick\SwingingBridgeGimmick.h" />

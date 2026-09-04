@@ -2,6 +2,7 @@
 
 #include "App/Game/Gimmick/MapChipGimmickFactory.h"
 #include "App/Game/Gimmick/GoalGimmick.h"
+#include "App/Game/Gimmick/SwingingBridgeGimmick.h"
 #include "App/Game/Gimmick/Interaction/SwitchGimmick.h"
 #include "App/Game/Gimmick/Interaction/GasEmitterGimmick.h"
 #include "App/Game/Gimmick/Interaction/DestructibleWallGimmick.h"
@@ -9,6 +10,7 @@
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3d.h"
 #include "Engine/3D/Object3dManager.h"
+#include <algorithm>
 
 MapChipStage::~MapChipStage() = default;
 
@@ -214,6 +216,67 @@ std::vector<BaseMapChipGimmick*> MapChipStage::GetGimmicks() const
         result.push_back(gimmick.get());
     }
     return result;
+}
+
+void MapChipStage::AddGimmick(std::unique_ptr<BaseMapChipGimmick> gimmick)
+{
+    if (!gimmick) {
+        return;
+    }
+    gimmick->SetStage(this);
+    gimmicks_.push_back(std::move(gimmick));
+    if (gimmicks_.back()->IsHardenedSlime()) {
+        ResolveHardenedSlimeAdhesion(*gimmicks_.back());
+    }
+}
+
+void MapChipStage::ResolveHardenedSlimeAdhesion(
+    const BaseMapChipGimmick& hardenedSlime)
+{
+    const std::vector<AABB> bodyBoxes = hardenedSlime.GetCollisionBoxes();
+    std::vector<SwingingBridgeGimmick*> touchedBridges;
+    bool touchesTerrain = false;
+
+    for (const AABB& bodyBox : bodyBoxes) {
+        for (uint32_t y = 0; y < field_.GetBlockHeight(); ++y) {
+            for (uint32_t x = 0; x < field_.GetBlockWidth(); ++x) {
+                const MapChipType type = field_.GetMapChipTypeByIndex(x, y);
+                if (!MapChipRegistry::IsSolidBlock(type)) {
+                    continue;
+                }
+                const AABB terrainBox = {
+                    field_.GetMapChipPositionByIndex(x, y),
+                    { 1.0f, 1.0f, 1.0f } };
+                if (CollisionManager::Intersect(bodyBox, terrainBox).isHit) {
+                    touchesTerrain = true;
+                }
+            }
+        }
+
+        for (const std::unique_ptr<BaseMapChipGimmick>& gimmick : gimmicks_) {
+            auto* bridge = dynamic_cast<SwingingBridgeGimmick*>(gimmick.get());
+            if (!bridge ||
+                !CollisionManager::Intersect(bodyBox, bridge->GetAABB()).isHit) {
+                continue;
+            }
+            if (std::find(
+                    touchedBridges.begin(),
+                    touchedBridges.end(),
+                    bridge) == touchedBridges.end()) {
+                touchedBridges.push_back(bridge);
+            }
+        }
+    }
+
+    for (SwingingBridgeGimmick* bridge : touchedBridges) {
+        bridge->ApplyAdhesive();
+    }
+
+    if (touchesTerrain || touchedBridges.size() >= 2) {
+        for (SwingingBridgeGimmick* bridge : touchedBridges) {
+            bridge->ForceStuck();
+        }
+    }
 }
 
 std::vector<BaseMapChipGimmick*> MapChipStage::GetGimmicksInSphere(const Vector3& center, float radius)

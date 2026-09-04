@@ -15,7 +15,7 @@
 #include <cmath>
 
 namespace {
-constexpr float kPlayerSize = 1.0f;
+constexpr float kPlayerSize = 0.9f;
 constexpr float kMoveSpeed = 5.0f;
 constexpr float kJumpSpeed = 8.0f;
 constexpr float kGravity = -20.0f;
@@ -27,7 +27,11 @@ constexpr float kSlimeCoreLift = 0.10f;
 constexpr float kSlimeCeilingVisualPadding = 0.24f;
 constexpr float kSlimeMinimumVisualHeight = 0.12f;
 constexpr float kSlimeCeilingFollowSpeed = 3.0f;
-constexpr Vector3 kSlimeBaseRadii = { 0.50f, 0.50f, 0.50f };
+constexpr Vector3 kSlimeBaseRadii = { 0.45f, 0.45f, 0.45f };
+constexpr float kMousePullSensitivity = 0.006f;
+constexpr float kStickPullSpeed = 3.5f;
+constexpr float kMaximumPull = 2.5f;
+constexpr float kPullDeadZone = 0.06f;
 
 float Saturate(float value)
 {
@@ -77,6 +81,12 @@ void MapChipPlayer::Initialize(const MapChipField* mapChipField, const Vector3& 
     baseScale_ = kSlimeBaseRadii;
     visualScale_ = kSlimeBaseRadii;
     fluidFloorHeight_ = position_.y - kPlayerHalfHeight + kSlimeFluidGroundClearance;
+    velocity_ = { 0.0f, 0.0f, 0.0f };
+    isShapingSelfDestruct_ = false;
+    hardenedBodyReady_ = false;
+    deathRequested_ = false;
+    selfDestructRawPull_ = { 0.0f, 0.0f };
+    selfDestructPull_ = { 0.0f, 0.0f };
 }
 
 void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmicks)
@@ -102,13 +112,34 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
         }
     }
 
+    Input* input = Input::GetInstance();
+
     float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
     deltaTime = (std::min)(deltaTime, kMaximumDeltaTime);
     if (deltaTime < 0.0f) {
         deltaTime = 0.0f;
     }
 
-    Input* input = Input::GetInstance();
+    if (input->IsKeyTrigger(DIK_T)) {
+        if (isShapingSelfDestruct_) {
+            hardenedBody_ = GetAABB();
+            hardenedBodyReady_ = true;
+            isShapingSelfDestruct_ = false;
+            return;
+        }
+
+        isShapingSelfDestruct_ = true;
+        selfDestructRawPull_ = { 0.0f, 0.0f };
+        selfDestructPull_ = { 0.0f, 0.0f };
+        velocity_ = { 0.0f, 0.0f, 0.0f };
+    }
+
+    if (isShapingSelfDestruct_) {
+        UpdateSelfDestructShape(
+            TimeManager::GetInstance()->GetUnscaledDeltaTime());
+        return;
+    }
+
     velocity_.x = 0.0f;
     if (input->IsKeyPressed(DIK_A) || input->IsKeyPressed(DIK_LEFT)) {
         velocity_.x -= kMoveSpeed;
@@ -164,9 +195,102 @@ bool MapChipPlayer::IsCrushed() const
 
 AABB MapChipPlayer::GetAABB() const
 {
+    if (isShapingSelfDestruct_) {
+        const float sizeX = kPlayerSize + std::abs(selfDestructPull_.x);
+        const float sizeY = kPlayerSize + std::abs(selfDestructPull_.y);
+        const float depthHalfSize = std::clamp(
+            baseScale_.z / std::sqrt(sizeX * sizeY),
+            0.22f,
+            baseScale_.z);
+        const Vector3 size = {
+            sizeX,
+            sizeY,
+            depthHalfSize * 2.0f
+        };
+        return {
+            position_ + Vector3{
+                selfDestructPull_.x * 0.5f,
+                selfDestructPull_.y * 0.5f,
+                0.0f },
+            size
+        };
+    }
     return {
         position_,
         { kPlayerSize, kPlayerSize, 0.2f }
+    };
+}
+
+bool MapChipPlayer::ConsumeHardenedBody(AABB& outBody)
+{
+    if (!hardenedBodyReady_) {
+        return false;
+    }
+    outBody = hardenedBody_;
+    hardenedBodyReady_ = false;
+    return true;
+}
+
+bool MapChipPlayer::ConsumeDeathRequest()
+{
+    if (!deathRequested_) {
+        return false;
+    }
+    deathRequested_ = false;
+    return true;
+}
+
+void MapChipPlayer::UpdateSelfDestructShape(float unscaledDeltaTime)
+{
+    Input* input = Input::GetInstance();
+    // 自爆形状は左ドラッグ中だけつまんで伸ばす。
+    if (input->IsMousePressed(0)) {
+        selfDestructRawPull_.x +=
+            static_cast<float>(input->GetMouseDeltaX()) * kMousePullSensitivity;
+        selfDestructRawPull_.y -=
+            static_cast<float>(input->GetMouseDeltaY()) * kMousePullSensitivity;
+    }
+    selfDestructRawPull_.x +=
+        input->GetGamepadRightStickX() * kStickPullSpeed * unscaledDeltaTime;
+    selfDestructRawPull_.y +=
+        input->GetGamepadRightStickY() * kStickPullSpeed * unscaledDeltaTime;
+
+    const float length = std::sqrt(
+        selfDestructRawPull_.x * selfDestructRawPull_.x +
+        selfDestructRawPull_.y * selfDestructRawPull_.y);
+    if (length > kMaximumPull) {
+        selfDestructRawPull_.x *= kMaximumPull / length;
+        selfDestructRawPull_.y *= kMaximumPull / length;
+    }
+
+    selfDestructPull_ = selfDestructRawPull_;
+    if (length < kPullDeadZone) {
+        selfDestructPull_ = { 0.0f, 0.0f };
+    } else {
+        // 横壁・縦壁を簡単に作れるよう、主方向が明確なら副方向を滑らかに抑える。
+        const float absoluteX = std::abs(selfDestructPull_.x);
+        const float absoluteY = std::abs(selfDestructPull_.y);
+        if (absoluteX > absoluteY && absoluteX > 0.0f) {
+            const float dominance = absoluteX / (absoluteY + 0.0001f);
+            const float assist = Saturate((dominance - 1.05f) / 0.75f);
+            selfDestructPull_.y *= 1.0f - assist * 0.9f;
+        } else if (absoluteY > 0.0f) {
+            const float dominance = absoluteY / (absoluteX + 0.0001f);
+            const float assist = Saturate((dominance - 1.05f) / 0.75f);
+            selfDestructPull_.x *= 1.0f - assist * 0.9f;
+        }
+    }
+
+    velocity_ = { 0.0f, 0.0f, 0.0f };
+    const float sizeX = kPlayerSize + std::abs(selfDestructPull_.x);
+    const float sizeY = kPlayerSize + std::abs(selfDestructPull_.y);
+    visualScale_ = {
+        sizeX * 0.5f,
+        sizeY * 0.5f,
+        std::clamp(
+            baseScale_.z / std::sqrt(sizeX * sizeY),
+            0.22f,
+            baseScale_.z)
     };
 }
 
@@ -304,36 +428,34 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
     };
     
     for (BaseMapChipGimmick* gimmick : dynamicGimmicks) {
-        AABB blockBox = gimmick->GetAABB();
-        CollisionHit hit = CollisionManager::Intersect(playerBox, blockBox);
-        if (!hit.isHit || hit.penetration <= kCollisionEpsilon) {
-            continue;
-        }
-        // ゴール判定
         if (gimmick->IsGoal()) {
-            Logger::Log("Goal reached\n");
-            // クリアシーンへ遷移
-            SceneManager::GetInstance()->SetNextScene(std::make_unique<ClearScene>());
-            return true;
+            const CollisionHit goalHit =
+                CollisionManager::Intersect(playerBox, gimmick->GetAABB());
+            if (goalHit.isHit) {
+                Logger::Log("Goal reached\n");
+                SceneManager::GetInstance()->SetNextScene(std::make_unique<ClearScene>());
+                return true;
+            }
         }
-        
-        // 物理的な衝突（壁や床としての機能）を持たないギミックは押し出し判定をスキップする
+
         if (!gimmick->IsSolid()) {
             continue;
         }
-        
-        if (isHorizontal) {
-            if (std::abs(hit.normal.x) > 0.0f) {
-                // ブロックの方向（hit.normal）の逆へ押し出す
-                nextPosition.x -= hit.normal.x * hit.penetration;
-                resolved = true;
+
+        for (const AABB& blockBox : gimmick->GetCollisionBoxes()) {
+            const CollisionHit hit = CollisionManager::Intersect(playerBox, blockBox);
+            if (!hit.isHit || hit.penetration <= kCollisionEpsilon) {
+                continue;
             }
-        } else {
-            if (std::abs(hit.normal.y) > 0.0f) {
+
+            if (isHorizontal) {
+                if (std::abs(hit.normal.x) > 0.0f) {
+                    nextPosition.x -= hit.normal.x * hit.penetration;
+                    resolved = true;
+                }
+            } else if (std::abs(hit.normal.y) > 0.0f) {
                 nextPosition.y -= hit.normal.y * hit.penetration;
                 resolved = true;
-                
-                // ブロックがプレイヤーの下にある（hit.normal.y が負）場合に着地判定
                 if (hit.normal.y < 0.0f && velocity_.y <= 0.0f) {
                     isGrounded_ = true;
                     baseGimmick_ = gimmick;
@@ -341,9 +463,9 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
                     ceilingSquash_ = (std::max)(ceilingSquash_, 0.35f);
                 }
             }
+
+            playerBox.center = nextPosition;
         }
-        
-        playerBox.center = nextPosition; // 連続する衝突のため更新
     }
     
     return resolved;
@@ -353,9 +475,28 @@ const Vector3& MapChipPlayer::GetVelocity() const { return velocity_; }
 const Vector3& MapChipPlayer::GetForward() const { return forward_; }
 const Vector3& MapChipPlayer::GetVisualScale() const { return visualScale_; }
 
+Vector2 MapChipPlayer::GetEyeOffset() const
+{
+    if (isShapingSelfDestruct_) {
+        // 流体の中心は伸ばした形の中央へ移るが、目は元の頭部寄りに残す。
+        return {
+            selfDestructPull_.x * -0.15f,
+            selfDestructPull_.y * -0.15f
+        };
+    }
+
+    return { 0.0f, 0.0f };
+}
+
 Vector3 MapChipPlayer::GetFluidCorePosition() const
 {
-    return position_ + Vector3{0.0f, kSlimeCoreLift, 0.0f};
+    if (isShapingSelfDestruct_) {
+        return position_ + Vector3{
+            selfDestructPull_.x * 0.5f,
+            selfDestructPull_.y * 0.5f + kSlimeCoreLift,
+            0.0f };
+    }
+    return position_ + Vector3{ 0.0f, kSlimeCoreLift, 0.0f };
 }
 
 float MapChipPlayer::GetFluidFloorHeight() const
@@ -408,9 +549,10 @@ void MapChipPlayer::GetWallBoundaries(float& outMinX, float& outMaxX, float& out
 
     for (BaseMapChipGimmick* gimmick : dynamicGimmicks) {
         if (!gimmick->IsSolid()) continue;
-        AABB box = gimmick->GetAABB();
-        checkBoundary(box.center.x - box.size.x * 0.5f, box.center.x + box.size.x * 0.5f,
-                      box.center.y - box.size.y * 0.5f, box.center.y + box.size.y * 0.5f);
+        for (const AABB& box : gimmick->GetCollisionBoxes()) {
+            checkBoundary(box.center.x - box.size.x * 0.5f, box.center.x + box.size.x * 0.5f,
+                          box.center.y - box.size.y * 0.5f, box.center.y + box.size.y * 0.5f);
+        }
     }
 }
 
@@ -456,12 +598,13 @@ void MapChipPlayer::UpdateVerticalConfinement(const std::vector<BaseMapChipGimmi
 
     for (BaseMapChipGimmick* gimmick : dynamicGimmicks) {
         if (!gimmick->IsSolid()) continue;
-        const AABB box = gimmick->GetAABB();
-        checkObstacle(
-            box.center.x - box.size.x * 0.5f,
-            box.center.x + box.size.x * 0.5f,
-            box.center.y - box.size.y * 0.5f,
-            box.center.y + box.size.y * 0.5f);
+        for (const AABB& box : gimmick->GetCollisionBoxes()) {
+            checkObstacle(
+                box.center.x - box.size.x * 0.5f,
+                box.center.x + box.size.x * 0.5f,
+                box.center.y - box.size.y * 0.5f,
+                box.center.y + box.size.y * 0.5f);
+        }
     }
 
     fluidCeilingHeight_ = ceilingBottom;
@@ -501,7 +644,12 @@ void MapChipPlayer::UpdateVisualShape(float deltaTime)
     const float desiredHeight =
         ceilingLimitedHeight - ceilingSquash_ * 0.08f - verticalCompression01_ * 0.10f;
 
-    visualScale_.x = baseScale_.x - (wallSquash_ * 0.2f) + (landSquash_ * 0.2f) + wobble_ + speedStretch;
-    visualScale_.y = std::clamp(desiredHeight, kSlimeMinimumVisualHeight, baseScale_.y);
+    visualScale_.x =
+        baseScale_.x - (wallSquash_ * 0.2f) +
+        (landSquash_ * 0.2f) + wobble_ + speedStretch;
+    visualScale_.y = std::clamp(
+        desiredHeight,
+        kSlimeMinimumVisualHeight,
+        baseScale_.y);
     visualScale_.z = baseScale_.z;
 }

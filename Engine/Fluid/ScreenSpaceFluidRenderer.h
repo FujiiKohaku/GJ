@@ -33,6 +33,7 @@ public:
     void SetSettings(const Settings& settings);
     const Settings& GetSettings() const { return settings_; }
 
+    void RenderDepth(const std::vector<const GpuSphFluid*>& fluids, const Camera& camera);
     void RenderDepth(const GpuSphFluid& fluid, const Camera& camera);
     void SmoothDepth();
     void Composite(
