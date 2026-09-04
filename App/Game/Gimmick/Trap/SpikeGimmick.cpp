@@ -68,17 +68,10 @@ void SpikeGimmick::Update()
 
     if (isColliding) {
         if (!wasPlayerColliding_) {
-            // トゲに新しく触れた（または上から乗った）瞬間の処理
             Logger::Log(std::format("[SpikeGimmick] Player touched the spike at ({:.2f}, {:.2f}, {:.2f})\n",
                                     position_.x, position_.y, position_.z));
-
-            // =====================================================================================
-            // TODO: ここにチームメンバーが「プレイヤーへのダメージ」や「死体のスポーン」処理を実装する
-            // =====================================================================================
-            // 例: player->TakeDamage(1);
-            // 例: stage_->GetEventManager().PublishEvent("PlayerKilledBySpike", &position_);
-            // =====================================================================================
         }
+        player->RequestDeath();
         wasPlayerColliding_ = true;
     } else {
         wasPlayerColliding_ = false;

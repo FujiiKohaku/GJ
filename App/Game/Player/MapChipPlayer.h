@@ -17,7 +17,7 @@ public:
     const Vector3& GetVelocity() const;
     const Vector3& GetForward() const;
     const Vector3& GetVisualScale() const;
-    Vector2 GetSelfDestructEyeOffset() const;
+    Vector2 GetEyeOffset() const;
     Vector3 GetFluidCorePosition() const;
     float GetFluidFloorHeight() const;
     float GetFluidCeilingHeight() const;
@@ -27,6 +27,8 @@ public:
     bool IsCrushed() const;
     bool IsShapingSelfDestruct() const { return isShapingSelfDestruct_; }
     bool ConsumeHardenedBody(AABB& outBody);
+    void RequestDeath() { deathRequested_ = true; }
+    bool ConsumeDeathRequest();
     
     AABB GetAABB() const;
 
@@ -60,6 +62,7 @@ private:
     bool wasGrounded_ = false;  // 前フレームの接地状態（着地の瞬間を検知）
     bool isShapingSelfDestruct_ = false;
     bool hardenedBodyReady_ = false;
+    bool deathRequested_ = false;
     Vector2 selfDestructRawPull_ = { 0.0f, 0.0f };
     Vector2 selfDestructPull_ = { 0.0f, 0.0f };
     AABB hardenedBody_ = {};

@@ -64,6 +64,9 @@ public:
     void CreateExplosion(const Vector3& origin, float radius);
 
 private:
+    void ResolveHardenedSlimeAdhesion(
+        const BaseMapChipGimmick& hardenedSlime);
+
     MapChipField field_;
     std::vector<std::unique_ptr<Object3d>> blockObjects_;
     std::vector<std::unique_ptr<BaseMapChipGimmick>> gimmicks_;

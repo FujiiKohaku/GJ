@@ -302,7 +302,7 @@ void GamePlayScene::Initialize()
     instructionText_->Initialize(kDefaultFont);
     instructionText_->SetText(
         "MOVE : A/D OR LEFT/RIGHT   JUMP : SPACE/W/UP   "
-        "HOLD R + LEFT DRAG/RIGHT STICK : SHAPE, RELEASE R : HARDEN   "
+        "T : SLOW/SHAPE, T AGAIN : SELF-DESTRUCT   R : RESTART   "
         "F1 : FREE CAM   TAB : MENU   BACKSPACE : STAGE SELECT");
     instructionText_->SetPosition({ 32.0f, 32.0f });
     instructionText_->SetFontSize(24.0f);
@@ -379,6 +379,12 @@ void GamePlayScene::Update()
     Input* input = Input::GetInstance();
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
 
+    if (input->IsKeyTrigger(DIK_R)) {
+        SceneManager::GetInstance()->SetNextScene(
+            std::make_unique<GamePlayScene>());
+        return;
+    }
+
     if (isDeathTransitionActive_) {
         UpdateDeathTransition(TimeManager::GetInstance()->GetDeltaTime());
         return;
@@ -423,8 +429,15 @@ void GamePlayScene::Update()
     const bool isFreeCameraMode = debugCameraController_.GetDebugMode();
 
     mapChipStage_.Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
+    bool hardenedThisFrame = false;
+    if (player_->ConsumeDeathRequest()) {
+        RespawnPlayerLeavingCorpse();
+        hardenedThisFrame = true;
+    }
+
     //player_->Update(mapChipStage_.GetGimmicks());
-    if (!isFreeCameraMode || player_->IsShapingSelfDestruct()) {
+    if (!hardenedThisFrame &&
+        (!isFreeCameraMode || player_->IsShapingSelfDestruct())) {
         player_->Update(mapChipStage_.GetGimmicks());
     }
 
@@ -436,25 +449,9 @@ void GamePlayScene::Update()
     }
 
     AABB hardenedBody;
-    const bool hardenedThisFrame = player_->ConsumeHardenedBody(hardenedBody);
-    if (hardenedThisFrame) {
-        if (selfDestructSlowActive_) {
-            TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
-            selfDestructSlowActive_ = false;
-        }
-
-        std::vector<GpuSphFluid::Particle> particles = gpuSphFluid_->GetParticlesCPU();
-
-        auto corpse = std::make_unique<HardenedFluidSlimeCorpse>();
-        if (corpse->InitializeFromParticles(
-                DirectXCommon::GetInstance(),
-                SrvManager::GetInstance(),
-                particles,
-                gpuSphFluid_->GetSettings())) {
-            mapChipStage_.AddGimmick(std::move(corpse));
-        }
-
-        player_->Initialize(&mapChipStage_.GetField(), playerStartPosition_);
+    if (player_->ConsumeHardenedBody(hardenedBody)) {
+        RespawnPlayerLeavingCorpse();
+        hardenedThisFrame = true;
     }
      if (player_->IsCrushed()) {
       StartDeathTransition();
@@ -505,7 +502,7 @@ void GamePlayScene::Update()
             -kEyeFollowSpeed * deltaTime,
             kEyeFollowSpeed * deltaTime);
         eyeOffsetX_ += eyeDelta;
-        const Vector2 shapeEyeOffset = player_->GetSelfDestructEyeOffset();
+        const Vector2 shapeEyeOffset = player_->GetEyeOffset();
         gpuSphFluid_->SetEyeOffsetX(eyeOffsetX_ + shapeEyeOffset.x);
         gpuSphFluid_->SetEyeOffsetY(shapeEyeOffset.y);
         gpuSphFluid_->SetControlState(
@@ -593,6 +590,43 @@ void GamePlayScene::DrawParticle()
 
 void GamePlayScene::DrawImGui()
 {
+}
+
+void GamePlayScene::RespawnPlayerLeavingCorpse()
+{
+    if (selfDestructSlowActive_) {
+        TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
+        selfDestructSlowActive_ = false;
+    }
+
+    const GpuSphFluid::Settings currentSettings = gpuSphFluid_->GetSettings();
+    const std::vector<GpuSphFluid::Particle> particles =
+        gpuSphFluid_->GetParticlesCPU();
+
+    auto corpse = std::make_unique<HardenedFluidSlimeCorpse>();
+    if (corpse->InitializeFromParticles(
+            DirectXCommon::GetInstance(),
+            SrvManager::GetInstance(),
+            particles,
+            currentSettings)) {
+        mapChipStage_.AddGimmick(std::move(corpse));
+    }
+
+    player_->Initialize(&mapChipStage_.GetField(), playerStartPosition_);
+    eyeOffsetX_ = 0.0f;
+    wasLeftMousePressed_ = false;
+
+    GpuSphFluid::Settings respawnSettings = currentSettings;
+    respawnSettings.corePosition = MakeFluidCorePosition(*player_);
+    respawnSettings.floorHeight = player_->GetFluidFloorHeight();
+    respawnSettings.targetVelocity = { 0.0f, 0.0f, 0.0f };
+    const Vector3 playerScale = player_->GetVisualScale();
+    respawnSettings.blobRadii = {
+        playerScale.x * (2.4f * kNeoWorldScale),
+        playerScale.y * (1.7f * kNeoWorldScale),
+        playerScale.z * (2.4f * kNeoWorldScale) };
+    gpuSphFluid_->SetLiquidated(false);
+    gpuSphFluid_->Reset(respawnSettings);
 }
 
 void GamePlayScene::StartDeathTransition()
