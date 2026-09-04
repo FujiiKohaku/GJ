@@ -144,7 +144,7 @@ void GamePlayScene::Initialize()
     LevelData levelData = loader.Load(kStage1Json);
 
     mapChipStage_.Initialize(levelData);
-    mapChipStage_.EnableMossTerrain();
+    mapChipStage_.ApplyMaterialProperties();
 
     Vector3 playerStartPos = { 0.0f, 0.0f, 0.0f };
     if (!levelData.playerSpawns.empty()) {

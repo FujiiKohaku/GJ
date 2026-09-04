@@ -111,10 +111,14 @@ void MapChipRegistry::Initialize()
 
     auto Register = [](MapChipType type, const std::string& name, bool isSolid, bool isGimmick, const std::string& fallbackModelPath) {
         std::string modelPath = fallbackModelPath;
+        std::string materialType = "";
+        std::string texturePath = "";
         if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData(name)) {
             modelPath = metaData->defaultModelPath;
+            materialType = metaData->materialType;
+            texturePath = metaData->defaultTexturePath;
         }
-        configs_[type] = { type, name, isSolid, isGimmick, modelPath };
+        configs_[type] = { type, name, isSolid, isGimmick, modelPath, materialType, texturePath };
     };
 
     // ----------------------------------------------------
@@ -134,7 +138,7 @@ void MapChipRegistry::Initialize()
 
 const MapChipConfig& MapChipRegistry::GetConfig(MapChipType type)
 {
-    static const MapChipConfig defaultConfig = { MapChipType::Blank, "Unknown", false, false, "" };
+    static const MapChipConfig defaultConfig = { MapChipType::Blank, "Unknown", false, false, "", "", "" };
     auto it = configs_.find(type);
     if (it != configs_.end()) {
         return it->second;

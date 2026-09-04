@@ -71,6 +71,8 @@ void MapChipStage::Initialize(
             // 今回は "StoneBlock/StoneBlock.obj" が設定されているはずなのでそれをロードする
             if (!config.modelPath.empty()) {
                 model = ModelManager::GetInstance()->Load(config.modelPath);
+            } else if (!config.texturePath.empty()) {
+                model = ModelManager::GetInstance()->CreateCube(config.texturePath);
             }
 
             // GPUメモリ枯渇(VRAMリーク)を防ぐため、既存の Object3d を再利用する
@@ -128,40 +130,45 @@ void MapChipStage::Initialize(
     }
 }
 
-void MapChipStage::EnableToonLighting()
+void MapChipStage::ApplyMaterialProperties()
 {
+    // 全オブジェクトにToonLightingを適用
     for (const std::unique_ptr<Object3d>& block : blockObjects_) {
         block->EnableToonLighting();
     }
     for (const std::unique_ptr<BaseMapChipGimmick>& gimmick : gimmicks_) {
         gimmick->EnableToonLighting();
     }
-}
 
-void MapChipStage::EnableMossTerrain()
-{
-    EnableToonLighting();
-    Model* terrainModel = ModelManager::GetInstance()->CreateCube(
-        "resources/Textures/Terrain/MossSoil.png");
+    // マテリアルタイプに応じた特殊処理 (例: Moss の表面高さ計算)
     const uint32_t width = field_.GetBlockWidth();
     const uint32_t height = field_.GetBlockHeight();
     std::vector<float> surfaceHeights(width, 0.0f);
+    
     size_t blockIndex = 0;
     for (uint32_t y = 0; y < height; ++y) {
         for (uint32_t x = 0; x < width; ++x) {
-            if (field_.GetMapChipTypeByIndex(x, y) != MapChipType::Block) {
-                continue;
+            MapChipType type = field_.GetMapChipTypeByIndex(x, y);
+            if (!MapChipRegistry::IsSolidBlock(type) || MapChipRegistry::GetConfig(type).isGimmick) {
+                continue; // ソリッドな静的ブロック以外はスキップ
             }
-            // Each uninterrupted column shares its exposed surface height.
-            // Underground blocks therefore do not repeat the moss edge.
-            if (y == 0 || field_.GetMapChipTypeByIndex(x, y - 1) != MapChipType::Block) {
-                surfaceHeights[x] = field_.GetMapChipPositionByIndex(x, y).y + 0.5f;
+            
+            const auto& config = MapChipRegistry::GetConfig(type);
+            
+            // "Moss" マテリアルの特殊なシェーダー設定
+            if (config.materialType == "Moss") {
+                // 上面に空きがあるか判定し、高さを記録
+                if (y == 0 || field_.GetMapChipTypeByIndex(x, y - 1) != type) {
+                    surfaceHeights[x] = field_.GetMapChipPositionByIndex(x, y).y + 0.5f;
+                }
+                
+                if (blockIndex < blockObjects_.size()) {
+                    Material* material = blockObjects_[blockIndex]->GetMaterial();
+                    material->enableLighting = 7; // Moss用のライティングモード
+                    material->environmentCoefficient = surfaceHeights[x];
+                }
             }
-            blockObjects_[blockIndex]->SetModel(terrainModel);
-            Material* material = blockObjects_[blockIndex]->GetMaterial();
-            material->enableLighting = 7;
-            // In terrain mode this slot carries height, not reflectivity.
-            material->environmentCoefficient = surfaceHeights[x];
+            
             ++blockIndex;
         }
     }

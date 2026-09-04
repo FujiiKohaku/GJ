@@ -114,11 +114,11 @@ void Game::Initialize()
     GetBootProfilerForGame()->End("Model");
     CheckInitializeTime("ModelManager", prevTime);
 
-    MapChipRegistry::Initialize();
-    CheckInitializeTime("MapChipRegistry", prevTime);
-
     GimmickMetaDataManager::GetInstance()->Initialize();
     CheckInitializeTime("GimmickMetaDataManager", prevTime);
+
+    MapChipRegistry::Initialize();
+    CheckInitializeTime("MapChipRegistry", prevTime);
 
     DirectXCommon* dxCommon = DirectXCommon::GetInstance();
     Object3dManager::GetInstance()->Initialize(dxCommon);

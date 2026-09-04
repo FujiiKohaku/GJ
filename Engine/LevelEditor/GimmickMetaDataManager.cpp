@@ -31,6 +31,12 @@ void GimmickMetaDataManager::Initialize(const std::string& masterFilePath)
         if (objJson.contains("file_name")) {
             metaData.defaultModelPath = objJson["file_name"].get<std::string>();
         }
+        if (objJson.contains("material_type")) {
+            metaData.materialType = objJson["material_type"].get<std::string>();
+        }
+        if (objJson.contains("texture_name")) {
+            metaData.defaultTexturePath = objJson["texture_name"].get<std::string>();
+        }
 
         metaDatas_[type] = metaData;
     }

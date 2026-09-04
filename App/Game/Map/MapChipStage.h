@@ -20,8 +20,7 @@ public:
             "resources/Textures/checkerboard.png");
     void Update();
     void Draw();
-    void EnableToonLighting();
-    void EnableMossTerrain();
+    void ApplyMaterialProperties();
 
     const MapChipField& GetField() const;
     MapChipField& GetField();

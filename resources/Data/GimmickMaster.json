@@ -27,9 +27,13 @@
     "file_name": "SwingingBridge/SwingingBridgePlatform.obj"
   },
   "Floor": {
-    "file_name": ""
+    "file_name": "",
+    "material_type": "Moss",
+    "texture_name": "resources/Textures/Terrain/MossSoil.png"
   },
   "Wall": {
-    "file_name": ""
+    "file_name": "",
+    "material_type": "Moss",
+    "texture_name": "resources/Textures/Terrain/MossSoil.png"
   }
 }

@@ -6,6 +6,8 @@
 
 struct GimmickMetaData {
     std::string defaultModelPath;
+    std::string materialType;
+    std::string defaultTexturePath;
 };
 
 class GimmickMetaDataManager {
