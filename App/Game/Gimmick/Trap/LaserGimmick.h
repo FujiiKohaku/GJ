@@ -59,4 +59,5 @@ private:
     float currentLaserLength_ = 0.0f;         // 現在のレーザーの長さ（マス数）
 
     bool wasPlayerColliding_ = false;         // 前フレームのプレイヤー衝突フラグ
+    float playerHitTime_ = 0.0f;              // レーザー接触から死亡までの経過時間
 };

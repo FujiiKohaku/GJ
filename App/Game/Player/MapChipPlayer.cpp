@@ -15,7 +15,7 @@
 #include <cmath>
 
 namespace {
-constexpr float kPlayerSize = 1.0f;
+constexpr float kPlayerSize = 0.9f;
 constexpr float kMoveSpeed = 5.0f;
 constexpr float kJumpSpeed = 8.0f;
 constexpr float kGravity = -20.0f;
@@ -27,7 +27,7 @@ constexpr float kSlimeCoreLift = 0.10f;
 constexpr float kSlimeCeilingVisualPadding = 0.24f;
 constexpr float kSlimeMinimumVisualHeight = 0.12f;
 constexpr float kSlimeCeilingFollowSpeed = 3.0f;
-constexpr Vector3 kSlimeBaseRadii = { 0.50f, 0.50f, 0.50f };
+constexpr Vector3 kSlimeBaseRadii = { 0.45f, 0.45f, 0.45f };
 constexpr float kMousePullSensitivity = 0.006f;
 constexpr float kStickPullSpeed = 3.5f;
 constexpr float kMaximumPull = 2.5f;
@@ -84,6 +84,7 @@ void MapChipPlayer::Initialize(const MapChipField* mapChipField, const Vector3& 
     velocity_ = { 0.0f, 0.0f, 0.0f };
     isShapingSelfDestruct_ = false;
     hardenedBodyReady_ = false;
+    deathRequested_ = false;
     selfDestructRawPull_ = { 0.0f, 0.0f };
     selfDestructPull_ = { 0.0f, 0.0f };
 }
@@ -111,15 +112,22 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
         }
     }
 
+    Input* input = Input::GetInstance();
+
     float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
     deltaTime = (std::min)(deltaTime, kMaximumDeltaTime);
     if (deltaTime < 0.0f) {
         deltaTime = 0.0f;
     }
 
-    Input* input = Input::GetInstance();
+    if (input->IsKeyTrigger(DIK_T)) {
+        if (isShapingSelfDestruct_) {
+            hardenedBody_ = GetAABB();
+            hardenedBodyReady_ = true;
+            isShapingSelfDestruct_ = false;
+            return;
+        }
 
-    if (!isShapingSelfDestruct_ && input->IsKeyTrigger(DIK_R)) {
         isShapingSelfDestruct_ = true;
         selfDestructRawPull_ = { 0.0f, 0.0f };
         selfDestructPull_ = { 0.0f, 0.0f };
@@ -129,11 +137,6 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
     if (isShapingSelfDestruct_) {
         UpdateSelfDestructShape(
             TimeManager::GetInstance()->GetUnscaledDeltaTime());
-        if (!input->IsKeyPressed(DIK_R)) {
-            hardenedBody_ = GetAABB();
-            hardenedBodyReady_ = true;
-            isShapingSelfDestruct_ = false;
-        }
         return;
     }
 
@@ -228,10 +231,19 @@ bool MapChipPlayer::ConsumeHardenedBody(AABB& outBody)
     return true;
 }
 
+bool MapChipPlayer::ConsumeDeathRequest()
+{
+    if (!deathRequested_) {
+        return false;
+    }
+    deathRequested_ = false;
+    return true;
+}
+
 void MapChipPlayer::UpdateSelfDestructShape(float unscaledDeltaTime)
 {
     Input* input = Input::GetInstance();
-    // マウスは「Rを押しただけ」では反応させず、左ドラッグ中だけ形をつまんで伸ばす。
+    // 自爆形状は左ドラッグ中だけつまんで伸ばす。
     if (input->IsMousePressed(0)) {
         selfDestructRawPull_.x +=
             static_cast<float>(input->GetMouseDeltaX()) * kMousePullSensitivity;
@@ -463,18 +475,17 @@ const Vector3& MapChipPlayer::GetVelocity() const { return velocity_; }
 const Vector3& MapChipPlayer::GetForward() const { return forward_; }
 const Vector3& MapChipPlayer::GetVisualScale() const { return visualScale_; }
 
-Vector2 MapChipPlayer::GetSelfDestructEyeOffset() const
+Vector2 MapChipPlayer::GetEyeOffset() const
 {
-    if (!isShapingSelfDestruct_) {
-        return { 0.0f, 0.0f };
+    if (isShapingSelfDestruct_) {
+        // 流体の中心は伸ばした形の中央へ移るが、目は元の頭部寄りに残す。
+        return {
+            selfDestructPull_.x * -0.15f,
+            selfDestructPull_.y * -0.15f
+        };
     }
 
-    // 流体の中心は伸ばした形の中央へ移るが、目は元の頭部寄りに残す。
-    // 中心との差分を15%だけ戻すことで、端へ飛ばず常に胴体内部へ収まる。
-    return {
-        selfDestructPull_.x * -0.15f,
-        selfDestructPull_.y * -0.15f
-    };
+    return { 0.0f, 0.0f };
 }
 
 Vector3 MapChipPlayer::GetFluidCorePosition() const
@@ -485,7 +496,7 @@ Vector3 MapChipPlayer::GetFluidCorePosition() const
             selfDestructPull_.y * 0.5f + kSlimeCoreLift,
             0.0f };
     }
-    return position_ + Vector3{0.0f, kSlimeCoreLift, 0.0f};
+    return position_ + Vector3{ 0.0f, kSlimeCoreLift, 0.0f };
 }
 
 float MapChipPlayer::GetFluidFloorHeight() const
@@ -633,7 +644,12 @@ void MapChipPlayer::UpdateVisualShape(float deltaTime)
     const float desiredHeight =
         ceilingLimitedHeight - ceilingSquash_ * 0.08f - verticalCompression01_ * 0.10f;
 
-    visualScale_.x = baseScale_.x - (wallSquash_ * 0.2f) + (landSquash_ * 0.2f) + wobble_ + speedStretch;
-    visualScale_.y = std::clamp(desiredHeight, kSlimeMinimumVisualHeight, baseScale_.y);
+    visualScale_.x =
+        baseScale_.x - (wallSquash_ * 0.2f) +
+        (landSquash_ * 0.2f) + wobble_ + speedStretch;
+    visualScale_.y = std::clamp(
+        desiredHeight,
+        kSlimeMinimumVisualHeight,
+        baseScale_.y);
     visualScale_.z = baseScale_.z;
 }

@@ -32,6 +32,7 @@ private:
     void UpdateCollisionText();
     void StartDeathTransition();
     void UpdateDeathTransition(float deltaTime);
+    void RespawnPlayerLeavingCorpse();
 
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
