@@ -686,7 +686,6 @@ void EditorScene::UpdateRaycastEdit()
                                 LevelData::ObjectData newData;
                                 newData.name = "Goal";
                                 newData.type = "Goal";
-                                newData.fileName = "GoalPost/GoalPost.obj";
                                 newData.translation = newPos;
                                 newData.rotation = {0,0,0};
                                 newData.scale = {1,1,1};
@@ -760,7 +759,6 @@ void EditorScene::UpdateRaycastEdit()
                                         else if (type == MapChipType::PressurePlate) {
                                             newData.name = "Switch";
                                             newData.type = "Switch";
-                                            newData.fileName = "PressurePlate.obj";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Switch");
                                             if (auto* param = dynamic_cast<SwitchParam*>(newData.gimmickParam.get())) {
                                                 param->switchType_ = 0; // 感圧盤
@@ -770,7 +768,6 @@ void EditorScene::UpdateRaycastEdit()
                                         else if (type == MapChipType::Bonfire) {
                                             newData.name = "Switch";
                                             newData.type = "Switch";
-                                            newData.fileName = "Bonfire/Bonfire.obj";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Switch");
                                             if (auto* param = dynamic_cast<SwitchParam*>(newData.gimmickParam.get())) {
                                                 param->switchType_ = 2; // 篝火
@@ -779,7 +776,6 @@ void EditorScene::UpdateRaycastEdit()
                                         else if (type == MapChipType::GasEmitter) {
                                             newData.name = "GasEmitter";
                                             newData.type = "GasEmitter";
-                                            newData.fileName = "Vent/Venct.obj";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("GasEmitter");
                                             if (auto* param = dynamic_cast<GasEmitterParam*>(newData.gimmickParam.get())) {
                                                 param->listenEventName_ = "Event_1"; // デフォルト
@@ -792,25 +788,21 @@ void EditorScene::UpdateRaycastEdit()
                                         else if (type == MapChipType::DestructibleWall) {
                                             newData.name = "DestructibleWall";
                                             newData.type = "DestructibleWall";
-                                            newData.fileName = "StoneBlock/StoneBlock.obj";
                                             // DestructibleWallGimmick は Param を持たず、DestructibleWall 側の Factory ロジック等に任せるか Param を作る
                                         }
                                         else if (type == MapChipType::Spike) {
                                             newData.name = "Spike";
                                             newData.type = "Spike";
-                                            newData.fileName = "Thorn/Thorn.obj";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Spike");
                                         }
                                         else if (type == MapChipType::LaserEmitter) {
                                             newData.name = "LaserEmitter";
                                             newData.type = "LaserEmitter";
-                                            newData.fileName = "LaserEmitter/LaserEmitter.obj";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("LaserEmitter");
                                         }
                                         else if (type == MapChipType::SwingingBridge) {
                                             newData.name = "SwingingBridge";
                                             newData.type = "SwingingBridge";
-                                            newData.fileName = "SwingingBridge/SwingingBridgePlatform.obj";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("SwingingBridge");
                                         }
                                         

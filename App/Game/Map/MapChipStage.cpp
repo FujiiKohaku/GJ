@@ -104,16 +104,19 @@ void MapChipStage::Initialize(
 
         if (obj.type == "Goal") {
             gimmick = std::make_unique<GoalGimmick>();
-            modelFile = obj.fileName.empty() ? "GoalPost/GoalPost.obj" : obj.fileName;
+            modelFile = obj.fileName;
         } else if (obj.type == "Switch") {
             gimmick = std::make_unique<SwitchGimmick>();
+            modelFile = obj.fileName;
         } else if (obj.type == "GasEmitter") {
             gimmick = std::make_unique<GasEmitterGimmick>();
+            modelFile = obj.fileName;
         } else if (obj.type == "DestructibleWall") {
             gimmick = std::make_unique<DestructibleWallGimmick>();
+            modelFile = obj.fileName;
         } else if (obj.type == "Spike") {
             gimmick = std::make_unique<SpikeGimmick>();
-            modelFile = obj.fileName.empty() ? "Thorn/Thorn.obj" : obj.fileName;
+            modelFile = obj.fileName;
         }
 
         if (gimmick) {

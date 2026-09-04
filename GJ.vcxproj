@@ -317,6 +317,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Engine\PostEffect\PostEffectType.cpp" />
     <ClCompile Include="Engine\LevelEditor\LevelData.cpp" />
     <ClCompile Include="Engine\LevelEditor\LevelDataLoader.cpp" />
+    <ClCompile Include="Engine\LevelEditor\GimmickMetaDataManager.cpp" />
     <ClCompile Include="Engine\LevelEditor\MapEditor.cpp" />
     <ClCompile Include="Engine\Network\UdpServer.cpp" />
     <ClCompile Include="Engine\math\Ray.cpp" />
@@ -464,6 +465,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Engine\PostEffect\PostEffectType.h" />
     <ClInclude Include="Engine\LevelEditor\LevelData.h" />
     <ClInclude Include="Engine\LevelEditor\LevelDataLoader.h" />
+    <ClInclude Include="Engine\LevelEditor\GimmickMetaDataManager.h" />
     <ClInclude Include="Engine\LevelEditor\MapEditor.h" />
     <ClInclude Include="Engine\Network\UdpServer.h" />
     <ClInclude Include="Engine\math\Ray.h" />

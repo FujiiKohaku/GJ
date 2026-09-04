@@ -6,6 +6,8 @@
 #include "Engine/3D/Object3d.h"
 #include "Engine/Logger/Logger.h"
 #include "Engine/DirectXCommon/DirectXCommon.h"
+#include "Engine/DirectXCommon/DirectXCommon.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include <format>
 
 // 初期AABB設定: 横1、高さ0.7、底面(Y=-0.5)にくっつくようにY=-0.15オフセット
@@ -27,7 +29,16 @@ bool SpikeGimmick::Initialize(
     object3d_->Initialize(Object3dManager::GetInstance());
     
     // モデルのロード
-    std::string modelFile = "Thorn/Thorn.obj";
+    std::string modelFile = "Thorn/Thorn.obj"; // Fallback
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("Spike")) {
+        modelFile = metaData->defaultModelPath;
+    }
+    
+    // texturePath（checkerboard.png等）を渡してくるパターンがあるため、objやgltf以外は無視するか、ここではメタデータを優先する。
+    // MapChipStageから直接objファイル名が渡された場合のみ上書きする
+    if (!texturePath.empty() && (texturePath.find(".obj") != std::string::npos || texturePath.find(".gltf") != std::string::npos)) {
+        modelFile = texturePath;
+    }
     ModelManager::GetInstance()->Load(modelFile);
     
     object3d_->SetModel(modelFile);

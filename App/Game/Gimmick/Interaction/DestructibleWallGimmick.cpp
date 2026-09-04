@@ -7,6 +7,7 @@
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/3D/Object3d.h"
 #include "App/Game/Map/MapChipStage.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 
 DestructibleWallGimmick::DestructibleWallGimmick()
     : stage_(nullptr)
@@ -29,10 +30,20 @@ bool DestructibleWallGimmick::Initialize(
     object_ = std::make_unique<Object3d>();
     object_->Initialize(Object3dManager::GetInstance());
 
-    // 破壊される石ブロックのモデルをロード
-    const std::string modelFile = "StoneBlock/StoneBlock.obj";
-    ModelManager::GetInstance()->Load(modelFile);
-    object_->SetModel(modelFile);
+    std::string finalModelPath = texturePath;
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("DestructibleWall")) {
+        finalModelPath = metaData->defaultModelPath;
+    }
+
+    if (!finalModelPath.empty()) {
+        ModelManager::GetInstance()->Load(finalModelPath);
+        object_->SetModel(finalModelPath);
+    } else {
+        Model* model = ModelManager::GetInstance()->CreateCube();
+        if (model) {
+            object_->SetModel(model);
+        }
+    }
 
     object_->SetTranslate(position_);
     object_->SetScale(size_);

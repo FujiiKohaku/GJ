@@ -9,6 +9,7 @@
 #include "App/Game/Map/MapChipStage.h"
 #include "Engine/CollisionManager/CollisionManager.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include <cmath>
 #include <format>
 #include <numbers>
@@ -34,8 +35,15 @@ bool SwingingBridgeGimmick::Initialize(
     previousPosition_ = basePosition_;
 
     // 足場モデルの初期化
-    std::string platformFile = "SwingingBridge/SwingingBridgePlatform.obj";
-    Model* platformModel = ModelManager::GetInstance()->Load(platformFile);
+    std::string platformFile = texturePath;
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("SwingingBridge")) {
+        platformFile = metaData->defaultModelPath;
+    }
+
+    Model* platformModel = nullptr;
+    if (!platformFile.empty()) {
+        platformModel = ModelManager::GetInstance()->Load(platformFile);
+    }
     if (!platformModel) {
         // フォールバックとしてキューブを使用
         platformModel = ModelManager::GetInstance()->CreateCube("resources/Textures/white1x1.png");

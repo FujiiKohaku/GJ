@@ -5,6 +5,7 @@
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/CollisionManager/CollisionManager.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include <algorithm>
 #include <format>
 #include <numbers>
@@ -15,7 +16,7 @@ LaserGimmick::LaserGimmick()
 
 bool LaserGimmick::Initialize(
     const Vector3& position,
-    const std::string& /*texturePath*/, // 外部からのテクスチャパスは無視
+    const std::string& texturePath,
     const BaseGimmickParam* gimmickParam)
 {
     position_ = position;
@@ -31,9 +32,20 @@ bool LaserGimmick::Initialize(
     emitterObject_ = std::make_unique<Object3d>();
     emitterObject_->Initialize(Object3dManager::GetInstance());
     
-    std::string emitterModel = "LaserEmitter/LaserEmitter.obj";
-    ModelManager::GetInstance()->Load(emitterModel);
-    emitterObject_->SetModel(emitterModel);
+    std::string emitterModel = texturePath;
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("LaserEmitter")) {
+        emitterModel = metaData->defaultModelPath;
+    }
+
+    if (!emitterModel.empty()) {
+        ModelManager::GetInstance()->Load(emitterModel);
+        emitterObject_->SetModel(emitterModel);
+    } else {
+        Model* model = ModelManager::GetInstance()->CreateCube();
+        if (model) {
+            emitterObject_->SetModel(model);
+        }
+    }
     emitterObject_->SetTranslate(position_);
     emitterObject_->SetScale({1.0f, 1.0f, 1.0f});
     emitterObject_->SetEnableLighting(true);

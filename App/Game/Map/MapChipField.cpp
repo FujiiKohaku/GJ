@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 
 void MapChipField::Initialize(const LevelData::TileMapData& tileMapData)
 {
@@ -108,7 +109,11 @@ void MapChipRegistry::Initialize()
 {
     configs_.clear();
 
-    auto Register = [](MapChipType type, const std::string& name, bool isSolid, bool isGimmick, const std::string& modelPath) {
+    auto Register = [](MapChipType type, const std::string& name, bool isSolid, bool isGimmick, const std::string& fallbackModelPath) {
+        std::string modelPath = fallbackModelPath;
+        if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData(name)) {
+            modelPath = metaData->defaultModelPath;
+        }
         configs_[type] = { type, name, isSolid, isGimmick, modelPath };
     };
 
