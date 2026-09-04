@@ -98,6 +98,10 @@ public:
     void SetObstacles(const std::vector<CollisionObstacle>& obstacles);
     void SetBlobRadii(const Vector3& blobRadii) { settings_.blobRadii = blobRadii; }
     void SetFloorHeight(float floorHeight) { settings_.floorHeight = floorHeight; }
+    void SetGrounded(bool grounded) { isGrounded_ = grounded; }
+    bool IsGrounded() const { return isGrounded_; }
+    void SetEyeOffsetX(float offset) { eyeOffsetX_ = offset; }
+    float GetEyeOffsetX() const { return eyeOffsetX_; }
     void SetWallBoundaries(float wallMinX, float wallMaxX, float wallMinZ = -0.3f, float wallMaxZ = 0.3f, float wallMinY = -1000.0f, float wallMaxY = 1000.0f);
     void TriggerLiquidationBurst(float strength = 8.0f);
     void SetLiquidated(bool liquidated) { isLiquidated_ = liquidated; }
@@ -217,9 +221,11 @@ private:
     Settings settings_ {};
     bool needsReset_ = true;
     bool isLiquidated_ = false;
+    bool isGrounded_ = false;
     bool hasPreviousCorePosition_ = false;
     bool emitterEnabled_ = false;
     float liquidBlend_ = 0.0f;
+    float eyeOffsetX_ = 0.0f;
     float liquidationBurstStrength_ = 0.0f;
     float emitAccumulator_ = 0.0f;
     uint32_t emitCursor_ = 0;

@@ -14,11 +14,15 @@ PSOutput main(SlimeDepthVertexOutput input)
     }
 
     float32_t sphereNormalZ = sqrt(saturate(1.0f - radiusSquared));
+    float32_t radialDistance = sqrt(radiusSquared);
+    float32_t alpha = saturate(1.0f - radialDistance);
+    alpha = alpha * alpha * (3.0f - 2.0f * alpha);
     
     PSOutput output;
     output.depth = saturate(input.centerDepth - sphereNormalZ * depthThickness);
     
-    output.thickness = sphereNormalZ * 0.72f;
+    // neo_Engine GPUFluidPS と同じ、1粒あたり0.2の加算アルファ密度。
+    output.thickness = alpha * 0.2f;
     
     return output;
 }
