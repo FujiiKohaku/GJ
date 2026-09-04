@@ -26,7 +26,8 @@ SlimeDepthVertexOutput main(
         return inactiveOutput;
     }
 
-    float32_t renderRadius = particleRadius * 1.35f;
+    // neo_Engineの0.7を、形状全体と同じ36%へ縮小する。
+    float32_t renderRadius = 0.252f;
     float32_t2 local = kQuadPositions[vertexId];
     float32_t3 worldPos = particle.position +
         cameraRight * (local.x * renderRadius) +

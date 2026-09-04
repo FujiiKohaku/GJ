@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 
 void ScreenSpaceFluidRenderer::Initialize(
     DirectXCommon* dxCommon,
@@ -563,8 +564,24 @@ void ScreenSpaceFluidRenderer::UpdateCompositeParameter(
     compositeData_->specularStrength = settings_.specularStrength;
     compositeData_->fresnelStrength = settings_.fresnelStrength;
     compositeData_->floorHeightWorld = fluid.GetSettings().floorHeight;
-    compositeData_->padding0 = { 0.0f, 0.0f };
+    compositeData_->groundClipEnabled = fluid.IsGrounded() ? 1.0f : 0.0f;
+    compositeData_->padding0 = 0.0f;
     compositeData_->invViewProj = MatrixMath::Inverse(camera.GetViewProjectionMatrix());
+    compositeData_->viewProj = camera.GetViewProjectionMatrix();
+    compositeData_->eyeWorldPosition = fluid.GetSettings().corePosition;
+    compositeData_->eyeWorldPosition.x += fluid.GetEyeOffsetX();
+    compositeData_->eyeWorldPosition.y += 0.015f;
+    compositeData_->eyeWorldPosition.z = 0.0f;
+    compositeData_->eyeHalfWidthPixels = 9.0f;
+    compositeData_->eyeHalfHeightPixels = 22.0f;
+    compositeData_->eyeVisibility = 1.0f;
+    const Vector3& gazeVelocity = fluid.GetSettings().targetVelocity;
+    const float gazeSpeed = std::sqrt(
+        gazeVelocity.x * gazeVelocity.x +
+        gazeVelocity.y * gazeVelocity.y);
+    compositeData_->eyeGazeDirection = gazeSpeed > 0.1f
+        ? Vector2{ gazeVelocity.x / gazeSpeed, gazeVelocity.y / gazeSpeed }
+        : Vector2{ 0.0f, 0.0f };
 }
 
 void ScreenSpaceFluidRenderer::DrawFullScreen(

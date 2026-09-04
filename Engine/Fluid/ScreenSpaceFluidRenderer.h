@@ -118,8 +118,15 @@ private:
         float specularStrength;
         float fresnelStrength;
         float floorHeightWorld;
-        Vector2 padding0;
+        float groundClipEnabled;
+        float padding0;
         Matrix4x4 invViewProj;
+        Matrix4x4 viewProj;
+        Vector3 eyeWorldPosition;
+        float eyeHalfWidthPixels;
+        float eyeHalfHeightPixels;
+        float eyeVisibility;
+        Vector2 eyeGazeDirection;
     };
 
     static constexpr uint32_t kDefaultFirstRtvIndex = 8;
