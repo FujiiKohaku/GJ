@@ -28,8 +28,7 @@ constexpr const char* kMapChipTexture = "resources/Textures/checkerboard.png";
 constexpr const char* kWhiteTexture = "resources/Textures/white.png";
 constexpr const char* kStage1Json = "resources/Maps/stage1.json";
 constexpr float kCameraDistance = 12.0f;
-constexpr const char* kDefaultFont =
-    "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
+constexpr const char* kDefaultFont ="resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
 constexpr float kFluidRenderZ = -0.72f;
 constexpr Vector3 kSlimeRenderForward = { 0.0f, 0.0f, 1.0f };
 

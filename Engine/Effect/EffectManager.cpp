@@ -776,6 +776,7 @@ void EffectManager::ApplyEffectConfig(const EffectData& effectData, EffectRuntim
 
     runtime.defaultLoop = render.value("Loop", runtime.defaultLoop);
     runtime.duration = render.value("Duration", runtime.duration);
+    runtime.stopTailDuration = (std::max)(0.0f, render.value("StopTailDuration", 0.0f));
 }
 
 void EffectManager::ApplyRenderParameterConfig(
@@ -1218,9 +1219,9 @@ void EffectManager::BeginEffectFadeOut(
         return;
     }
 
-    float tailDuration = 0.0f;
+    float tailDuration = runtime.stopTailDuration;
     if (runtime.renderType == ParticleRenderType::Trail) {
-        tailDuration = runtime.renderParameter.trailLifeTime;
+        tailDuration = (std::max)(tailDuration, runtime.renderParameter.trailLifeTime);
     }
 
     if (activeEffect.pointLightHandle != kInvalidPointLightHandle &&

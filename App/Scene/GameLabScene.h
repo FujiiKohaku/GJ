@@ -12,6 +12,7 @@
 #include "App/Effect/DeathSlimeShower.h"
 
 #include <memory>
+#include <array>
 #include <vector>
 
 class GameLabScene : public BaseScene {
@@ -35,6 +36,7 @@ private:
     void InitializePostEffectList();
     void UpdatePostEffectPreviewParameters();
     void UpdateSmokePreview();
+    void UpdateFlamePreview();
     void ApplyPostEffectToggle(PostEffectToggle& toggle);
 
 private:
@@ -53,6 +55,11 @@ private:
     float postEffectPreviewProgress_ = 0.05f;
     EffectHandle smokeEffectHandle_ = kInvalidEffectHandle;
     bool isSmokeEnabled_ = false;
+    std::array<EffectHandle, 4> flameEffectHandles_ = {
+        kInvalidEffectHandle, kInvalidEffectHandle,
+        kInvalidEffectHandle, kInvalidEffectHandle };
+    bool isFlameEnabled_ = false;
+    Vector3 flamePosition_ = { 0.0f, 0.05f, -2.0f };
     Vector3 fireworkLaunchPosition_ = { 0.0f, 4.0f, 0.0f };
     std::unique_ptr<DeathSlimeShower> deathSlimeShower_;
     PageTransition::RevealOverlay pageReveal_;

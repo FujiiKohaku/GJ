@@ -1,0 +1,66 @@
+{
+  "ResourcePoolReserve": 2,
+  "Emitter": {
+    "Shape": "Circle",
+    "Count": 4,
+    "Radius": 0.48,
+    "Frequency": 0.04
+  },
+  "Particle": {
+    "MaxParticles": 192,
+    "LifeTime": 1.65,
+    "StartScale": 0.95,
+    "EndScale": 0.06,
+    "StartRotation": 0.0,
+    "RotationSpeed": 0.16,
+    "Velocity": [
+      0.0,
+      1.25,
+      0.0
+    ],
+    "StartColor": [
+      1.0,
+      1.0,
+      1.0,
+      0.26
+    ],
+    "EndColor": [
+      1.0,
+      0.7,
+      0.5,
+      0.12
+    ]
+  },
+  "Simulation": {
+    "EnableGravity": true,
+    "Gravity": 0.25,
+    "EnableDrag": false,
+    "Drag": 0.99,
+    "EnableNoise": true,
+    "NoiseStrength": 0.28,
+    "EnableAttraction": true,
+    "AttractionStrength": 2.5
+  },
+  "Render": {
+    "Type": "Mesh",
+    "MeshType": "Board",
+    "Texture": "resources/Textures/white.png",
+    "BlendMode": "Normal",
+    "DepthTest": true,
+    "DepthWrite": false,
+    "CullMode": "None",
+    "Loop": true,
+    "Duration": -1.0,
+    "EmissionStrength": 1.15,
+    "UvScrollSpeedX": 0.18,
+    "UvScrollSpeedY": 2.8,
+    "DissolveThreshold": 0.02,
+    "StopTailDuration": 1.65
+  },
+  "Shaders": {
+    "Emit": "Emit.CS.hlsl",
+    "Update": "Update.CS.hlsl",
+    "Vertex": "resources/Effects/Flame/Flame.VS.hlsl",
+    "Pixel": "Flame.PS.hlsl"
+  }
+}
