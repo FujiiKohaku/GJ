@@ -12,6 +12,12 @@ public:
         const BaseGimmickParam* gimmickParam = nullptr) override;
     void Update() override;
     void Draw() override;
+    void EnableToonLighting() override
+    {
+        if (object_) {
+            object_->EnableToonLighting();
+        }
+    }
     void SetEditorMode(bool isEditorMode) override { isEditorMode_ = isEditorMode; }
     
     AABB GetAABB() const override;

@@ -116,6 +116,16 @@ void MapChipStage::Initialize(
     }
 }
 
+void MapChipStage::EnableToonLighting()
+{
+    for (const std::unique_ptr<Object3d>& block : blockObjects_) {
+        block->EnableToonLighting();
+    }
+    for (const std::unique_ptr<BaseMapChipGimmick>& gimmick : gimmicks_) {
+        gimmick->EnableToonLighting();
+    }
+}
+
 void MapChipStage::Update()
 {
     for (std::unique_ptr<Object3d>& block : blockObjects_) {

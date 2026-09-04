@@ -126,7 +126,8 @@ std::vector<GpuSphFluid::CollisionObstacle> BuildFluidObstacles(
 
 void GamePlayScene::Initialize()
 {
-    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
+    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
+    SceneManager::GetInstance()->SetArchiveApproach(0.0f);
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     isDeathTransitionActive_ = false;
     deathTransitionTime_ = 0.0f;
@@ -143,6 +144,7 @@ void GamePlayScene::Initialize()
     LevelData levelData = loader.Load(kStage1Json);
 
     mapChipStage_.Initialize(levelData);
+    mapChipStage_.EnableToonLighting();
 
     Vector3 playerStartPos = { 0.0f, 0.0f, 0.0f };
     if (!levelData.playerSpawns.empty()) {

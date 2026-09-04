@@ -25,6 +25,7 @@ public:
 
     void Update() override;
     void Draw() override;
+    void EnableToonLighting() override;
     void SetEditorMode(bool isEditorMode) override;
     
     AABB GetAABB() const override;

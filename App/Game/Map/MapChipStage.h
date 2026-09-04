@@ -20,6 +20,7 @@ public:
             "resources/Textures/checkerboard.png");
     void Update();
     void Draw();
+    void EnableToonLighting();
 
     const MapChipField& GetField() const;
     MapChipField& GetField();
