@@ -32,12 +32,8 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
         density += particleMass * Poly6Kernel(dot(offset, offset), smoothingRadius);
     }
 
-    density = max(density, restDensity * 0.25f);
+    density = max(density, 0.01f);
     particle.density = density;
-
-    float32_t densityRatio = density / max(restDensity, kEpsilon);
-    float32_t taitPressure =
-        stiffness * (pow(max(densityRatio, 0.001f), 7.0f) - 1.0f);
-    particle.pressure = clamp(taitPressure, -stiffness * 0.20f, stiffness * 4.0f);
+    particle.pressure = max(stiffness * (density - restDensity), 0.0f);
     gParticles[index] = particle;
 }

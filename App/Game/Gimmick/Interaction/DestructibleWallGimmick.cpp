@@ -42,6 +42,13 @@ bool DestructibleWallGimmick::Initialize(
     return true;
 }
 
+void DestructibleWallGimmick::EnableToonLighting()
+{
+    if (object_) {
+        object_->EnableToonLighting();
+    }
+}
+
 void DestructibleWallGimmick::Update()
 {
     // 破壊済みなら何もしない

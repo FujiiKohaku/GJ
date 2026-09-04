@@ -17,6 +17,53 @@ struct PixelShaderOutput
     float32_t4 color : SV_Target0;
 };
 
+float3 ToonIllumination(float3 normal, float3 worldPosition)
+{
+    float3 N = normalize(normal);
+    float3 L = -gDirectionalLight.direction;
+    L /= max(length(L), 0.0001f);
+    // Half Lambert gives vertical faces a readable middle band.
+    float3 light = max(gAmbientLight.color.rgb * gAmbientLight.color.a, 0.0f);
+    light += gDirectionalLight.color.rgb * max(gDirectionalLight.intensity, 0.0f) *
+        saturate(dot(N, L) * 0.5f + 0.5f);
+    for (uint index = 0; index < kMaxPointLights; ++index) {
+        PointLight source = gPointLights.lights[index];
+        if (source.isActive == 0 || source.radius <= 0.0f) {
+            continue;
+        }
+        float3 toLight = source.position - worldPosition;
+        float distanceToLight = length(toLight);
+        float attenuation = pow(saturate(1.0f - distanceToLight / source.radius), max(source.decay, 0.001f));
+        float diffuse = saturate(dot(N, toLight / max(distanceToLight, 0.0001f)));
+        light += source.color.rgb * max(source.intensity, 0.0f) * attenuation * diffuse;
+    }
+    for (uint index = 0; index < kMaxSpotLights; ++index) {
+        SpotLight source = gSpotLights.lights[index];
+        if (source.isActive == 0 || source.distance <= 0.0f) {
+            continue;
+        }
+        float3 toLight = source.position - worldPosition;
+        float distanceToLight = length(toLight);
+        float3 Ls = toLight / max(distanceToLight, 0.0001f);
+        float3 direction = source.direction / max(length(source.direction), 0.0001f);
+        float cone = saturate((dot(-Ls, direction) - source.cosAngle) / max(1.0f - source.cosAngle, 0.0001f));
+        float attenuation = pow(saturate(1.0f - distanceToLight / source.distance), max(source.decay, 0.001f));
+        light += source.color.rgb * max(source.intensity, 0.0f) * cone * attenuation * saturate(dot(N, Ls));
+    }
+
+    float brightness = dot(light, float3(0.2126f, 0.7152f, 0.0722f));
+    float3 band = float3(0.40f, 0.53f, 0.55f);
+    if (brightness >= 0.95f) {
+        band = float3(1.0f, 0.92f, 0.78f);
+    } else if (brightness >= 0.45f) {
+        band = float3(0.73f, 0.74f, 0.66f);
+    }
+    // Retain a restrained tint from local lights without specular highlights.
+    float peak = max(max(light.r, light.g), light.b);
+    float3 tint = light / max(peak, 0.0001f);
+    return band * lerp(float3(1.0f, 1.0f, 1.0f), tint, 0.30f);
+}
+
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
@@ -72,6 +119,12 @@ PixelShaderOutput main(VertexShaderOutput input)
         }
         output.color = float4(base * illumination * saturate(occlusion) +
             float3(1.0f, 0.78f, 0.42f) * specular, gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 6)
+    {
+        output.color = float4(
+            gMaterial.color.rgb * textureColor.rgb * ToonIllumination(input.normal, input.worldPosition),
+            gMaterial.color.a * textureColor.a);
     }
     else if (gMaterial.enableLighting != 0)
     {
@@ -153,7 +206,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color = gMaterial.color * textureColor;
     }
 
-    if (gMaterial.enableEnvironmentMap != 0)
+    if (gMaterial.enableEnvironmentMap != 0 && gMaterial.enableLighting != 6)
     {
         float3 N = normalize(input.normal);
         float3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);

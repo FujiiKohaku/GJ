@@ -67,6 +67,16 @@ public:
         }
     }
 
+    void EnableToonLighting()
+    {
+        if (materialData_) {
+            materialData_->enableLighting = 6;
+            materialData_->enableEnvironmentMap = 0;
+            materialData_->environmentCoefficient = 0.0f;
+            materialData_->shininess = 0.0f;
+        }
+    }
+
     void SetAnimation(PlayAnimation* anim);
     const Node& GetRootNode() const;
     const Matrix4x4& GetWorldMatrix() const

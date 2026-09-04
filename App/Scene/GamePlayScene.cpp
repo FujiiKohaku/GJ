@@ -30,12 +30,16 @@ constexpr const char* kStage1Json = "resources/Maps/stage1.json";
 constexpr float kCameraDistance = 12.0f;
 constexpr const char* kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
-constexpr float kFluidRenderZ = -0.72f;
+constexpr float kFluidRenderZ = 0.0f;
+constexpr float kNeoWorldScale = 0.36f;
 constexpr Vector3 kSlimeRenderForward = { 0.0f, 0.0f, 1.0f };
 
 Vector3 MakeFluidCorePosition(const MapChipPlayer& player)
 {
     Vector3 corePosition = player.GetPosition();
+    // neo_Engineの形状比率を保ち、GJのワールド寸法へ一律縮小する。
+    // 最下部の休止粒子が床の衝突面へ届き、接地時に底が平らになる高さ。
+    corePosition.y += 0.086f * kNeoWorldScale;
     corePosition.z = kFluidRenderZ;
     return corePosition;
 }
@@ -122,7 +126,8 @@ std::vector<GpuSphFluid::CollisionObstacle> BuildFluidObstacles(
 
 void GamePlayScene::Initialize()
 {
-    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
+    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
+    SceneManager::GetInstance()->SetArchiveApproach(0.0f);
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     isDeathTransitionActive_ = false;
     deathTransitionTime_ = 0.0f;
@@ -132,10 +137,14 @@ void GamePlayScene::Initialize()
     Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
     SkinningObject3dManager::GetInstance()->SetDefaultCamera(camera_.get());
 
+    debugCameraController_.SetTargetCamera(camera_.get());
+    debugCameraController_.SetDebugMode(true);
+
     LevelDataLoader loader;
     LevelData levelData = loader.Load(kStage1Json);
 
     mapChipStage_.Initialize(levelData);
+    mapChipStage_.EnableToonLighting();
 
     Vector3 playerStartPos = { 0.0f, 0.0f, 0.0f };
     if (!levelData.playerSpawns.empty()) {
@@ -148,18 +157,24 @@ void GamePlayScene::Initialize()
     
     gpuSphFluid_ = std::make_unique<GpuSphFluid>();
     GpuSphFluid::Settings fluidSettings;
-    fluidSettings.particleCount = 1280;
-    fluidSettings.particleRadius = 0.14f;
-    fluidSettings.smoothingRadius = 0.45f;
-    fluidSettings.blobRadii = { 0.65f, 0.65f, 0.65f }; // 完全な球体形状
-    fluidSettings.stiffness = 22.0f;        // SPH圧力反発力
-    fluidSettings.shapeAttraction = 9.0f;   // Shape Matchingバネ強度
-    fluidSettings.velocityAttraction = 8.5f; // 移動速度同期
-    fluidSettings.viscosity = 2.8f;         // まとまりのある粘性
-    fluidSettings.surfaceTension = 5.0f;    // ピンと張った滑らかな水面（表面張力）
-    fluidSettings.gravity = { 0.0f, -16.0f, 0.0f }; // 重力
-    fluidSettings.damping = 0.25f;          // 振動ダンピング制御
-    fluidSettings.horizontalFriction = 0.95f;
+    fluidSettings.particleCount = 2048;
+    fluidSettings.particleRadius = 0.20f * kNeoWorldScale;
+    fluidSettings.smoothingRadius = 0.40f * kNeoWorldScale;
+    fluidSettings.particleMass =
+        kNeoWorldScale * kNeoWorldScale * kNeoWorldScale;
+    fluidSettings.restDensity = 3.0f;
+    fluidSettings.blobRadii = {
+        1.2f * kNeoWorldScale,
+        0.85f * kNeoWorldScale,
+        1.2f * kNeoWorldScale };
+    fluidSettings.stiffness = 50.0f;
+    fluidSettings.shapeAttraction = 80.0f;
+    fluidSettings.velocityAttraction = 0.0f;
+    fluidSettings.viscosity = 15.0f;
+    fluidSettings.surfaceTension = 0.0f;
+    fluidSettings.gravity = { 0.0f, -20.0f * kNeoWorldScale, 0.0f };
+    fluidSettings.damping = 0.985f;
+    fluidSettings.horizontalFriction = 0.60f;
     fluidSettings.liquidShapeAttraction = 0.0f;
     fluidSettings.liquidVelocityAttraction = 0.0f;
     fluidSettings.liquidViscosity = 1.15f;
@@ -170,12 +185,12 @@ void GamePlayScene::Initialize()
     fluidSettings.sloshStrength = 0.0f;
     fluidSettings.puddleSpread = 0.0f;
     fluidSettings.emitterRate = 560.0f;
-    fluidSettings.emitterRadius = 0.20f;
-    fluidSettings.emitterSpeed = 6.4f;
+    fluidSettings.emitterRadius = 0.20f * kNeoWorldScale;
+    fluidSettings.emitterSpeed = 6.4f * kNeoWorldScale;
     fluidSettings.particleLifetime = 6.0f;
-    fluidSettings.collisionFriction = 0.78f;
-    fluidSettings.collisionBounce = 0.06f;
-    fluidSettings.simulationSubsteps = 3;
+    fluidSettings.collisionFriction = 0.60f;
+    fluidSettings.collisionBounce = 0.30f;
+    fluidSettings.simulationSubsteps = 1;
     fluidSettings.corePosition = MakeFluidCorePosition(*player_);
     fluidSettings.floorHeight = player_->GetFluidFloorHeight();
 
@@ -226,7 +241,7 @@ void GamePlayScene::Initialize()
     instructionText_->Initialize(kDefaultFont);
     instructionText_->SetText(
         "MOVE : A/D OR LEFT/RIGHT   JUMP : SPACE/W/UP   "
-        "TAB : MENU   BACKSPACE : STAGE SELECT");
+        "F1 : FREE CAM (WASD+MOUSE)   TAB : MENU   BACKSPACE : STAGE SELECT");
     instructionText_->SetPosition({ 32.0f, 32.0f });
     instructionText_->SetFontSize(24.0f);
     instructionText_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
@@ -284,6 +299,7 @@ void GamePlayScene::Finalize()
 {
     SceneManager::GetInstance()->RemovePostEffect(PostEffectType::SlimeScreen);
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
+    debugCameraController_.SetTargetCamera(nullptr);
     SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
     if (gpuSphFluid_) {
         gpuSphFluid_->Finalize();
@@ -336,34 +352,56 @@ void GamePlayScene::Update()
         showForces_ = !showForces_;
     }
 
+    debugCameraController_.Update();
+    const bool isFreeCameraMode = debugCameraController_.GetDebugMode();
+
     mapChipStage_.Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
-    player_->Update(mapChipStage_.GetGimmicks());
-    if (player_->IsCrushed()) {
-        StartDeathTransition();
-        return;
+    //player_->Update(mapChipStage_.GetGimmicks());
+    if (!isFreeCameraMode) {
+        player_->Update(mapChipStage_.GetGimmicks());
     }
+     if (player_->IsCrushed()) {
+      StartDeathTransition();
+      return;
+    }
+
     if (gpuSphFluid_) {
         const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
         const std::vector<BaseMapChipGimmick*> gimmicks = mapChipStage_.GetGimmicks();
         gpuSphFluid_->SetObstacles(
             BuildFluidObstacles(mapChipStage_, gimmicks, deltaTime));
         gpuSphFluid_->SetFloorHeight(player_->GetFluidFloorHeight());
-        Vector3 targetRadii = player_->IsGrounded()
-            ? Vector3{ 0.76f, 0.48f, 0.76f }
-            : Vector3{ 0.65f, 0.65f, 0.65f };
+        gpuSphFluid_->SetGrounded(player_->IsGrounded());
+        const Vector3 targetRadii = {
+            1.2f * kNeoWorldScale,
+            0.85f * kNeoWorldScale,
+            1.2f * kNeoWorldScale };
         gpuSphFluid_->SetBlobRadii(targetRadii);
         float minX = -1000.0f, maxX = 1000.0f, maxY = 1000.0f;
         player_->GetWallBoundaries(minX, maxX, maxY, gimmicks);
         Vector3 corePos = MakeFluidCorePosition(*player_);
-        float minZ = corePos.z - 0.22f;
-        float maxZ = corePos.z + 0.22f;
+        const float zEnvelope = targetRadii.z * 1.2f;
+        float minZ = corePos.z - zEnvelope;
+        float maxZ = corePos.z + zEnvelope;
         gpuSphFluid_->SetWallBoundaries(minX, maxX, minZ, maxZ, -1000.0f, maxY);
         gpuSphFluid_->SetLiquidated(false);
+        constexpr float kEyeMaximumOffset = 0.075f;
+        constexpr float kEyeFollowSpeed = 0.90f;
+        const float desiredEyeOffset = std::clamp(
+            player_->GetVelocity().x / 5.0f,
+            -1.0f,
+            1.0f) * kEyeMaximumOffset;
+        const float eyeDelta = std::clamp(
+            desiredEyeOffset - eyeOffsetX_,
+            -kEyeFollowSpeed * deltaTime,
+            kEyeFollowSpeed * deltaTime);
+        eyeOffsetX_ += eyeDelta;
+        gpuSphFluid_->SetEyeOffsetX(eyeOffsetX_);
         gpuSphFluid_->SetControlState(
             MakeFluidCorePosition(*player_),
             MakeFluidTargetVelocity(player_->GetVelocity()),
             kSlimeRenderForward);
-        const bool leftMousePressed = IsLeftMouseButtonDown(input);
+        const bool leftMousePressed = !isFreeCameraMode && IsLeftMouseButtonDown(input);
         const bool leftMouseTriggered =
             leftMousePressed && !wasLeftMousePressed_;
         const Vector3 emitterPosition = MakeFluidEmitterPosition(*player_);
@@ -385,7 +423,9 @@ void GamePlayScene::Update()
         wasLeftMousePressed_ = leftMousePressed;
         gpuSphFluid_->Update(deltaTime);
     }
-    UpdateFollowCamera();
+    if (!isFreeCameraMode) {
+        UpdateFollowCamera();
+    }
     camera_->Update();
     skyBox_->Update(camera_.get());
     instructionText_->Update();

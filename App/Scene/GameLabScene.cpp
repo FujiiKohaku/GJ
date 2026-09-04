@@ -22,6 +22,9 @@ constexpr const char* kArchiveRoomModel = "StageSelectBook/ArchiveRoom.obj";
 constexpr int32_t kGridHalfExtent = 10;
 constexpr float kGridSpacing = 1.0f;
 constexpr Vector3 kSmokePreviewPosition = { 3.0f, 0.05f, 2.0f };
+constexpr const char* kFlameEffects[] = {
+    "FlameSmoke", "Flame", "FlameCore", "FlameSparks"
+};
 const PostEffectType kPostEffectTypes[] = {
     PostEffectType::Copy,
     PostEffectType::GrayScale,
@@ -100,6 +103,8 @@ void GameLabScene::Initialize()
     EffectManager::GetInstance()->SetCamera(camera_.get());
     smokeEffectHandle_ = kInvalidEffectHandle;
     isSmokeEnabled_ = false;
+    flameEffectHandles_.fill(kInvalidEffectHandle);
+    isFlameEnabled_ = false;
 
     InitializePostEffectList();
 
@@ -145,6 +150,9 @@ void GameLabScene::Finalize()
         EffectManager::GetInstance()->StopEffect(smokeEffectHandle_);
     }
     smokeEffectHandle_ = kInvalidEffectHandle;
+    // Retire this scene's particles and lights, including extinguishing tails.
+    EffectManager::GetInstance()->StopAllEffects();
+    flameEffectHandles_.fill(kInvalidEffectHandle);
     EffectManager::GetInstance()->SetCamera(nullptr);
 
     TimeManager::GetInstance()->SetTimeScale(previousTimeScale_);
@@ -173,6 +181,7 @@ void GameLabScene::Update()
 
     UpdatePostEffectPreviewParameters();
     UpdateSmokePreview();
+    UpdateFlamePreview();
     EffectManager::GetInstance()->Update();
     debugCameraController_.Update();
     debugCameraController_.SetDebugMode(true);
@@ -230,6 +239,17 @@ void GameLabScene::DrawImGui()
 
     ImGui::Separator();
     ImGui::Checkbox("Smoke", &isSmokeEnabled_);
+
+    ImGui::Separator();
+    ImGui::Checkbox("Flame (white.png)", &isFlameEnabled_);
+    ImGui::DragFloat3("Flame Position", &flamePosition_.x, 0.05f, -20.0f, 20.0f);
+    if (ImGui::Button("Focus Flame")) {
+        camera_->LookAt(
+            { flamePosition_.x + 3.0f, flamePosition_.y + 2.5f, flamePosition_.z - 6.0f },
+            { flamePosition_.x, flamePosition_.y + 1.2f, flamePosition_.z });
+        camera_->Update();
+        debugCameraController_.SetTargetCamera(camera_.get());
+    }
 
     ImGui::Separator();
     ImGui::TextColored(ImVec4(0.4f, 0.85f, 1.0f, 1.0f), "--- FIREWORK EFFECTS ---");
@@ -331,6 +351,23 @@ void GameLabScene::UpdateSmokePreview()
         effectManager->StopEffect(smokeEffectHandle_);
     }
     smokeEffectHandle_ = kInvalidEffectHandle;
+}
+
+void GameLabScene::UpdateFlamePreview()
+{
+    EffectManager* effects = EffectManager::GetInstance();
+    for (size_t index = 0; index < flameEffectHandles_.size(); ++index) {
+        EffectHandle& handle = flameEffectHandles_[index];
+        if (isFlameEnabled_) {
+            if (!effects->IsEffectAlive(handle)) {
+                handle = effects->PlayLoopEffect(kFlameEffects[index], flamePosition_);
+            }
+            effects->SetEffectPosition(handle, flamePosition_);
+        } else if (handle != kInvalidEffectHandle) {
+            effects->StopEffect(handle);
+            handle = kInvalidEffectHandle;
+        }
+    }
 }
 
 void GameLabScene::ApplyPostEffectToggle(PostEffectToggle& toggle)

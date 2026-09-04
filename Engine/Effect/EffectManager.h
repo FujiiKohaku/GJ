@@ -269,6 +269,7 @@ private:
         float emitRadius = 0.2f;
         float emitFrequency = 0.05f;
         float duration = 1.5f;
+        float stopTailDuration = 0.0f;
         bool defaultLoop = false;
         uint32_t resourcePoolReserve = 0;
         EffectSettings settings;
