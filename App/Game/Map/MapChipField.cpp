@@ -119,6 +119,7 @@ void MapChipRegistry::Initialize()
     // 基本的な地形（当たり判定あり、静的描画）
     Register(MapChipType::Block, "Floor", true, false, ""); // 空パスで標準キューブを使用
     Register(MapChipType::Wall,  "Wall",  true, false, ""); // 空パスで標準キューブを使用
+    configs_[MapChipType::Foundation] = { MapChipType::Foundation, "Foundation", true, false, "" };
     
     // 【拡張例】もし氷の床を作りたくなったら、ここに1行追加するだけ！
     // Register(MapChipType::IceFloor, "Ice Floor", true, "IceBlock/IceBlock.obj");

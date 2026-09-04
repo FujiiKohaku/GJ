@@ -10,7 +10,7 @@ class EditorTool(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Map Editor")
-        self.geometry("400x500")
+        self.geometry("400x550")
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         
@@ -65,6 +65,7 @@ class EditorTool(tk.Tk):
             (9, "Laser Emitter"),
             (10, "Swinging Bridge"),
             (11, "Wall"),
+            (12, "土台 (Foundation)"),
             (99, "Player Spawn"),
         ]
         

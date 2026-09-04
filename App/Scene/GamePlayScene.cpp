@@ -94,7 +94,8 @@ std::vector<GpuSphFluid::CollisionObstacle> BuildFluidObstacles(
 
     for (uint32_t y = 0; y < field.GetBlockHeight(); ++y) {
         for (uint32_t x = 0; x < field.GetBlockWidth(); ++x) {
-            if (field.GetMapChipTypeByIndex(x, y) != MapChipType::Block) {
+            const MapChipType type = field.GetMapChipTypeByIndex(x, y);
+            if (type != MapChipType::Block && type != MapChipType::Foundation) {
                 continue;
             }
 

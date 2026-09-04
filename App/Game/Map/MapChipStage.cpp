@@ -88,6 +88,14 @@ void MapChipStage::Initialize(
                 block->Update();
                 blockObjects_.push_back(std::move(block));
             }
+            // Reused objects must lose the material mode of their previous tile.
+            Object3d* placedBlock = blockObjects_[currentBlockIndex].get();
+            placedBlock->SetEnableLighting(true);
+            placedBlock->SetEnableEnvironmentMap(false);
+            placedBlock->SetEnvironmentMapStrength(0.0f);
+            if (type == MapChipType::Foundation) {
+                placedBlock->GetMaterial()->enableLighting = 8;
+            }
             currentBlockIndex++;
         }
     }
@@ -128,6 +136,10 @@ void MapChipStage::Initialize(
 void MapChipStage::EnableToonLighting()
 {
     for (const std::unique_ptr<Object3d>& block : blockObjects_) {
+        // Foundation keeps its procedural stone material in gameplay as well.
+        if (block->GetMaterial()->enableLighting == 8) {
+            continue;
+        }
         block->EnableToonLighting();
     }
     for (const std::unique_ptr<BaseMapChipGimmick>& gimmick : gimmicks_) {
@@ -146,7 +158,13 @@ void MapChipStage::EnableMossTerrain()
     size_t blockIndex = 0;
     for (uint32_t y = 0; y < height; ++y) {
         for (uint32_t x = 0; x < width; ++x) {
-            if (field_.GetMapChipTypeByIndex(x, y) != MapChipType::Block) {
+            const MapChipType type = field_.GetMapChipTypeByIndex(x, y);
+            const MapChipConfig& config = MapChipRegistry::GetConfig(type);
+            if (!config.isSolid || config.isGimmick) {
+                continue;
+            }
+            if (type != MapChipType::Block) {
+                ++blockIndex;
                 continue;
             }
             // Each uninterrupted column shares its exposed surface height.

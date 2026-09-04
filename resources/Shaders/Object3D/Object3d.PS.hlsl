@@ -54,7 +54,7 @@ float3 ToonIllumination(float3 normal, float3 worldPosition)
     float brightness = dot(light, float3(0.2126f, 0.7152f, 0.0722f));
     // Terrain uses painted shadow colors and a stable face value so its shape
     // remains readable even under broad ambient lighting.
-    if (gMaterial.enableLighting == 7) {
+    if (gMaterial.enableLighting == 7 || gMaterial.enableLighting == 8) {
         brightness += saturate(N.y) * 0.20f;
         float3 terrainBand = float3(0.58f, 0.53f, 0.72f);
         if (brightness >= 0.95f) {
@@ -143,6 +143,59 @@ float3 MossTerrainColor(float3 worldPosition, float3 normal)
     return lerp(dirt, green, moss);
 }
 
+float3 StoneTileColor(float3 worldPosition, float3 normal)
+{
+    // Match MossSoil: 256 texels across four map units = 64 texels per unit.
+    // Dominant-axis projection keeps every cube face at the same density.
+    float2 facePosition = float2(worldPosition.x, -worldPosition.y);
+    float3 faceNormal = abs(normal);
+    if (faceNormal.y >= faceNormal.x && faceNormal.y >= faceNormal.z) {
+        facePosition = worldPosition.xz;
+    } else if (faceNormal.x > faceNormal.z) {
+        facePosition = float2(worldPosition.z, -worldPosition.y);
+    }
+    float2 texel = floor((facePosition + 0.5f) * 64.0f);
+    // Rectangular bricks use a running bond: alternate rows shift half a brick.
+    // floor/frac keep the bond continuous across blocks and negative coordinates.
+    float2 brickSize = float2(32.0f, 16.0f);
+    float row = floor(texel.y / brickSize.y);
+    float rowOffset = frac(row * 0.5f) * brickSize.x;
+    float2 brickTexel = texel + float2(rowOffset, 0.0f);
+    float2 tile = floor(brickTexel / brickSize);
+    float2 local = brickTexel - tile * brickSize;
+    float stoneTone = TerrainNoise(tile * 7.13f + 19.6f);
+    float grain = TerrainNoise(texel * 0.73f + 31.2f);
+    float mottling = TerrainNoise(texel * 0.12f + 5.8f);
+    float3 stone = lerp(float3(0.36f, 0.39f, 0.42f),
+        float3(0.58f, 0.59f, 0.57f), stoneTone);
+    stone *= 0.88f + floor(mottling * 4.0f) * 0.055f;
+    stone += (floor(grain * 4.0f) - 1.5f) * 0.014f;
+
+    float2 farEdge = brickSize - 1.0f - local;
+    float edge = min(min(local.x, local.y), min(farEdge.x, farEdge.y));
+    // A two-texel joint and small chips separate stones without thick outlines.
+    float chip = 0.0f;
+    if (grain > 0.72f) {
+        chip = 1.0f;
+    }
+    if (edge < 1.0f + chip) {
+        return float3(0.20f, 0.22f, 0.24f) * (0.92f + grain * 0.16f);
+    }
+    if (local.x < 3.0f || local.y < 3.0f) {
+        stone *= 1.16f;
+    }
+    if (farEdge.x < 3.0f || farEdge.y < 3.0f) {
+        stone *= 0.76f;
+    }
+    // Sparse mineral flecks stay on the same 64-texel grid as the soil detail.
+    if (grain > 0.82f) {
+        stone *= 1.12f;
+    } else if (grain < 0.16f) {
+        stone *= 0.86f;
+    }
+    return stone;
+}
+
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
@@ -198,6 +251,14 @@ PixelShaderOutput main(VertexShaderOutput input)
         }
         output.color = float4(base * illumination * saturate(occlusion) +
             float3(1.0f, 0.78f, 0.42f) * specular, gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 8)
+    {
+        float3 normal = normalize(input.normal);
+        output.color = float4(
+            gMaterial.color.rgb * StoneTileColor(input.worldPosition, normal) *
+                ToonIllumination(normal, input.worldPosition),
+            gMaterial.color.a);
     }
     else if (gMaterial.enableLighting == 7)
     {
@@ -293,7 +354,8 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color = gMaterial.color * textureColor;
     }
 
-    if (gMaterial.enableEnvironmentMap != 0 && gMaterial.enableLighting != 6 && gMaterial.enableLighting != 7)
+    if (gMaterial.enableEnvironmentMap != 0 && gMaterial.enableLighting != 6 &&
+        gMaterial.enableLighting != 7 && gMaterial.enableLighting != 8)
     {
         float3 N = normalize(input.normal);
         float3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);
