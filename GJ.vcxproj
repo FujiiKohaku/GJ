@@ -197,6 +197,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="App\Game\Map\MapChipStage.cpp" />
     <ClCompile Include="App\Game\Gimmick\MapChipGimmickFactory.cpp" />
     <ClCompile Include="App\Game\Gimmick\MovingBlockGimmick.cpp" />
+    <ClCompile Include="App\Game\Gimmick\SwingingBridgeGimmick.cpp" />
+    <ClCompile Include="App\Game\Gimmick\SwingingBridgeParam.cpp" />
     <ClCompile Include="App\Game\Gimmick\MovingBlockParam.cpp" />
     <ClCompile Include="Engine\LevelEditor\GimmickParamFactory.cpp" />
     <ClCompile Include="App\Game\Player\MapChipPlayer.cpp" />
@@ -436,6 +438,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="App\Game\Gimmick\BaseMapChipGimmick.h" />
     <ClInclude Include="App\Game\Gimmick\MapChipGimmickFactory.h" />
     <ClInclude Include="App\Game\Gimmick\MovingBlockGimmick.h" />
+    <ClInclude Include="App\Game\Gimmick\SwingingBridgeGimmick.h" />
+    <ClInclude Include="App\Game\Gimmick\SwingingBridgeParam.h" />
     <ClInclude Include="App\Game\Gimmick\MovingBlockParam.h" />
     <ClInclude Include="Engine\LevelEditor\BaseGimmickParam.h" />
     <ClInclude Include="Engine\LevelEditor\GimmickParamFactory.h" />

@@ -743,7 +743,8 @@ void EditorScene::UpdateRaycastEdit()
                                         type == MapChipType::Bonfire ||
                                         type == MapChipType::DestructibleWall ||
                                         type == MapChipType::Spike ||
-                                        type == MapChipType::LaserEmitter) {
+                                        type == MapChipType::LaserEmitter ||
+                                        type == MapChipType::SwingingBridge) {
                                         
                                         LevelData::ObjectData newData;
                                         newData.translation = newPos;
@@ -805,6 +806,12 @@ void EditorScene::UpdateRaycastEdit()
                                             newData.type = "LaserEmitter";
                                             newData.fileName = "LaserEmitter/LaserEmitter.obj";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("LaserEmitter");
+                                        }
+                                        else if (type == MapChipType::SwingingBridge) {
+                                            newData.name = "SwingingBridge";
+                                            newData.type = "SwingingBridge";
+                                            newData.fileName = "SwingingBridge/SwingingBridgePlatform.obj";
+                                            newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("SwingingBridge");
                                         }
                                         
                                         currentLevelData_.objects.push_back(newData);

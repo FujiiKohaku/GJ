@@ -17,6 +17,7 @@ enum class MapChipType {
     Bonfire = 7,
     DestructibleWall = 8,
     LaserEmitter = 9,
+    SwingingBridge = 10,
 };
 
 class MapChipField {
