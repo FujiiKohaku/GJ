@@ -123,6 +123,9 @@ std::vector<GpuSphFluid::CollisionObstacle> BuildFluidObstacles(
 void GamePlayScene::Initialize()
 {
     SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
+    isDeathTransitionActive_ = false;
+    deathTransitionTime_ = 0.0f;
 
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
@@ -279,6 +282,8 @@ void GamePlayScene::Initialize()
 
 void GamePlayScene::Finalize()
 {
+    SceneManager::GetInstance()->RemovePostEffect(PostEffectType::SlimeScreen);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
     if (gpuSphFluid_) {
         gpuSphFluid_->Finalize();
@@ -292,6 +297,11 @@ void GamePlayScene::Update()
     Input* input = Input::GetInstance();
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
 
+    if (isDeathTransitionActive_) {
+        UpdateDeathTransition(TimeManager::GetInstance()->GetDeltaTime());
+        return;
+    }
+
     // TABキーでメニュー開閉
     if (Input::GetInstance()->IsKeyTrigger(DIK_TAB)) {
         isMenuOpen_ = !isMenuOpen_;
@@ -300,8 +310,7 @@ void GamePlayScene::Update()
     // メニューが開いているときはゲーム内処理を行わずに早期リターン
     if (isMenuOpen_) {
         if (Input::GetInstance()->IsKeyTrigger(DIK_G)) {
-            SceneManager::GetInstance()->SetNextScene(
-                std::make_unique<GameOverScene>());
+            StartDeathTransition();
             return;
         }
         if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
@@ -329,6 +338,10 @@ void GamePlayScene::Update()
 
     mapChipStage_.Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
     player_->Update(mapChipStage_.GetGimmicks());
+    if (player_->IsCrushed()) {
+        StartDeathTransition();
+        return;
+    }
     if (gpuSphFluid_) {
         const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
         const std::vector<BaseMapChipGimmick*> gimmicks = mapChipStage_.GetGimmicks();
@@ -382,6 +395,9 @@ void GamePlayScene::Update()
 
 void GamePlayScene::Draw2D()
 {
+    if (isDeathTransitionActive_) {
+        return;
+    }
     if (showForces_) {
         fluidForceRenderer_->Draw(*gpuSphFluid_, *camera_);
     }
@@ -421,6 +437,34 @@ void GamePlayScene::DrawParticle()
 
 void GamePlayScene::DrawImGui()
 {
+}
+
+void GamePlayScene::StartDeathTransition()
+{
+    if (isDeathTransitionActive_) {
+        return;
+    }
+    isDeathTransitionActive_ = true;
+    deathTransitionTime_ = 0.0f;
+    isMenuOpen_ = false;
+    SceneManager* sceneManager = SceneManager::GetInstance();
+    const Vector3 position = player_->GetPosition();
+    sceneManager->SetPaintSeed(position.x * 17.31f + position.y * 7.13f);
+    sceneManager->SetSlimeScreenProgress(0.0f);
+    sceneManager->AddPostEffect(
+        PostEffectType::SlimeScreen, PostEffectStage::AfterParticle);
+}
+
+void GamePlayScene::UpdateDeathTransition(float deltaTime)
+{
+    constexpr float kCoverDuration = 2.1f;
+    deathTransitionTime_ += deltaTime;
+    const float progress = std::clamp(deathTransitionTime_ / kCoverDuration, 0.0f, 1.0f);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(progress);
+    if (progress >= 1.0f) {
+        PageTransition::RequestSlimeReveal();
+        SceneManager::GetInstance()->SetNextScene(std::make_unique<GameOverScene>());
+    }
 }
 
 void GamePlayScene::UpdateFollowCamera()

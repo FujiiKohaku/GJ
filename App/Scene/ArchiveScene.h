@@ -138,8 +138,6 @@ private:
     std::unique_ptr<Text> instructionText_;
     std::unique_ptr<Sprite> transitionPage_;
     PageTransition::RevealOverlay pageReveal_;
-    bool slimeRevealActive_ = false;
-    float slimeRevealTime_ = 0.0f;
 
     std::vector<StageData> stages_;
     std::vector<std::string> printedPagePaths_;

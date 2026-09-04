@@ -113,13 +113,21 @@ void GameOverScene::Initialize()
     instructionText_->SetFontSize(28.0f);
     instructionText_->SetColor({ 0.82f, 0.74f, 0.74f, 1.0f });
     sceneTime_ = 0.0f;
-    transitionTime_ = 0.0f;
-    isTransitioning_ = false;
+    slimeRevealTime_ = 0.0f;
+    slimeRevealActive_ = PageTransition::ConsumeSlimeReveal();
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
+    if (slimeRevealActive_) {
+        SceneManager::GetInstance()->SetSlimeScreenProgress(1.0f);
+        SceneManager::GetInstance()->AddPostEffect(
+            PostEffectType::SlimeScreen, PostEffectStage::AfterParticle);
+        titleText_->SetColor({ 1.0f, 0.35f, 0.40f, 0.0f });
+        instructionText_->SetColor({ 0.82f, 0.74f, 0.74f, 0.0f });
+    }
 }
 
 void GameOverScene::Finalize()
 {
+    SceneManager::GetInstance()->RemovePostEffect(PostEffectType::SlimeScreen);
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     Object3dManager::GetInstance()->SetDefaultCamera(nullptr);
 }
@@ -127,29 +135,24 @@ void GameOverScene::Finalize()
 void GameOverScene::Update()
 {
     Input* input = Input::GetInstance();
-    if (!isTransitioning_ && sceneTime_ >= 1.0f &&
+    if (!slimeRevealActive_ && sceneTime_ >= 1.0f &&
         (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE))) {
-        isTransitioning_ = true;
-        transitionTime_ = 0.0f;
-        SceneManager::GetInstance()->SetPaintSeed(sceneTime_ * 17.31f);
-        SceneManager::GetInstance()->AddPostEffect(
-            PostEffectType::SlimeScreen,
-            PostEffectStage::AfterParticle);
+        SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
+        return;
     }
 
     const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
     sceneTime_ += deltaTime;
-    if (isTransitioning_) {
-        constexpr float kTransitionDuration = 2.1f;
-        transitionTime_ += deltaTime;
-        const float progress = (std::min)(transitionTime_ / kTransitionDuration, 1.0f);
+    if (slimeRevealActive_) {
+        constexpr float kRevealDuration = 1.05f;
+        slimeRevealTime_ += deltaTime;
+        const float progress = 1.0f - std::clamp(slimeRevealTime_ / kRevealDuration, 0.0f, 1.0f);
         SceneManager::GetInstance()->SetSlimeScreenProgress(progress);
         titleText_->SetColor({ 1.0f, 0.35f, 0.40f, 1.0f - progress });
         instructionText_->SetColor({ 0.82f, 0.74f, 0.74f, 1.0f - progress });
-        if (progress >= 1.0f) {
-            PageTransition::RequestSlimeReveal();
-            SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
-            return;
+        if (progress <= 0.0f) {
+            slimeRevealActive_ = false;
+            SceneManager::GetInstance()->RemovePostEffect(PostEffectType::SlimeScreen);
         }
     }
     camera_->Update();
