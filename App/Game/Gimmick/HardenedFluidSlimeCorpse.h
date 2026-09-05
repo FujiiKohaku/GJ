@@ -28,6 +28,8 @@ public:
 
     AABB GetAABB() const override { return boundsAABB_; }
     std::vector<AABB> GetCollisionBoxes() const override { return collisionBoxes_; }
+    // A corpse remains a physical platform. Player crush handling explicitly
+    // excludes it, so it can be stood on without becoming a lethal wall.
     bool IsSolid() const override { return true; }
     bool IsHardenedSlime() const override { return true; }
 
