@@ -18,7 +18,7 @@
 namespace {
 constexpr const char* kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
-constexpr const char* kArchiveRoomModel = "StageSelectBook/ArchiveRoom.obj";
+constexpr const char* kFloorTexture = "resources/Textures/white.png";
 constexpr int32_t kGridHalfExtent = 10;
 constexpr float kGridSpacing = 1.0f;
 constexpr Vector3 kSmokePreviewPosition = { 3.0f, 0.05f, 2.0f };
@@ -84,7 +84,7 @@ void GameLabScene::Initialize()
     previousSonicBoomProgress_ = sceneManager->GetSonicBoomProgress();
     postEffectPreviewProgress_ = 0.05f;
     sceneManager->ClearPostEffects();
-    sceneManager->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
+    sceneManager->SetPostEffectType(PostEffectType::Copy);
     sceneManager->SetArchiveApproach(0.0f);
     sceneManager->SetPostEffectKickStrength(1.0f);
     sceneManager->SetPaintIntensity(1.0f);
@@ -110,9 +110,12 @@ void GameLabScene::Initialize()
 
     backdrop_ = std::make_unique<Object3d>();
     backdrop_->Initialize(Object3dManager::GetInstance());
-    backdrop_->SetModel(ModelManager::GetInstance()->Load(kArchiveRoomModel));
+    backdrop_->SetModel(ModelManager::GetInstance()->CreatePlane(kFloorTexture));
+    backdrop_->SetScale({ 100.0f, 100.0f, 1.0f });
+    backdrop_->SetRotate({ 1.57079632679f, 0.0f, 0.0f });
+    backdrop_->SetTranslate({ 0.0f, 0.0f, 0.0f });
     backdrop_->SetEnableLighting(false);
-    backdrop_->SetColor({ 0.58f, 0.61f, 0.65f, 1.0f });
+    backdrop_->SetColor({ 0.55f, 0.55f, 0.55f, 1.0f });
     backdrop_->Update();
 
     // 死亡ぽよぽよスライムシャワーの初期化
