@@ -167,24 +167,21 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
     float32_t3 refracted = gSceneColor.SampleLevel(gSampler, input.texcoord + refractOffset, 0).rgb;
 
     float32_t thickness = saturate(density * 2.2f);
-    // 宇宙ファンタジーの深いゼリー。ワールド座標で重ねた星雲層と
-    // 微細な星を用いることで、平面的な単色ではなく内部に奥行きを作る。
-    float32_t3 cosmicPosition = worldPosition.xyz * 2.10f + normal * 0.65f;
-    float32_t nebulaWide = NebulaNoise(cosmicPosition);
-    float32_t nebulaFine = NebulaNoise(cosmicPosition * 2.70f + 9.0f);
-    float32_t violetBand = smoothstep(0.38f, 0.76f, nebulaWide);
-    float32_t cyanBand = smoothstep(0.46f, 0.84f, nebulaFine);
-    float32_t starNoise = ValueNoise(cosmicPosition * 15.0f + normal * 2.0f);
-    float32_t stars = smoothstep(0.965f, 0.994f, starNoise) *
-        smoothstep(0.14f, 0.52f, thickness);
+    // 低周波の星雲だけで色を作る。高周波の星ノイズは移動時に細かく
+    // 明滅して見えたため使わず、広い色面がゆっくり移る表現にする。
+    float32_t3 cosmicPosition = worldPosition.xyz * 0.78f + normal * 0.22f;
+    float32_t nebulaWide = NebulaNoise(cosmicPosition * 0.72f);
+    float32_t nebulaAccent = NebulaNoise(cosmicPosition * 1.12f + 5.0f);
+    float32_t nebulaBlend = lerp(nebulaWide, nebulaAccent, 0.30f);
+    float32_t violetBand = smoothstep(0.28f, 0.78f, nebulaBlend);
+    float32_t cyanBand = smoothstep(0.34f, 0.82f, 1.0f - nebulaWide * 0.55f + nebulaAccent * 0.45f);
     float32_t3 deepSpace = lerp(
         float32_t3(0.008f, 0.010f, 0.070f),
         float32_t3(0.018f, 0.105f, 0.205f),
         thickness);
-    float32_t3 violetNebula = float32_t3(0.30f, 0.035f, 0.62f) * violetBand;
-    float32_t3 cyanNebula = float32_t3(0.015f, 0.52f, 0.72f) * cyanBand;
-    float32_t3 jellyColor = deepSpace + violetNebula * 0.62f + cyanNebula * 0.48f;
-    jellyColor += float32_t3(0.55f, 0.82f, 1.0f) * stars * 1.35f;
+    float32_t3 violetNebula = float32_t3(0.24f, 0.055f, 0.52f) * violetBand;
+    float32_t3 cyanNebula = float32_t3(0.025f, 0.44f, 0.62f) * cyanBand;
+    float32_t3 jellyColor = deepSpace + violetNebula * 0.46f + cyanNebula * 0.42f;
 
     float32_t3 halfVec = normalize(lightDir + viewDir);
     float32_t spec =
