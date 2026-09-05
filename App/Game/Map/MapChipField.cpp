@@ -134,7 +134,7 @@ void MapChipRegistry::Initialize()
     // Register(MapChipType::IceFloor, "Ice Floor", true, "IceBlock/IceBlock.obj");
     
     // 特殊な壁（ギミックとして処理される）
-    Register(MapChipType::DestructibleWall, "DestructibleWall", true, true, "");
+    Register(MapChipType::DestructibleWall, "DestructibleWall", false, true, ""); // ギミックで判定するため地形としては透過(false)にする
     
     Register(MapChipType::Door, "Door", false, true, ""); // ドア（ギミック）は自身で当たり判定を持つため地形としては透過(false)にする
 }
