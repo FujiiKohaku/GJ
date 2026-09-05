@@ -91,8 +91,29 @@ public:
     float GetWaterEffectIntensity() const { return waterEffectIntensity_; }
     void SetSlimeScreenProgress(float progress) { slimeScreenProgress_ = progress; }
     float GetSlimeScreenProgress() const { return slimeScreenProgress_; }
-    void SetScreenSpaceFluid(GpuSphFluid* fluid) { screenSpaceFluid_ = fluid; }
+    void SetScreenSpaceFluid(GpuSphFluid* fluid) {
+        screenSpaceFluid_ = fluid;
+        extraScreenSpaceFluids_.clear();
+    }
     GpuSphFluid* GetScreenSpaceFluid() const { return screenSpaceFluid_; }
+    void AddExtraScreenSpaceFluid(const GpuSphFluid* fluid) {
+        if (fluid) {
+            extraScreenSpaceFluids_.push_back(fluid);
+        }
+    }
+    void ClearExtraScreenSpaceFluids() {
+        extraScreenSpaceFluids_.clear();
+    }
+    std::vector<const GpuSphFluid*> GetScreenSpaceFluids() const {
+        std::vector<const GpuSphFluid*> list;
+        if (screenSpaceFluid_) {
+            list.push_back(screenSpaceFluid_);
+        }
+        for (const auto* f : extraScreenSpaceFluids_) {
+            if (f) list.push_back(f);
+        }
+        return list;
+    }
 
 private:
     SceneManager() = default;
@@ -120,6 +141,7 @@ private:
     int paintPatternType_ = 0;
     Vector3 paintColor_ = { 0.95f, 0.10f, 0.58f };
     GpuSphFluid* screenSpaceFluid_ = nullptr;
+    std::vector<const GpuSphFluid*> extraScreenSpaceFluids_;
 
 private:
     std::unique_ptr<BaseScene> scene_;

@@ -9,6 +9,7 @@
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/LevelEditor/LevelDataLoader.h"
 #include "Engine/LevelEditor/GimmickParamFactory.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include "App/Game/Gimmick/MovingBlockParam.h"
 #include "App/Game/Gimmick/Interaction/SwitchParam.h"
 #include "App/Game/Gimmick/Interaction/SwitchGimmick.h"
@@ -130,6 +131,7 @@ void EditorScene::Initialize()
     }
     mapChipStage_.SetEditorMode(true);
     mapChipStage_.Initialize(currentLevelData_);
+    mapChipStage_.ApplyMaterialProperties();
 
     // プレイヤーのプレビュー用モデルの初期化
     playerModel_ = ModelManager::GetInstance()->CreatePlane("resources/Textures/checkerboard.png");
@@ -484,6 +486,7 @@ void EditorScene::ProcessUdpCommand(const std::string& command)
             LevelData::TileMapData expandedData = ExpandTileMapData(currentLevelData_.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
             currentLevelData_.tileMaps[0] = expandedData;
             mapChipStage_.Initialize(currentLevelData_);
+            mapChipStage_.ApplyMaterialProperties();
             Logger::Log("Loaded map: " + filename + "\n");
         }
         
@@ -590,6 +593,7 @@ void EditorScene::UpdateRaycastEdit()
                         DirectXCommon::GetInstance()->WaitForGPU();
                         currentLevelData_.tileMaps[0] = mapChipStage_.GetField().GetTileMapData();
                         mapChipStage_.Initialize(currentLevelData_);
+                        mapChipStage_.ApplyMaterialProperties();
                         hasUnsavedChanges_ = true;
                     }
                 }
@@ -686,10 +690,12 @@ void EditorScene::UpdateRaycastEdit()
                                 LevelData::ObjectData newData;
                                 newData.name = "Goal";
                                 newData.type = "Goal";
-                                newData.fileName = "GoalPost/GoalPost.obj";
                                 newData.translation = newPos;
                                 newData.rotation = {0,0,0};
                                 newData.scale = {1,1,1};
+                                if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("Goal")) {
+                                    newData.fileName = metaData->defaultModelPath;
+                                }
                                 currentLevelData_.objects.push_back(newData);
                             } else {
                                 goalIt->translation = newPos;
@@ -703,6 +709,7 @@ void EditorScene::UpdateRaycastEdit()
                             // 座標だけ変わった場合でもInitializeでGoalのインスタンス位置を更新させるため
                             DirectXCommon::GetInstance()->WaitForGPU();
                             mapChipStage_.Initialize(currentLevelData_);
+                            mapChipStage_.ApplyMaterialProperties();
                             
                             hasUnsavedChanges_ = true;
                         }
@@ -751,16 +758,18 @@ void EditorScene::UpdateRaycastEdit()
                                         newData.rotation = {0,0,0};
                                         newData.scale = {1,1,1};
                                         
+                                        std::string metaKey = "";
+
                                         if (type == MapChipType::MovingBlock) {
                                             newData.name = "MovingBlock";
                                             newData.type = "MovingBlock";
-                                            newData.fileName = "cube";
+                                            metaKey = "MovingBlock";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("MovingBlock");
                                         }
                                         else if (type == MapChipType::PressurePlate) {
                                             newData.name = "Switch";
                                             newData.type = "Switch";
-                                            newData.fileName = "PressurePlate.obj";
+                                            metaKey = "Switch_PressurePlate";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Switch");
                                             if (auto* param = dynamic_cast<SwitchParam*>(newData.gimmickParam.get())) {
                                                 param->switchType_ = 0; // 感圧盤
@@ -770,7 +779,7 @@ void EditorScene::UpdateRaycastEdit()
                                         else if (type == MapChipType::Bonfire) {
                                             newData.name = "Switch";
                                             newData.type = "Switch";
-                                            newData.fileName = "Bonfire/Bonfire.obj";
+                                            metaKey = "Switch_Bonfire";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Switch");
                                             if (auto* param = dynamic_cast<SwitchParam*>(newData.gimmickParam.get())) {
                                                 param->switchType_ = 2; // 篝火
@@ -779,7 +788,7 @@ void EditorScene::UpdateRaycastEdit()
                                         else if (type == MapChipType::GasEmitter) {
                                             newData.name = "GasEmitter";
                                             newData.type = "GasEmitter";
-                                            newData.fileName = "Vent/Venct.obj";
+                                            metaKey = "GasEmitter";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("GasEmitter");
                                             if (auto* param = dynamic_cast<GasEmitterParam*>(newData.gimmickParam.get())) {
                                                 param->listenEventName_ = "Event_1"; // デフォルト
@@ -792,26 +801,32 @@ void EditorScene::UpdateRaycastEdit()
                                         else if (type == MapChipType::DestructibleWall) {
                                             newData.name = "DestructibleWall";
                                             newData.type = "DestructibleWall";
-                                            newData.fileName = "StoneBlock/StoneBlock.obj";
+                                            metaKey = "DestructibleWall";
                                             // DestructibleWallGimmick は Param を持たず、DestructibleWall 側の Factory ロジック等に任せるか Param を作る
                                         }
                                         else if (type == MapChipType::Spike) {
                                             newData.name = "Spike";
                                             newData.type = "Spike";
-                                            newData.fileName = "Thorn/Thorn.obj";
+                                            metaKey = "Spike";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Spike");
                                         }
                                         else if (type == MapChipType::LaserEmitter) {
                                             newData.name = "LaserEmitter";
                                             newData.type = "LaserEmitter";
-                                            newData.fileName = "LaserEmitter/LaserEmitter.obj";
+                                            metaKey = "LaserEmitter";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("LaserEmitter");
                                         }
                                         else if (type == MapChipType::SwingingBridge) {
                                             newData.name = "SwingingBridge";
                                             newData.type = "SwingingBridge";
-                                            newData.fileName = "SwingingBridge/SwingingBridgePlatform.obj";
+                                            metaKey = "SwingingBridge";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("SwingingBridge");
+                                        }
+                                        
+                                        if (!metaKey.empty()) {
+                                            if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData(metaKey)) {
+                                                newData.fileName = metaData->defaultModelPath;
+                                            }
                                         }
                                         
                                         currentLevelData_.objects.push_back(newData);
@@ -825,6 +840,7 @@ void EditorScene::UpdateRaycastEdit()
                                     DirectXCommon::GetInstance()->WaitForGPU();
                                     currentLevelData_.tileMaps[0] = mapChipStage_.GetField().GetTileMapData();
                                     mapChipStage_.Initialize(currentLevelData_);
+                                    mapChipStage_.ApplyMaterialProperties();
                                 }
                             }
                         }
@@ -870,6 +886,7 @@ void EditorScene::Undo()
 
     DirectXCommon::GetInstance()->WaitForGPU();
     mapChipStage_.Initialize(currentLevelData_);
+    mapChipStage_.ApplyMaterialProperties();
 
     if (playerPreview_ && !currentLevelData_.playerSpawns.empty()) {
         playerPreview_->SetTranslate(currentLevelData_.playerSpawns[0].translation);
@@ -894,6 +911,7 @@ void EditorScene::Redo()
 
     DirectXCommon::GetInstance()->WaitForGPU();
     mapChipStage_.Initialize(currentLevelData_);
+    mapChipStage_.ApplyMaterialProperties();
 
     if (playerPreview_ && !currentLevelData_.playerSpawns.empty()) {
         playerPreview_->SetTranslate(currentLevelData_.playerSpawns[0].translation);

@@ -4,6 +4,7 @@
 #include "Engine/Debug/Profiler/ProfilerScope.h"
 #include "Engine/CollisionManager/CollisionManager.h"
 #include "App/Game/Map/MapChipField.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 
 #include <format>
 
@@ -112,6 +113,9 @@ void Game::Initialize()
     ModelManager::GetInstance()->Initialize(DirectXCommon::GetInstance());
     GetBootProfilerForGame()->End("Model");
     CheckInitializeTime("ModelManager", prevTime);
+
+    GimmickMetaDataManager::GetInstance()->Initialize();
+    CheckInitializeTime("GimmickMetaDataManager", prevTime);
 
     MapChipRegistry::Initialize();
     CheckInitializeTime("MapChipRegistry", prevTime);

@@ -659,3 +659,140 @@ void GpuSphFluid::ReleaseDescriptor(uint32_t& descriptorIndex)
     srvManager_->Free(descriptorIndex);
     descriptorIndex = kInvalidDescriptorIndex;
 }
+
+std::vector<GpuSphFluid::Particle> GpuSphFluid::GetParticlesCPU() const
+{
+    std::vector<Particle> result(settings_.particleCount);
+    if (!particleResource_ || settings_.particleCount == 0 || dxCommon_ == nullptr) {
+        return result;
+    }
+
+    ID3D12Device* device = dxCommon_->GetDevice();
+    ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+    ID3D12CommandQueue* commandQueue = dxCommon_->GetCommandQueue();
+    ID3D12CommandAllocator* commandAllocator = dxCommon_->GetCommandAllocator();
+    if (!device || !commandList || !commandQueue || !commandAllocator) {
+        return result;
+    }
+
+    const UINT64 bufferSize = sizeof(Particle) * static_cast<UINT64>(settings_.particleCount);
+
+    D3D12_HEAP_PROPERTIES heapProperties {};
+    heapProperties.Type = D3D12_HEAP_TYPE_READBACK;
+
+    D3D12_RESOURCE_DESC bufferDesc {};
+    bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bufferDesc.Width = bufferSize;
+    bufferDesc.Height = 1;
+    bufferDesc.DepthOrArraySize = 1;
+    bufferDesc.MipLevels = 1;
+    bufferDesc.SampleDesc.Count = 1;
+    bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> readbackBuffer;
+    HRESULT hr = device->CreateCommittedResource(
+        &heapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &bufferDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&readbackBuffer));
+    if (FAILED(hr)) return result;
+
+    D3D12_RESOURCE_STATES oldState = particleState_;
+    const_cast<GpuSphFluid*>(this)->TransitionResource(
+        particleResource_.Get(),
+        const_cast<GpuSphFluid*>(this)->particleState_,
+        D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    commandList->CopyResource(readbackBuffer.Get(), particleResource_.Get());
+
+    const_cast<GpuSphFluid*>(this)->TransitionResource(
+        particleResource_.Get(),
+        const_cast<GpuSphFluid*>(this)->particleState_,
+        oldState);
+
+    commandList->Close();
+    ID3D12CommandList* ppCommandLists[] = { commandList };
+    commandQueue->ExecuteCommandLists(1, ppCommandLists);
+    dxCommon_->WaitForGPU();
+
+    commandAllocator->Reset();
+    commandList->Reset(commandAllocator, nullptr);
+
+    void* mappedData = nullptr;
+    D3D12_RANGE readRange{ 0, bufferSize };
+    if (SUCCEEDED(readbackBuffer->Map(0, &readRange, &mappedData))) {
+        std::memcpy(result.data(), mappedData, bufferSize);
+        readbackBuffer->Unmap(0, nullptr);
+    }
+
+    return result;
+}
+
+void GpuSphFluid::SetParticlesCPU(const std::vector<Particle>& particles)
+{
+    if (!particleResource_ || particles.empty() || dxCommon_ == nullptr) return;
+
+    ID3D12Device* device = dxCommon_->GetDevice();
+    ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+    ID3D12CommandQueue* commandQueue = dxCommon_->GetCommandQueue();
+    ID3D12CommandAllocator* commandAllocator = dxCommon_->GetCommandAllocator();
+    if (!device || !commandList || !commandQueue || !commandAllocator) return;
+
+    const UINT64 bufferSize = (std::min)(
+        sizeof(Particle) * static_cast<UINT64>(settings_.particleCount),
+        sizeof(Particle) * static_cast<UINT64>(particles.size()));
+
+    D3D12_HEAP_PROPERTIES heapProperties {};
+    heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    D3D12_RESOURCE_DESC bufferDesc {};
+    bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bufferDesc.Width = bufferSize;
+    bufferDesc.Height = 1;
+    bufferDesc.DepthOrArraySize = 1;
+    bufferDesc.MipLevels = 1;
+    bufferDesc.SampleDesc.Count = 1;
+    bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> uploadBuffer;
+    HRESULT hr = device->CreateCommittedResource(
+        &heapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &bufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&uploadBuffer));
+    if (FAILED(hr)) return;
+
+    void* mappedData = nullptr;
+    D3D12_RANGE writeRange{ 0, 0 };
+    if (SUCCEEDED(uploadBuffer->Map(0, &writeRange, &mappedData))) {
+        std::memcpy(mappedData, particles.data(), bufferSize);
+        uploadBuffer->Unmap(0, nullptr);
+    }
+
+    D3D12_RESOURCE_STATES oldState = particleState_;
+    TransitionResource(
+        particleResource_.Get(),
+        particleState_,
+        D3D12_RESOURCE_STATE_COPY_DEST);
+
+    commandList->CopyBufferRegion(particleResource_.Get(), 0, uploadBuffer.Get(), 0, bufferSize);
+
+    TransitionResource(
+        particleResource_.Get(),
+        particleState_,
+        oldState);
+
+    commandList->Close();
+    ID3D12CommandList* ppCommandLists[] = { commandList };
+    commandQueue->ExecuteCommandLists(1, ppCommandLists);
+    dxCommon_->WaitForGPU();
+
+    commandAllocator->Reset();
+    commandList->Reset(commandAllocator, nullptr);
+
+    needsReset_ = false;
+}

@@ -8,6 +8,7 @@
 #include "Engine/3D/Object3d.h"
 #include "App/Game/Map/MapChipStage.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 
 GasEmitterGimmick::GasEmitterGimmick()
     : stage_(nullptr)
@@ -36,10 +37,20 @@ bool GasEmitterGimmick::Initialize(
     object_ = std::make_unique<Object3d>();
     object_->Initialize(Object3dManager::GetInstance());
 
-    // 指定されたVentモデルをロード
-    const std::string modelFile = "Vent/Venct.obj"; // 指定通りのパス
-    ModelManager::GetInstance()->Load(modelFile);
-    object_->SetModel(modelFile);
+    std::string finalModelPath = texturePath;
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("GasEmitter")) {
+        finalModelPath = metaData->defaultModelPath;
+    }
+
+    if (!finalModelPath.empty()) {
+        ModelManager::GetInstance()->Load(finalModelPath);
+        object_->SetModel(finalModelPath);
+    } else {
+        Model* model = ModelManager::GetInstance()->CreateCube();
+        if (model) {
+            object_->SetModel(model);
+        }
+    }
 
     object_->SetTranslate(position_);
     object_->SetScale(size_);

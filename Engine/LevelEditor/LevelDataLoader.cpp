@@ -4,8 +4,9 @@
 #include <fstream>
 #include <iostream>
 #include "Engine/Logger/Logger.h"
+#include "Engine/Logger/Logger.h"
 #include "GimmickParamFactory.h"
-
+#include "GimmickMetaDataManager.h"
 LevelData LevelDataLoader::Load(const std::string& filePath)
 {
     std::ifstream file(filePath);
@@ -129,15 +130,35 @@ void LevelDataLoader::LoadObject(const nlohmann::json& objectJson, LevelData& le
         objectData.name = objectJson["name"].get<std::string>();
     }
 
-    if (objectJson.contains("file_name")) {
-        objectData.fileName = objectJson["file_name"].get<std::string>();
+    std::string metaKey = objectData.type;
+    if (metaKey == "Switch" && objectJson.contains("gimmick") && objectJson["gimmick"].contains("switchType")) {
+        int switchType = objectJson["gimmick"]["switchType"].get<int>();
+        if (switchType == 2) {
+            metaKey = "Switch_Bonfire";
+        } else {
+            metaKey = "Switch_PressurePlate";
+        }
+    }
+
+    if (objectJson.contains("file_name") && !objectJson["file_name"].get<std::string>().empty()) {
+        std::string jsonFileName = objectJson["file_name"].get<std::string>();
+        objectData.fileName = jsonFileName;
+
+        // もし古い形式(スラッシュが含まれない単なるファイル名)の場合はメタデータから最新のパスを引く
+        if (jsonFileName.find('/') == std::string::npos && jsonFileName.find('\\') == std::string::npos) {
+            const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData(metaKey);
+            if (metaData) {
+                objectData.fileName = metaData->defaultModelPath;
+            }
+        }
     } else {
-        if (objectData.type == "Goal") {
-            objectData.fileName = "GoalPost/GoalPost.obj";
-            objectData.name = "Goal";
-        } else if (objectData.type == "MovingBlock") {
-            objectData.fileName = "cube";
-            objectData.name = "MovingBlock";
+        const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData(metaKey);
+        if (metaData) {
+            objectData.fileName = metaData->defaultModelPath;
+        }
+
+        if (objectData.name.empty()) {
+            objectData.name = objectData.type;
         }
     }
 

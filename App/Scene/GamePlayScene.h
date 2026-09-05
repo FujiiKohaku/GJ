@@ -32,6 +32,7 @@ private:
     void UpdateCollisionText();
     void StartDeathTransition();
     void UpdateDeathTransition(float deltaTime);
+    void RespawnPlayerLeavingCorpse();
 
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
@@ -57,4 +58,7 @@ private:
     uint32_t emittedParticleTotal_ = 0;
     bool showForces_ = false;
     float eyeOffsetX_ = 0.0f;
+    Vector3 playerStartPosition_ = { 0.0f, 0.0f, 0.0f };
+    bool selfDestructSlowActive_ = false;
+    float timeScaleBeforeSelfDestruct_ = 1.0f;
 };

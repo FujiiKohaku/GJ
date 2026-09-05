@@ -1,0 +1,39 @@
+{
+  "Goal": {
+    "file_name": "GoalPost/GoalPost.obj"
+  },
+  "Spike": {
+    "file_name": "Thorn/Thorn.obj"
+  },
+  "Switch_PressurePlate": {
+    "file_name": "PressurePlate/PressurePlate.obj"
+  },
+  "Switch_Bonfire": {
+    "file_name": "Bonfire/Bonfire.obj"
+  },
+  "MovingBlock": {
+    "file_name": "cube"
+  },
+  "GasEmitter": {
+    "file_name": "Vent/Venct.obj"
+  },
+  "DestructibleWall": {
+    "file_name": "StoneBlock/StoneBlock.obj"
+  },
+  "LaserEmitter": {
+    "file_name": "LaserEmitter/LaserEmitter.obj"
+  },
+  "SwingingBridge": {
+    "file_name": "SwingingBridge/SwingingBridgePlatform.obj"
+  },
+  "Floor": {
+    "file_name": "",
+    "material_type": "Moss",
+    "texture_name": "resources/Textures/Terrain/MossSoil.png"
+  },
+  "Wall": {
+    "file_name": "",
+    "material_type": "Moss",
+    "texture_name": "resources/Textures/Terrain/MossSoil.png"
+  }
+}

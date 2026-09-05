@@ -20,8 +20,7 @@ public:
             "resources/Textures/checkerboard.png");
     void Update();
     void Draw();
-    void EnableToonLighting();
-    void EnableMossTerrain();
+    void ApplyMaterialProperties();
 
     const MapChipField& GetField() const;
     MapChipField& GetField();
@@ -32,6 +31,7 @@ public:
     MapChipPlayer* GetPlayer() const { return player_; }
     
     std::vector<BaseMapChipGimmick*> GetGimmicks() const;
+    void AddGimmick(std::unique_ptr<BaseMapChipGimmick> gimmick);
 
     /**
      * @brief イベントマネージャを取得する
@@ -63,6 +63,9 @@ public:
     void CreateExplosion(const Vector3& origin, float radius);
 
 private:
+    void ResolveHardenedSlimeAdhesion(
+        const BaseMapChipGimmick& hardenedSlime);
+
     MapChipField field_;
     std::vector<std::unique_ptr<Object3d>> blockObjects_;
     std::vector<std::unique_ptr<BaseMapChipGimmick>> gimmicks_;

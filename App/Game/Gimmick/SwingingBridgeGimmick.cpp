@@ -4,11 +4,11 @@
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/Time/TimeManager.h"
-#include "Engine/Input/Input.h"
 #include "Engine/Math/MathStruct.h"
 #include "App/Game/Map/MapChipStage.h"
 #include "Engine/CollisionManager/CollisionManager.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include <cmath>
 #include <format>
 #include <numbers>
@@ -34,8 +34,15 @@ bool SwingingBridgeGimmick::Initialize(
     previousPosition_ = basePosition_;
 
     // 足場モデルの初期化
-    std::string platformFile = "SwingingBridge/SwingingBridgePlatform.obj";
-    Model* platformModel = ModelManager::GetInstance()->Load(platformFile);
+    std::string platformFile = texturePath;
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("SwingingBridge")) {
+        platformFile = metaData->defaultModelPath;
+    }
+
+    Model* platformModel = nullptr;
+    if (!platformFile.empty()) {
+        platformModel = ModelManager::GetInstance()->Load(platformFile);
+    }
     if (!platformModel) {
         // フォールバックとしてキューブを使用
         platformModel = ModelManager::GetInstance()->CreateCube("resources/Textures/white1x1.png");
@@ -75,21 +82,6 @@ void SwingingBridgeGimmick::Update()
     if (!platformObject_) return;
 
     previousPosition_ = currentPosition_;
-
-    auto input = Input::GetInstance();
-    
-    // TODO: チームメンバーが死体処理を追加する場所
-    // （ここで、プレイヤーの死体があるか、または死体がくっついた橋と接触しているかを判定し、
-    //   isStuck_ フラグを true にする処理を後日追加してください。）
-    
-    // 【デバッグ機能】Kキーを押すと強制的にスタック（くっつき）状態になる
-    // これは「死体がのりになる」という前提（フラグ）が成立したことを意味する
-    if (input->IsKeyTrigger(DIK_K)) {
-        if (!isStuck_) {
-            Logger::Log("[SwingingBridge] Debug: K key pressed. Ready to stick on next collision!\n");
-        }
-        isStuck_ = true;
-    }
 
     if (isPermanentlyStuck_) {
         // 壁などにぶつかって完全に固定された場合は一切移動しない
@@ -139,9 +131,12 @@ void SwingingBridgeGimmick::Update()
                     // ぶつかった瞬間の時間を計算してめり込みを防ぐ
                     float safeT = static_cast<float>(i - 1) / steps; // 1つ前の安全な位置の割合
                     
-                    if (isStuck_) {
+                    const bool shouldStick =
+                        isStuck_ ||
+                        (hitBridge && hitBridge->HasAdhesive());
+                    if (shouldStick) {
                         // のりが付いている場合は完全にくっついて停止する
-                        isPermanentlyStuck_ = true;
+                        ForceStuck();
                         if (hitBridge) {
                             hitBridge->ForceStuck();
                         }
@@ -306,7 +301,6 @@ bool SwingingBridgeGimmick::CheckCollision(const AABB& aabb, SwingingBridgeGimmi
     for (BaseMapChipGimmick* other : stage_->GetGimmicks()) {
         if (other == this) continue;
         
-        SwingingBridgeGimmick* otherBridge = dynamic_cast<SwingingBridgeGimmick*>(other);
         SwingingBridgeGimmick* bridge = dynamic_cast<SwingingBridgeGimmick*>(other);
         if (bridge) {
             AABB otherAABB = bridge->GetAABB();

@@ -3,6 +3,7 @@
 #include "Engine/2D/SpriteManager.h"
 #include "Engine/2D/Text/TextRenderer.h"
 #include "Engine/3D/Object3dManager.h"
+#include "Engine/3D/ModelManager.h"
 #include "Engine/3D/SkinningObject3dManager.h"
 #include "Engine/3D/SkyBox/SkyBoxManager.h"
 #include "Engine/DirectXCommon/DirectXCommon.h"
@@ -16,6 +17,7 @@
 #include "SceneManager.h"
 #include "ArchiveScene.h"
 #include "GameOverScene.h"
+#include "App/Game/Gimmick/HardenedFluidSlimeCorpse.h"
 #include <algorithm>
 #include <format>
 #include <string>
@@ -36,13 +38,73 @@ constexpr Vector3 kSlimeRenderForward = { 0.0f, 0.0f, 1.0f };
 
 Vector3 MakeFluidCorePosition(const MapChipPlayer& player)
 {
-    Vector3 corePosition = player.GetPosition();
+    Vector3 corePosition = player.IsShapingSelfDestruct()
+        ? player.GetAABB().center
+        : player.GetPosition();
     // neo_Engineの形状比率を保ち、GJのワールド寸法へ一律縮小する。
     // 最下部の休止粒子が床の衝突面へ届き、接地時に底が平らになる高さ。
     corePosition.y += 0.086f * kNeoWorldScale;
     corePosition.z = kFluidRenderZ;
     return corePosition;
 }
+
+class HardenedSlimeBody final : public BaseMapChipGimmick {
+public:
+    explicit HardenedSlimeBody(const AABB& bounds)
+        : bounds_(bounds)
+    {
+    }
+
+    bool Initialize(
+        const Vector3&,
+        const std::string&,
+        const BaseGimmickParam*) override
+    {
+        // 外部モデル(slime_mesh.obj)は一切使わず、変形した自爆形状(bounds_)に100%一致するCubeモデルで生成する。
+        object_ = std::make_unique<Object3d>();
+        object_->Initialize(Object3dManager::GetInstance());
+        Model* cubeModel = ModelManager::GetInstance()->CreateCube("resources/Textures/white.png");
+        object_->SetModel(cubeModel);
+        object_->SetTranslate({
+            bounds_.center.x,
+            bounds_.center.y,
+            kFluidRenderZ });
+        object_->SetScale(bounds_.size);
+        object_->SetColor({ 0.20f, 0.95f, 0.65f, 1.0f });
+        object_->SetEnableLighting(true);
+        object_->Update();
+
+        collisionBoxes_.clear();
+        collisionBoxes_.push_back(bounds_);
+        return true;
+    }
+
+    void Update() override
+    {
+        if (object_) {
+            object_->Update();
+        }
+    }
+
+    void Draw() override
+    {
+        if (object_) {
+            object_->Draw();
+        }
+    }
+
+    AABB GetAABB() const override { return bounds_; }
+    std::vector<AABB> GetCollisionBoxes() const override
+    {
+        return collisionBoxes_;
+    }
+    bool IsHardenedSlime() const override { return true; }
+
+private:
+    AABB bounds_ {};
+    std::vector<AABB> collisionBoxes_;
+    std::unique_ptr<Object3d> object_;
+};
 
 Vector3 MakeFluidEmitterPosition(const MapChipPlayer& player)
 {
@@ -109,16 +171,17 @@ std::vector<GpuSphFluid::CollisionObstacle> BuildFluidObstacles(
     const float safeDeltaTime = (std::max)(deltaTime, 0.0001f);
     for (BaseMapChipGimmick* gimmick : gimmicks) {
         if (!gimmick->IsSolid()) continue;
-        const AABB box = gimmick->GetAABB();
         const Vector3 delta = gimmick->GetDeltaPosition();
-        obstacles.push_back(MakeFluidObstacle(
-            box.center,
-            box.size,
-            {
-                delta.x / safeDeltaTime,
-                delta.y / safeDeltaTime,
-                delta.z / safeDeltaTime
-            }));
+        for (const AABB& box : gimmick->GetCollisionBoxes()) {
+            obstacles.push_back(MakeFluidObstacle(
+                box.center,
+                box.size,
+                {
+                    delta.x / safeDeltaTime,
+                    delta.y / safeDeltaTime,
+                    delta.z / safeDeltaTime
+                }));
+        }
     }
 
     return obstacles;
@@ -139,13 +202,13 @@ void GamePlayScene::Initialize()
     SkinningObject3dManager::GetInstance()->SetDefaultCamera(camera_.get());
 
     debugCameraController_.SetTargetCamera(camera_.get());
-    debugCameraController_.SetDebugMode(true);
+    debugCameraController_.SetDebugMode(false);
 
     LevelDataLoader loader;
     LevelData levelData = loader.Load(kStage1Json);
 
     mapChipStage_.Initialize(levelData);
-    mapChipStage_.EnableMossTerrain();
+    mapChipStage_.ApplyMaterialProperties();
 
     Vector3 playerStartPos = { 0.0f, 0.0f, 0.0f };
     if (!levelData.playerSpawns.empty()) {
@@ -154,6 +217,7 @@ void GamePlayScene::Initialize()
 
     player_ = std::make_unique<MapChipPlayer>();
     player_->Initialize(&mapChipStage_.GetField(), playerStartPos);
+    playerStartPosition_ = playerStartPos;
     mapChipStage_.SetPlayer(player_.get());
     
     gpuSphFluid_ = std::make_unique<GpuSphFluid>();
@@ -239,7 +303,8 @@ void GamePlayScene::Initialize()
     instructionText_->Initialize(kDefaultFont);
     instructionText_->SetText(
         "MOVE : A/D OR LEFT/RIGHT   JUMP : SPACE/W/UP   "
-        "F1 : FREE CAM (WASD+MOUSE)   TAB : MENU   BACKSPACE : STAGE SELECT");
+        "T : SLOW/SHAPE, T AGAIN : SELF-DESTRUCT   R : RESTART   "
+        "F1 : FREE CAM   TAB : MENU   BACKSPACE : STAGE SELECT");
     instructionText_->SetPosition({ 32.0f, 32.0f });
     instructionText_->SetFontSize(24.0f);
     instructionText_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
@@ -295,6 +360,10 @@ void GamePlayScene::Initialize()
 
 void GamePlayScene::Finalize()
 {
+    if (selfDestructSlowActive_) {
+        TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
+        selfDestructSlowActive_ = false;
+    }
     SceneManager::GetInstance()->RemovePostEffect(PostEffectType::SlimeScreen);
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     debugCameraController_.SetTargetCamera(nullptr);
@@ -311,13 +380,20 @@ void GamePlayScene::Update()
     Input* input = Input::GetInstance();
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
 
+    if (input->IsKeyTrigger(DIK_R)) {
+        SceneManager::GetInstance()->SetNextScene(
+            std::make_unique<GamePlayScene>());
+        return;
+    }
+
     if (isDeathTransitionActive_) {
         UpdateDeathTransition(TimeManager::GetInstance()->GetDeltaTime());
         return;
     }
 
     // TABキーでメニュー開閉
-    if (Input::GetInstance()->IsKeyTrigger(DIK_TAB)) {
+    if (Input::GetInstance()->IsKeyTrigger(DIK_TAB) &&
+        !player_->IsShapingSelfDestruct()) {
         isMenuOpen_ = !isMenuOpen_;
     }
 
@@ -354,9 +430,29 @@ void GamePlayScene::Update()
     const bool isFreeCameraMode = debugCameraController_.GetDebugMode();
 
     mapChipStage_.Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
+    bool hardenedThisFrame = false;
+    if (player_->ConsumeDeathRequest()) {
+        RespawnPlayerLeavingCorpse();
+        hardenedThisFrame = true;
+    }
+
     //player_->Update(mapChipStage_.GetGimmicks());
-    if (!isFreeCameraMode) {
+    if (!hardenedThisFrame &&
+        (!isFreeCameraMode || player_->IsShapingSelfDestruct())) {
         player_->Update(mapChipStage_.GetGimmicks());
+    }
+
+    if (player_->IsShapingSelfDestruct() && !selfDestructSlowActive_) {
+        TimeManager* timeManager = TimeManager::GetInstance();
+        timeScaleBeforeSelfDestruct_ = timeManager->GetTimeScale();
+        timeManager->SetTimeScale(0.08f);
+        selfDestructSlowActive_ = true;
+    }
+
+    AABB hardenedBody;
+    if (player_->ConsumeHardenedBody(hardenedBody)) {
+        RespawnPlayerLeavingCorpse();
+        hardenedThisFrame = true;
     }
      if (player_->IsCrushed()) {
       StartDeathTransition();
@@ -366,14 +462,27 @@ void GamePlayScene::Update()
     if (gpuSphFluid_) {
         const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
         const std::vector<BaseMapChipGimmick*> gimmicks = mapChipStage_.GetGimmicks();
+
+        SceneManager* sceneManager = SceneManager::GetInstance();
+        sceneManager->ClearExtraScreenSpaceFluids();
+        for (BaseMapChipGimmick* gimmick : gimmicks) {
+            if (gimmick && gimmick->IsHardenedSlime()) {
+                auto corpse = static_cast<HardenedFluidSlimeCorpse*>(gimmick);
+                if (corpse->GetFluid()) {
+                    sceneManager->AddExtraScreenSpaceFluid(corpse->GetFluid());
+                }
+            }
+        }
+
         gpuSphFluid_->SetObstacles(
             BuildFluidObstacles(mapChipStage_, gimmicks, deltaTime));
         gpuSphFluid_->SetFloorHeight(player_->GetFluidFloorHeight());
         gpuSphFluid_->SetGrounded(player_->IsGrounded());
+        const Vector3 playerScale = player_->GetVisualScale();
         const Vector3 targetRadii = {
-            1.2f * kNeoWorldScale,
-            0.85f * kNeoWorldScale,
-            1.2f * kNeoWorldScale };
+            playerScale.x * (2.4f * kNeoWorldScale),
+            playerScale.y * (1.7f * kNeoWorldScale),
+            playerScale.z * (2.4f * kNeoWorldScale) };
         gpuSphFluid_->SetBlobRadii(targetRadii);
         float minX = -1000.0f, maxX = 1000.0f, maxY = 1000.0f;
         player_->GetWallBoundaries(minX, maxX, maxY, gimmicks);
@@ -394,12 +503,19 @@ void GamePlayScene::Update()
             -kEyeFollowSpeed * deltaTime,
             kEyeFollowSpeed * deltaTime);
         eyeOffsetX_ += eyeDelta;
-        gpuSphFluid_->SetEyeOffsetX(eyeOffsetX_);
+        const Vector2 shapeEyeOffset = player_->GetEyeOffset();
+        gpuSphFluid_->SetEyeOffsetX(eyeOffsetX_ + shapeEyeOffset.x);
+        gpuSphFluid_->SetEyeOffsetY(shapeEyeOffset.y);
         gpuSphFluid_->SetControlState(
             MakeFluidCorePosition(*player_),
             MakeFluidTargetVelocity(player_->GetVelocity()),
             kSlimeRenderForward);
-        const bool leftMousePressed = !isFreeCameraMode && IsLeftMouseButtonDown(input);
+        // 変形ドラッグ中の左クリックを、液体放出として二重に扱わない。
+        const bool leftMousePressed =
+            !isFreeCameraMode &&
+            !player_->IsShapingSelfDestruct() &&
+            !hardenedThisFrame &&
+            IsLeftMouseButtonDown(input);
         const bool leftMouseTriggered =
             leftMousePressed && !wasLeftMousePressed_;
         const Vector3 emitterPosition = MakeFluidEmitterPosition(*player_);
@@ -468,13 +584,50 @@ void GamePlayScene::Draw3D()
 
 void GamePlayScene::DrawParticle()
 {
-    if (showForces_ && gpuSphFluid_ && gpuSphFluidRenderer_) {
-        gpuSphFluidRenderer_->Draw(*gpuSphFluid_, *camera_);
+    if (showForces_ && gpuSphFluid_) {
+        fluidForceRenderer_->Draw(*gpuSphFluid_, *camera_);
     }
 }
 
 void GamePlayScene::DrawImGui()
 {
+}
+
+void GamePlayScene::RespawnPlayerLeavingCorpse()
+{
+    if (selfDestructSlowActive_) {
+        TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
+        selfDestructSlowActive_ = false;
+    }
+
+    const GpuSphFluid::Settings currentSettings = gpuSphFluid_->GetSettings();
+    const std::vector<GpuSphFluid::Particle> particles =
+        gpuSphFluid_->GetParticlesCPU();
+
+    auto corpse = std::make_unique<HardenedFluidSlimeCorpse>();
+    if (corpse->InitializeFromParticles(
+            DirectXCommon::GetInstance(),
+            SrvManager::GetInstance(),
+            particles,
+            currentSettings)) {
+        mapChipStage_.AddGimmick(std::move(corpse));
+    }
+
+    player_->Initialize(&mapChipStage_.GetField(), playerStartPosition_);
+    eyeOffsetX_ = 0.0f;
+    wasLeftMousePressed_ = false;
+
+    GpuSphFluid::Settings respawnSettings = currentSettings;
+    respawnSettings.corePosition = MakeFluidCorePosition(*player_);
+    respawnSettings.floorHeight = player_->GetFluidFloorHeight();
+    respawnSettings.targetVelocity = { 0.0f, 0.0f, 0.0f };
+    const Vector3 playerScale = player_->GetVisualScale();
+    respawnSettings.blobRadii = {
+        playerScale.x * (2.4f * kNeoWorldScale),
+        playerScale.y * (1.7f * kNeoWorldScale),
+        playerScale.z * (2.4f * kNeoWorldScale) };
+    gpuSphFluid_->SetLiquidated(false);
+    gpuSphFluid_->Reset(respawnSettings);
 }
 
 void GamePlayScene::StartDeathTransition()

@@ -5,9 +5,75 @@
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/CollisionManager/CollisionManager.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
+#include "Engine/Time/TimeManager.h"
 #include <algorithm>
+#include <cmath>
 #include <format>
 #include <numbers>
+
+namespace {
+constexpr float kLaserThickness = 0.2f;
+constexpr float kPlayerDeathDelay = 0.15f;
+
+bool OverlapsLaserWidth(
+    const AABB& box,
+    const Vector3& emitterPosition,
+    int dx,
+    int dy)
+{
+    const Vector3 halfSize = box.size * 0.5f;
+    const float halfThickness = kLaserThickness * 0.5f;
+    if (std::abs(box.center.z - emitterPosition.z) >
+        halfSize.z + halfThickness) {
+        return false;
+    }
+
+    if (dx != 0) {
+        return std::abs(box.center.y - emitterPosition.y) <=
+            halfSize.y + halfThickness;
+    }
+    if (dy != 0) {
+        return std::abs(box.center.x - emitterPosition.x) <=
+            halfSize.x + halfThickness;
+    }
+    return false;
+}
+
+float GetBlockDistanceFromHardenedSlime(
+    const AABB& box,
+    const Vector3& emitterPosition,
+    int dx,
+    int dy)
+{
+    if (!OverlapsLaserWidth(box, emitterPosition, dx, dy)) {
+        return -1.0f;
+    }
+
+    const Vector3 halfSize = box.size * 0.5f;
+    if (dx > 0) {
+        const float muzzle = emitterPosition.x + 0.5f;
+        if (box.center.x + halfSize.x < muzzle) return -1.0f;
+        return (std::max)(0.0f, box.center.x - halfSize.x - muzzle);
+    }
+    if (dx < 0) {
+        const float muzzle = emitterPosition.x - 0.5f;
+        if (box.center.x - halfSize.x > muzzle) return -1.0f;
+        return (std::max)(0.0f, muzzle - (box.center.x + halfSize.x));
+    }
+    if (dy > 0) {
+        const float muzzle = emitterPosition.y + 0.5f;
+        if (box.center.y + halfSize.y < muzzle) return -1.0f;
+        return (std::max)(0.0f, box.center.y - halfSize.y - muzzle);
+    }
+    if (dy < 0) {
+        const float muzzle = emitterPosition.y - 0.5f;
+        if (box.center.y - halfSize.y > muzzle) return -1.0f;
+        return (std::max)(0.0f, muzzle - (box.center.y + halfSize.y));
+    }
+    return -1.0f;
+}
+}
 
 LaserGimmick::LaserGimmick()
 {
@@ -15,7 +81,7 @@ LaserGimmick::LaserGimmick()
 
 bool LaserGimmick::Initialize(
     const Vector3& position,
-    const std::string& /*texturePath*/, // 外部からのテクスチャパスは無視
+    const std::string& texturePath,
     const BaseGimmickParam* gimmickParam)
 {
     position_ = position;
@@ -31,9 +97,20 @@ bool LaserGimmick::Initialize(
     emitterObject_ = std::make_unique<Object3d>();
     emitterObject_->Initialize(Object3dManager::GetInstance());
     
-    std::string emitterModel = "LaserEmitter/LaserEmitter.obj";
-    ModelManager::GetInstance()->Load(emitterModel);
-    emitterObject_->SetModel(emitterModel);
+    std::string emitterModel = texturePath;
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("LaserEmitter")) {
+        emitterModel = metaData->defaultModelPath;
+    }
+
+    if (!emitterModel.empty()) {
+        ModelManager::GetInstance()->Load(emitterModel);
+        emitterObject_->SetModel(emitterModel);
+    } else {
+        Model* model = ModelManager::GetInstance()->CreateCube();
+        if (model) {
+            emitterObject_->SetModel(model);
+        }
+    }
     emitterObject_->SetTranslate(position_);
     emitterObject_->SetScale({1.0f, 1.0f, 1.0f});
     emitterObject_->SetEnableLighting(true);
@@ -117,11 +194,30 @@ void LaserGimmick::Update()
 
     float floatDist = static_cast<float>(distance);
 
+    // 硬化したスライムの実形状を遮蔽物として扱い、最も手前でレーザーを止める。
+    for (BaseMapChipGimmick* gimmick : stage_->GetGimmicks()) {
+        if (!gimmick || !gimmick->IsHardenedSlime()) {
+            continue;
+        }
+        for (const AABB& bodyBox : gimmick->GetCollisionBoxes()) {
+            const float blockDistance = GetBlockDistanceFromHardenedSlime(
+                bodyBox,
+                position_,
+                dx,
+                dy);
+            if (blockDistance >= 0.0f) {
+                floatDist = (std::min)(floatDist, blockDistance);
+            }
+        }
+    }
+
     // --- Step 2: レーザービームのAABBを仮作成 ---
     // 発射口（本体の中心から少し前）から、障害物の手前までの長さ
-    float laserThickness = 0.2f;
     Vector3 laserCenter = position_;
-    Vector3 laserSize = { laserThickness, laserThickness, laserThickness };
+    Vector3 laserSize = {
+        kLaserThickness,
+        kLaserThickness,
+        kLaserThickness };
 
     if (dx != 0) {
         laserSize.x = floatDist;
@@ -186,16 +282,16 @@ void LaserGimmick::Update()
         if (!wasPlayerColliding_) {
             Logger::Log(std::format("[LaserGimmick] Player hit by laser at ({}, {}, {})\n",
                                     position_.x, position_.y, position_.z));
-            
-            // =====================================================================================
-            // TODO: ここにチームメンバーが「プレイヤーへのダメージ」や「死体のスポーン」処理を実装する
-            // =====================================================================================
-            // 例: player->TakeDamage(1);
-            // =====================================================================================
+        }
+        playerHitTime_ += TimeManager::GetInstance()->GetUnscaledDeltaTime();
+        if (playerHitTime_ >= kPlayerDeathDelay) {
+            player->RequestDeath();
+            playerHitTime_ = 0.0f;
         }
         wasPlayerColliding_ = true;
     } else {
         wasPlayerColliding_ = false;
+        playerHitTime_ = 0.0f;
     }
 }
 

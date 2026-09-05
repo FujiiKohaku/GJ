@@ -6,6 +6,8 @@
 #include "Engine/3D/Object3d.h"
 #include "Engine/Logger/Logger.h"
 #include "Engine/DirectXCommon/DirectXCommon.h"
+#include "Engine/DirectXCommon/DirectXCommon.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include <format>
 
 // 初期AABB設定: 横1、高さ0.7、底面(Y=-0.5)にくっつくようにY=-0.15オフセット
@@ -27,7 +29,16 @@ bool SpikeGimmick::Initialize(
     object3d_->Initialize(Object3dManager::GetInstance());
     
     // モデルのロード
-    std::string modelFile = "Thorn/Thorn.obj";
+    std::string modelFile = "Thorn/Thorn.obj"; // Fallback
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("Spike")) {
+        modelFile = metaData->defaultModelPath;
+    }
+    
+    // texturePath（checkerboard.png等）を渡してくるパターンがあるため、objやgltf以外は無視するか、ここではメタデータを優先する。
+    // MapChipStageから直接objファイル名が渡された場合のみ上書きする
+    if (!texturePath.empty() && (texturePath.find(".obj") != std::string::npos || texturePath.find(".gltf") != std::string::npos)) {
+        modelFile = texturePath;
+    }
     ModelManager::GetInstance()->Load(modelFile);
     
     object3d_->SetModel(modelFile);
@@ -68,17 +79,10 @@ void SpikeGimmick::Update()
 
     if (isColliding) {
         if (!wasPlayerColliding_) {
-            // トゲに新しく触れた（または上から乗った）瞬間の処理
             Logger::Log(std::format("[SpikeGimmick] Player touched the spike at ({:.2f}, {:.2f}, {:.2f})\n",
                                     position_.x, position_.y, position_.z));
-
-            // =====================================================================================
-            // TODO: ここにチームメンバーが「プレイヤーへのダメージ」や「死体のスポーン」処理を実装する
-            // =====================================================================================
-            // 例: player->TakeDamage(1);
-            // 例: stage_->GetEventManager().PublishEvent("PlayerKilledBySpike", &position_);
-            // =====================================================================================
         }
+        player->RequestDeath();
         wasPlayerColliding_ = true;
     } else {
         wasPlayerColliding_ = false;

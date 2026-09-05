@@ -6,6 +6,7 @@
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/3D/Object3d.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include "App/Game/Map/MapChipStage.h"
 #include "App/Game/Player/MapChipPlayer.h"
 #include "Engine/CollisionManager/CollisionManager.h"
@@ -44,10 +45,16 @@ bool SwitchGimmick::Initialize(
 
     // Typeに応じたモデルのロード
     std::string modelFile;
-    if (param_->switchType_ == 2) {
-        modelFile = "Bonfire/Bonfire.obj";
+    std::string metaKey = (param_->switchType_ == 2) ? "Switch_Bonfire" : "Switch_PressurePlate";
+    
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData(metaKey)) {
+        modelFile = metaData->defaultModelPath;
     } else {
-        modelFile = "PressurePlate/PressurePlate.obj";
+        modelFile = (param_->switchType_ == 2) ? "Bonfire/Bonfire.obj" : "PressurePlate/PressurePlate.obj";
+    }
+
+    if (!texturePath.empty() && (texturePath.find(".obj") != std::string::npos || texturePath.find(".gltf") != std::string::npos)) {
+        modelFile = texturePath;
     }
 
     ModelManager::GetInstance()->Load(modelFile);
@@ -84,6 +91,21 @@ void SwitchGimmick::Update()
             AABB playerBox = stage_->GetPlayer()->GetAABB();
             if (CollisionManager::Intersect(GetAABB(), playerBox).isHit) {
                 isStepped = true;
+            }
+        }
+
+        // プレイヤーが復帰した後も、硬化した死体の重さで感圧板を維持する。
+        if (!isStepped) {
+            for (BaseMapChipGimmick* gimmick : stage_->GetGimmicks()) {
+                if (gimmick != this && gimmick->IsHardenedSlime()) {
+                    for (const AABB& bodyBox : gimmick->GetCollisionBoxes()) {
+                        if (CollisionManager::Intersect(GetAABB(), bodyBox).isHit) {
+                            isStepped = true;
+                            break;
+                        }
+                    }
+                    if (isStepped) break;
+                }
             }
         }
         

@@ -3,6 +3,7 @@
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 
 bool GoalGimmick::Initialize(
     const Vector3& position,
@@ -14,9 +15,14 @@ bool GoalGimmick::Initialize(
     object_ = std::make_unique<Object3d>();
     object_->Initialize(Object3dManager::GetInstance());
 
-    if (!modelFile.empty()) {
-        ModelManager::GetInstance()->Load(modelFile);
-        object_->SetModel(modelFile);
+    std::string finalModelPath = modelFile;
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("Goal")) {
+        finalModelPath = metaData->defaultModelPath;
+    }
+
+    if (!finalModelPath.empty()) {
+        ModelManager::GetInstance()->Load(finalModelPath);
+        object_->SetModel(finalModelPath);
     } else {
         // デフォルトはプレーン
         Model* model = ModelManager::GetInstance()->CreatePlane();
