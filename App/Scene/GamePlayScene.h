@@ -10,6 +10,7 @@
 #include "Engine/Fluid/GpuSphFluid.h"
 #include "Engine/Fluid/FluidForceRenderer.h"
 #include "Engine/Fluid/GpuSphFluidRenderer.h"
+#include "Engine/Effect/EffectManager.h"
 #include "Engine/2D/Sprite.h"
 #include "Engine/2D/Text/Text.h"
 #include "Engine/3D/SkyBox/SkyBox.h"
@@ -61,9 +62,8 @@ private:
     std::unique_ptr<Text> menuInstructionText_;
     bool isDeathTransitionActive_ = false;
     float deathTransitionTime_ = 0.0f;
-    bool wasLeftMousePressed_ = false;
-    uint32_t emittedParticleTotal_ = 0;
     bool showForces_ = false;
+    EffectHandle walkingDustEffectHandle_ = kInvalidEffectHandle;
     float eyeOffsetX_ = 0.0f;
     Vector3 playerStartPosition_ = { 0.0f, 0.0f, 0.0f };
     bool selfDestructSlowActive_ = false;

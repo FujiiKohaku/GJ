@@ -612,6 +612,10 @@ void ScreenSpaceFluidRenderer::UpdateCompositeParameter(
         eyeScreenPosition.y / static_cast<float>(WinApp::kClientHeight)
     };
     compositeData_->paddingEyeCenter = { 0.0f, 0.0f };
+    const float idleDuration = fluid.GetIdleDuration();
+    compositeData_->idleFaceAmount = fluid.GetIdleExpressionBlend();
+    compositeData_->idleFaceTime = idleDuration;
+    compositeData_->paddingIdleFace = { 0.0f, 0.0f };
 }
 
 void ScreenSpaceFluidRenderer::DrawFullScreen(

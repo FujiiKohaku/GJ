@@ -23,7 +23,6 @@
 #include <format>
 #include <string>
 #include <vector>
-#include <Windows.h>
 
 namespace {
 constexpr const char* kSkyBoxTexture = "resources/Textures/skybox.dds";
@@ -107,11 +106,6 @@ private:
     std::unique_ptr<Object3d> object_;
 };
 
-Vector3 MakeFluidEmitterPosition(const MapChipPlayer& player)
-{
-    return MakeFluidCorePosition(player);
-}
-
 Vector3 MakeFluidTargetVelocity(const Vector3& playerVelocity)
 {
     return {
@@ -135,12 +129,6 @@ GpuSphFluid::CollisionObstacle MakeFluidObstacle(
     };
     obstacle.velocity = { velocity.x, velocity.y, 0.0f };
     return obstacle;
-}
-
-bool IsLeftMouseButtonDown(Input* input)
-{
-    return input->IsMousePressed(0) ||
-        (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 }
 
 std::vector<GpuSphFluid::CollisionObstacle> BuildFluidObstacles(
@@ -275,6 +263,8 @@ void GamePlayScene::Initialize()
     };
     gpuSphFluid_->Initialize(DirectXCommon::GetInstance(), SrvManager::GetInstance(), fluidSettings);
     gpuSphFluid_->SetLiquidated(false); // スライムプレイヤーとしてのまとまった形状を維持
+    walkingDustEffectHandle_ = kInvalidEffectHandle;
+    EffectManager::GetInstance()->SetCamera(camera_.get());
     
     fluidForceRenderer_ = std::make_unique<FluidForceRenderer>();
     fluidForceRenderer_->Initialize(DirectXCommon::GetInstance());
@@ -383,6 +373,10 @@ void GamePlayScene::Finalize()
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     debugCameraController_.SetTargetCamera(nullptr);
     SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
+    SceneManager::GetInstance()->ClearExtraScreenSpaceFluids();
+    EffectManager::GetInstance()->StopAllEffects();
+    EffectManager::GetInstance()->SetCamera(nullptr);
+    walkingDustEffectHandle_ = kInvalidEffectHandle;
     if (gpuSphFluid_) {
         gpuSphFluid_->Finalize();
     }
@@ -530,37 +524,56 @@ void GamePlayScene::Update()
             MakeFluidCorePosition(*player_),
             MakeFluidTargetVelocity(player_->GetVelocity()),
             kSlimeRenderForward);
-        // 変形ドラッグ中の左クリックを、液体放出として二重に扱わない。
-        const bool leftMousePressed =
-            !isFreeCameraMode &&
-            !player_->IsShapingSelfDestruct() &&
-            !hardenedThisFrame &&
-            IsLeftMouseButtonDown(input);
-        const bool leftMouseTriggered =
-            leftMousePressed && !wasLeftMousePressed_;
-        const Vector3 emitterPosition = MakeFluidEmitterPosition(*player_);
-        if (leftMouseTriggered) {
-            constexpr uint32_t kClickBurstParticleCount = 260;
-            gpuSphFluid_->TriggerEmitBurst(kClickBurstParticleCount);
-            emittedParticleTotal_ += kClickBurstParticleCount;
-            Logger::Log(std::format(
-                "[GamePlayScene] Liquid emit burst. source=({:.2f},{:.2f},{:.2f}) total={}\n",
-                emitterPosition.x,
-                emitterPosition.y,
-                emitterPosition.z,
-                emittedParticleTotal_));
-        }
+        const float horizontalSpeed = std::abs(player_->GetVelocity().x);
+        const bool emitWalkingTrail =
+            player_->IsGrounded() &&
+            horizontalSpeed > 0.25f;
+        const float movementDirection =
+            player_->GetVelocity().x >= 0.0f ? 1.0f : -1.0f;
+        Vector3 trailPosition = MakeFluidCorePosition(*player_);
+        trailPosition.x -= movementDirection * targetRadii.x * 0.92f;
+        trailPosition.y = player_->GetFluidFloorHeight() + 0.07f;
+        const Vector3 trailVelocity = {
+            -movementDirection * (0.70f + horizontalSpeed * 0.12f),
+            0.10f,
+            0.0f };
         gpuSphFluid_->SetEmitter(
-            leftMousePressed,
-            emitterPosition,
-            MakeFluidTargetVelocity(player_->GetVelocity()));
-        wasLeftMousePressed_ = leftMousePressed;
+            false,
+            corePos,
+            { 0.0f, 0.0f, 0.0f });
         gpuSphFluid_->Update(deltaTime);
+
+        // 流体とは無関係な土埃エフェクト。低い位置から後方へ短く舞い上がる。
+        EffectManager* effects = EffectManager::GetInstance();
+        const bool emitWalkingDust =
+            player_->IsGrounded() && horizontalSpeed > 0.45f;
+        if (emitWalkingDust) {
+            Vector3 dustPosition = trailPosition;
+            // 地面の内部に埋まらない高さから、足元で土煙を見せる。
+            dustPosition.y = player_->GetFluidFloorHeight() + 0.14f;
+            if (!effects->IsEffectAlive(walkingDustEffectHandle_)) {
+                walkingDustEffectHandle_ = effects->PlayLoopEffect(
+                    "WalkDust", dustPosition);
+            }
+            effects->SetEffectPosition(walkingDustEffectHandle_, dustPosition);
+            effects->SetEffectVelocity(
+                walkingDustEffectHandle_,
+                {
+                    -movementDirection * (0.30f + horizontalSpeed * 0.08f),
+                    0.16f,
+                    0.0f,
+                });
+        } else if (effects->IsEffectAlive(walkingDustEffectHandle_)) {
+            effects->StopEffect(walkingDustEffectHandle_);
+            walkingDustEffectHandle_ = kInvalidEffectHandle;
+        }
     }
     if (!isFreeCameraMode) {
         UpdateFollowCamera();
     }
     camera_->Update();
+    EffectManager::GetInstance()->SetCamera(camera_.get());
+    EffectManager::GetInstance()->Update();
     skyBox_->Update(camera_.get());
     instructionText_->Update();
     UpdateCollisionText();
@@ -608,6 +621,8 @@ void GamePlayScene::Draw3D()
 
 void GamePlayScene::DrawParticle()
 {
+    EffectManager::GetInstance()->PreDraw();
+    EffectManager::GetInstance()->Draw();
     if (showForces_ && gpuSphFluid_) {
         fluidForceRenderer_->Draw(*gpuSphFluid_, *camera_);
     }
@@ -639,7 +654,6 @@ void GamePlayScene::RespawnPlayerLeavingCorpse()
 
     player_->Initialize(&mapChipStage_.GetField(), playerStartPosition_);
     eyeOffsetX_ = 0.0f;
-    wasLeftMousePressed_ = false;
 
     GpuSphFluid::Settings respawnSettings = currentSettings;
     respawnSettings.corePosition = MakeFluidCorePosition(*player_);
@@ -689,6 +703,8 @@ void GamePlayScene::StartDeathTransition()
     isMenuOpen_ = false;
     remainingLives_ = 0;
     UpdateLivesText();
+    EffectManager::GetInstance()->StopAllEffects();
+    walkingDustEffectHandle_ = kInvalidEffectHandle;
     if (selfDestructSlowActive_) {
         TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
         selfDestructSlowActive_ = false;
@@ -782,6 +798,5 @@ void GamePlayScene::UpdateCollisionText()
     collisionText_->SetText(
         "COLLISION : " + state +
         "   PLAYER X=" + std::to_string(position.x) +
-        " Y=" + std::to_string(position.y) +
-        "   LIQUID BURST=" + std::to_string(emittedParticleTotal_));
+        " Y=" + std::to_string(position.y));
 }

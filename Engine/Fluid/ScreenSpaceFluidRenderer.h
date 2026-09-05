@@ -132,6 +132,9 @@ private:
         Vector3 paddingEyes;
         Vector2 eyeCenterUv;
         Vector2 paddingEyeCenter;
+        float idleFaceAmount;
+        float idleFaceTime;
+        Vector2 paddingIdleFace;
     };
 
     static constexpr uint32_t kDefaultFirstRtvIndex = 8;

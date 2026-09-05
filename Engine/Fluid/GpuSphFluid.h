@@ -93,7 +93,12 @@ public:
         const Vector3& corePosition,
         const Vector3& targetVelocity,
         const Vector3& coreForward);
-    void SetEmitter(bool enabled, const Vector3& position, const Vector3& velocity);
+    void SetEmitter(
+        bool enabled,
+        const Vector3& position,
+        const Vector3& velocity,
+        float rateScale = 1.0f,
+        float lifetimeScale = 1.0f);
     void TriggerEmitBurst(uint32_t count);
     void SetObstacles(const std::vector<CollisionObstacle>& obstacles);
     void SetBlobRadii(const Vector3& blobRadii) { settings_.blobRadii = blobRadii; }
@@ -104,6 +109,8 @@ public:
     float GetEyeOffsetX() const { return eyeOffsetX_; }
     void SetEyeOffsetY(float offset) { eyeOffsetY_ = offset; }
     float GetEyeOffsetY() const { return eyeOffsetY_; }
+    float GetIdleDuration() const { return idleDuration_; }
+    float GetIdleExpressionBlend() const { return idleExpressionBlend_; }
     void SetDeathEyes(bool enabled) { deathEyes_ = enabled; }
     bool HasDeathEyes() const { return deathEyes_; }
     void SetWallBoundaries(float wallMinX, float wallMaxX, float wallMinZ = -0.3f, float wallMaxZ = 0.3f, float wallMinY = -1000.0f, float wallMaxY = 1000.0f);
@@ -231,9 +238,14 @@ private:
     bool isGrounded_ = false;
     bool hasPreviousCorePosition_ = false;
     bool emitterEnabled_ = false;
+    float emitterRateScale_ = 1.0f;
+    float emitterLifetimeScale_ = 1.0f;
     float liquidBlend_ = 0.0f;
     float eyeOffsetX_ = 0.0f;
     float eyeOffsetY_ = 0.0f;
+    float idleDuration_ = 0.0f;
+    float idleStillDuration_ = 0.0f;
+    float idleExpressionBlend_ = 0.0f;
     bool deathEyes_ = false;
     float liquidationBurstStrength_ = 0.0f;
     float emitAccumulator_ = 0.0f;
