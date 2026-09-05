@@ -27,6 +27,10 @@ cbuffer SlimeFluidCompositeParameter : register(b0)
     float32_t eyeHalfHeightPixels;
     float32_t eyeVisibility;
     float32_t2 eyeGazeDirection;
+    float32_t deathEyes;
+    float32_t3 paddingEyes;
+    float32_t2 eyeCenterUv;
+    float32_t2 paddingEyeCenter;
 };
 
 float32_t4 main(VertexShaderOutput input) : SV_TARGET
@@ -79,10 +83,6 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
             floorHeightWorld + 0.008f,
             worldPosition.y);
         edgeAA *= groundMask;
-    }
-
-    if (edgeAA <= 0.0f) {
-        return gSceneColor.SampleLevel(gSampler, input.texcoord, 0);
     }
 
     float32_t depthRight = gFluidDepth.SampleLevel(gSampler, input.texcoord + float32_t2(texelSize.x * 2.0f, 0.0f), 0);
@@ -161,10 +161,6 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
 
     // 縦長カプセル状の青い目。十分な流体密度がある領域だけに描き、
     // 半透明のスライム色を少し残すことで体内に沈んで見せる。
-    float32_t4 eyeClipPosition = mul(float32_t4(eyeWorldPosition, 1.0f), gViewProj);
-    float32_t2 eyeCenterUv = float32_t2(
-        eyeClipPosition.x / max(abs(eyeClipPosition.w), 0.0001f) * 0.5f + 0.5f,
-        0.5f - eyeClipPosition.y / max(abs(eyeClipPosition.w), 0.0001f) * 0.5f);
     float32_t2 eyePointBase = (input.texcoord - eyeCenterUv) / texelSize;
     static const float32_t kEyeSeparationPixels = 18.0f;
     float32_t2 leftEyePoint = eyePointBase + float32_t2(kEyeSeparationPixels, 0.0f);
@@ -181,14 +177,32 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
         1.0f - smoothstep(-1.0f, 1.0f, leftEyeDistance);
     float32_t rightEyeMask =
         1.0f - smoothstep(-1.0f, 1.0f, rightEyeDistance);
+    // Last-life rupture: replace both capsule eyes with a clear "X" mark.
+    float32_t leftCrossBand = min(abs(leftEyePoint.x - leftEyePoint.y),
+        abs(leftEyePoint.x + leftEyePoint.y));
+    float32_t rightCrossBand = min(abs(rightEyePoint.x - rightEyePoint.y),
+        abs(rightEyePoint.x + rightEyePoint.y));
+    float32_t leftCrossExtent = max(abs(leftEyePoint.x), abs(leftEyePoint.y));
+    float32_t rightCrossExtent = max(abs(rightEyePoint.x), abs(rightEyePoint.y));
+    float32_t leftCrossMask =
+        (1.0f - smoothstep(2.2f, 3.7f, leftCrossBand)) *
+        (1.0f - smoothstep(10.0f, 12.0f, leftCrossExtent));
+    float32_t rightCrossMask =
+        (1.0f - smoothstep(2.2f, 3.7f, rightCrossBand)) *
+        (1.0f - smoothstep(10.0f, 12.0f, rightCrossExtent));
+    leftEyeMask = lerp(leftEyeMask, leftCrossMask, deathEyes);
+    rightEyeMask = lerp(rightEyeMask, rightCrossMask, deathEyes);
     float32_t eyeMask = max(leftEyeMask, rightEyeMask) * eyeVisibility;
-    // 輪郭付近の低密度領域には描かず、常に体内側へ余白を残す。
+    // The eye center can overlap the floor's depth silhouette while grounded.
+    // Do not gate it by the local thickness sample: that sample is a soft
+    // metaball edge and becomes zero exactly where the grounded blob is most
+    // compressed, which made the eyes appear only after jumping.
     float32_t insideMask = smoothstep(threshold + 0.10f, threshold + 0.24f, density);
-    eyeMask *= insideMask * edgeAA;
+    eyeMask *= eyeVisibility;
     float32_t closestEyeDistance = min(leftEyeDistance, rightEyeDistance);
     float32_t eyeInnerMask =
         1.0f - smoothstep(-3.2f, -1.2f, closestEyeDistance);
-    eyeInnerMask *= insideMask * edgeAA * eyeVisibility;
+    eyeInnerMask *= eyeVisibility;
     float32_t eyeRimMask = saturate(eyeMask - eyeInnerMask);
 
     // 本体色を残した半透明ガラス色。完全な青で塗り潰さない。
@@ -216,7 +230,10 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
         float32_t3(0.38f, 0.76f, 1.0f) * eyeHighlight * eyeMask * 0.36f;
 
     float32_t3 background = gSceneColor.SampleLevel(gSampler, input.texcoord, 0).rgb;
-    float32_t3 result = lerp(background, finalColor, alpha * edgeAA);
+    // Keep the eye visible even when its pixel lands in a low-thickness part
+    // of a grounded metaball. The eye mask itself supplies the coverage there.
+    float32_t eyeAwareEdge = max(edgeAA, eyeMask);
+    float32_t3 result = lerp(background, finalColor, alpha * eyeAwareEdge);
 
     return float32_t4(result, 1.0f);
 }

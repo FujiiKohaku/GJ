@@ -104,6 +104,8 @@ public:
     float GetEyeOffsetX() const { return eyeOffsetX_; }
     void SetEyeOffsetY(float offset) { eyeOffsetY_ = offset; }
     float GetEyeOffsetY() const { return eyeOffsetY_; }
+    void SetDeathEyes(bool enabled) { deathEyes_ = enabled; }
+    bool HasDeathEyes() const { return deathEyes_; }
     void SetWallBoundaries(float wallMinX, float wallMaxX, float wallMinZ = -0.3f, float wallMaxZ = 0.3f, float wallMinY = -1000.0f, float wallMaxY = 1000.0f);
     void TriggerLiquidationBurst(float strength = 8.0f);
     void SetLiquidated(bool liquidated) { isLiquidated_ = liquidated; }
@@ -232,6 +234,7 @@ private:
     float liquidBlend_ = 0.0f;
     float eyeOffsetX_ = 0.0f;
     float eyeOffsetY_ = 0.0f;
+    bool deathEyes_ = false;
     float liquidationBurstStrength_ = 0.0f;
     float emitAccumulator_ = 0.0f;
     uint32_t emitCursor_ = 0;
