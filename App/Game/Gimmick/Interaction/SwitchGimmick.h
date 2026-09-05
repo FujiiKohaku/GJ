@@ -30,6 +30,10 @@ public:
     AABB GetAABB() const override;
     void SetStage(MapChipStage* stage) override;
     bool IsSolid() const override { return false; }
+    
+    // 連携用の状態公開
+    bool IsActive() const override { return isActive_; }
+    std::string GetLinkName() const override;
 
     // 感圧盤用の共通AABB設定
     static Vector3 s_pressurePlateAABBOffset;

@@ -135,6 +135,8 @@ void MapChipRegistry::Initialize()
     
     // 特殊な壁（ギミックとして処理される）
     Register(MapChipType::DestructibleWall, "DestructibleWall", true, true, "");
+    
+    Register(MapChipType::Door, "Door", false, true, ""); // ドア（ギミック）は自身で当たり判定を持つため地形としては透過(false)にする
 }
 
 const MapChipConfig& MapChipRegistry::GetConfig(MapChipType type)

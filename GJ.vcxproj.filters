@@ -52,6 +52,15 @@
     <ClCompile Include="App\Game\Gimmick\Trap\SpikeGimmick.cpp">
       <Filter>App\Game\Gimmick\Trap</Filter>
     </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Interaction\SwitchParam.cpp">
+      <Filter>App\Game\Gimmick\Interaction</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Interaction\DoorGimmick.cpp">
+      <Filter>App\Game\Gimmick\Interaction</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Interaction\DoorParam.cpp">
+      <Filter>App\Game\Gimmick\Interaction</Filter>
+    </ClCompile>
     <ClCompile Include="App\Game\Gimmick\Trap\SpikeParam.cpp">
       <Filter>App\Game\Gimmick\Trap</Filter>
     </ClCompile>

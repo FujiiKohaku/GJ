@@ -35,5 +35,14 @@
     "file_name": "",
     "material_type": "Moss",
     "texture_name": "resources/Textures/Terrain/MossSoil.png"
+  },
+  "Door_Top": {
+    "file_name": "Door/Door_Top.obj"
+  },
+  "Door_Middle": {
+    "file_name": "Door/Door_Middle.obj"
+  },
+  "Door_Bottom": {
+    "file_name": "Door/Door_Bottom.obj"
   }
 }

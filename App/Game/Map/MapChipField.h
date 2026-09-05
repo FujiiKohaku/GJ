@@ -20,7 +20,8 @@ enum class MapChipType {
     LaserEmitter = 9,
     SwingingBridge = 10,
     Wall = 11,
-    Foundation = 12,
+    Door = 12,
+    Foundation = 13,
 };
 
 struct MapChipConfig {

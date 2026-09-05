@@ -22,6 +22,11 @@ public:
     virtual AABB GetAABB() const { return AABB(); }
     virtual std::vector<AABB> GetCollisionBoxes() const { return { GetAABB() }; }
     virtual Vector3 GetDeltaPosition() const { return {0.0f, 0.0f, 0.0f}; }
+    
+    // 連携・状態同期用の仮想関数
+    virtual bool IsActive() const { return false; }
+    virtual std::string GetLinkName() const { return ""; }
+
     // ゴール判定用フラグ（デフォルトは偽）
     virtual bool IsGoal() const { return false; }
 

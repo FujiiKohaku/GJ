@@ -49,7 +49,7 @@ void SwitchParam::DrawImGui()
     if (ImGui::InputText("Fire Event Name", buffer, sizeof(buffer))) {
         fireEventName_ = buffer;
     }
-
+    
     // スイッチの種類
     const char* typeItems[] = { "PressurePlate (0)", "Button (1)", "Bonfire (2)" };
     if (ImGui::Combo("Switch Type", &switchType_, typeItems, IM_ARRAYSIZE(typeItems))) {

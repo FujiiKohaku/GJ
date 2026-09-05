@@ -65,7 +65,8 @@ class EditorTool(tk.Tk):
             (9, "Laser Emitter"),
             (10, "Swinging Bridge"),
             (11, "Wall"),
-            (12, "土台 (Foundation)"),
+            (12, "Door"),
+            (13, "土台 (Foundation)"),
             (99, "Player Spawn"),
         ]
         

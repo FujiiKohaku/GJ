@@ -171,6 +171,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="App\Game\Gimmick\Trap\LaserParam.cpp" />
     <ClCompile Include="Engine\Event\EventManager.cpp" />
     <ClCompile Include="App\Game\Gimmick\Interaction\SwitchParam.cpp" />
+    <ClCompile Include="App\Game\Gimmick\Interaction\DoorGimmick.cpp" />
+    <ClCompile Include="App\Game\Gimmick\Interaction\DoorParam.cpp" />
     <ClCompile Include="App\Game\Gimmick\Interaction\SwitchGimmick.cpp" />
     <ClCompile Include="App\Game\Gimmick\Interaction\GasEmitterParam.cpp" />
     <ClCompile Include="App\Game\Gimmick\Interaction\GasEmitterGimmick.cpp" />
@@ -183,6 +185,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="App\Game\Gimmick\Trap\LaserParam.h" />
     <ClInclude Include="Engine\Event\EventManager.h" />
     <ClInclude Include="App\Game\Gimmick\Interaction\SwitchParam.h" />
+    <ClInclude Include="App\Game\Gimmick\Interaction\DoorGimmick.h" />
+    <ClInclude Include="App\Game\Gimmick\Interaction\DoorParam.h" />
     <ClInclude Include="App\Game\Gimmick\Interaction\SwitchGimmick.h" />
     <ClInclude Include="App\Game\Gimmick\Interaction\GasEmitterParam.h" />
     <ClInclude Include="App\Game\Gimmick\Interaction\GasEmitterGimmick.h" />

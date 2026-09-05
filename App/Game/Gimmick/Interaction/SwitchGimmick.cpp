@@ -116,7 +116,9 @@ void SwitchGimmick::Update()
                 isActive_ = true;
             }
         } else {
-            isActive_ = false;
+            if (isActive_) {
+                isActive_ = false;
+            }
         }
     }
 }
@@ -142,9 +144,17 @@ AABB SwitchGimmick::GetAABB() const
         aabb.size = s_pressurePlateAABBSize;
     } else {
         aabb.center = position_;
-        aabb.size = size_;
+        aabb.size = s_pressurePlateAABBSize;
     }
     return aabb;
+}
+
+std::string SwitchGimmick::GetLinkName() const
+{
+    if (param_) {
+        return param_->fireEventName_;
+    }
+    return "";
 }
 
 void SwitchGimmick::SetStage(MapChipStage* stage)

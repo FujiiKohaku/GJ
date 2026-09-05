@@ -16,7 +16,7 @@
 #include "App/Game/Gimmick/Trap/SpikeParam.h"
 #include "App/Game/Gimmick/Trap/SpikeGimmick.h"
 #include "App/Game/Gimmick/Interaction/GasEmitterParam.h"
-#include "Engine/Logger/Logger.h"
+#include "App/Game/Gimmick/Interaction/DoorParam.h"
 #include "Engine/ImGuiManager/ImGuiManager.h"
 #include "Engine/3D/ModelManager.h"
 #include "Engine/Debug/DebugRenderer.h"
@@ -419,6 +419,8 @@ void EditorScene::Draw3D()
             std::string listenName;
             if (auto* gasParam = dynamic_cast<GasEmitterParam*>(receiver.gimmickParam.get())) {
                 listenName = gasParam->listenEventName_;
+            } else if (auto* doorParam = dynamic_cast<DoorParam*>(receiver.gimmickParam.get())) {
+                listenName = doorParam->listenEventName_;
             }
             
             if (!listenName.empty() && fireName == listenName) {
@@ -450,7 +452,17 @@ void EditorScene::DrawImGui()
         ImGui::Separator();
         
         if (selectedGimmick->gimmickParam) {
+            std::string beforeState = selectedGimmick->gimmickParam->Serialize().dump();
             selectedGimmick->gimmickParam->DrawImGui();
+            std::string afterState = selectedGimmick->gimmickParam->Serialize().dump();
+
+            if (beforeState != afterState) {
+                // パラメータが変更されたのでステージを再構築して即時反映
+                DirectXCommon::GetInstance()->WaitForGPU();
+                mapChipStage_.Initialize(currentLevelData_);
+                mapChipStage_.ApplyMaterialProperties();
+                SaveSnapshot();
+            }
         } else if (selectedGimmick->type == "MovingBlock") {
             // 互換性（未移行データ用）
             ImGui::Text("Type: MovingBlock (Legacy)");
@@ -751,7 +763,8 @@ void EditorScene::UpdateRaycastEdit()
                                         type == MapChipType::DestructibleWall ||
                                         type == MapChipType::Spike ||
                                         type == MapChipType::LaserEmitter ||
-                                        type == MapChipType::SwingingBridge) {
+                                        type == MapChipType::SwingingBridge ||
+                                        type == MapChipType::Door) {
                                         
                                         LevelData::ObjectData newData;
                                         newData.translation = newPos;
@@ -821,6 +834,12 @@ void EditorScene::UpdateRaycastEdit()
                                             newData.type = "SwingingBridge";
                                             metaKey = "SwingingBridge";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("SwingingBridge");
+                                        }
+                                        else if (type == MapChipType::Door) {
+                                            newData.name = "Door";
+                                            newData.type = "Door";
+                                            metaKey = "Door";
+                                            newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Door");
                                         }
                                         
                                         if (!metaKey.empty()) {
