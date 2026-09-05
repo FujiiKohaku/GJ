@@ -30,6 +30,8 @@ public:
 private:
     void UpdateFollowCamera();
     void UpdateCollisionText();
+    void UpdateLivesText();
+    void LoseLife();
     void StartDeathTransition();
     void UpdateDeathTransition(float deltaTime);
     void RespawnPlayerLeavingCorpse();
@@ -39,6 +41,9 @@ private:
     std::unique_ptr<SkyBox> skyBox_;
     std::unique_ptr<Text> instructionText_;
     std::unique_ptr<Text> collisionText_;
+    std::unique_ptr<Text> livesText_;
+    static constexpr int kInitialLives = 5;
+    int remainingLives_ = kInitialLives;
     MapChipStage mapChipStage_;
     std::unique_ptr<MapChipPlayer> player_;
     std::unique_ptr<GpuSphFluid> gpuSphFluid_;

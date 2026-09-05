@@ -578,7 +578,11 @@ void ScreenSpaceFluidRenderer::UpdateCompositeParameter(
     compositeData_->specularStrength = settings_.specularStrength;
     compositeData_->fresnelStrength = settings_.fresnelStrength;
     compositeData_->floorHeightWorld = fluid.GetSettings().floorHeight;
-    compositeData_->groundClipEnabled = fluid.IsGrounded() ? 1.0f : 0.0f;
+    // The depth buffer is already resolved against the fluid/ground collision.
+    // Reconstructing world Y here used the post-projection depth convention and
+    // clipped the entire blob while grounded (it reappeared as soon as jumping
+    // disabled this mask). Keep the complete fluid silhouette visible.
+    compositeData_->groundClipEnabled = 0.0f;
     compositeData_->padding0 = 0.0f;
     compositeData_->invViewProj = MatrixMath::Inverse(camera.GetViewProjectionMatrix());
     compositeData_->viewProj = camera.GetViewProjectionMatrix();
@@ -596,6 +600,18 @@ void ScreenSpaceFluidRenderer::UpdateCompositeParameter(
     compositeData_->eyeGazeDirection = gazeSpeed > 0.1f
         ? Vector2{ gazeVelocity.x / gazeSpeed, gazeVelocity.y / gazeSpeed }
         : Vector2{ 0.0f, 0.0f };
+    compositeData_->deathEyes = fluid.HasDeathEyes() ? 1.0f : 0.0f;
+    compositeData_->paddingEyes = { 0.0f, 0.0f, 0.0f };
+    // Use the camera's established CPU projection. The fullscreen shader's
+    // matrix packing differs from the particle vertex shader, which caused
+    // a separately reprojected eye position to drift away from the blob.
+    const Vector2 eyeScreenPosition =
+        camera.WorldToScreen(compositeData_->eyeWorldPosition);
+    compositeData_->eyeCenterUv = {
+        eyeScreenPosition.x / static_cast<float>(WinApp::kClientWidth),
+        eyeScreenPosition.y / static_cast<float>(WinApp::kClientHeight)
+    };
+    compositeData_->paddingEyeCenter = { 0.0f, 0.0f };
 }
 
 void ScreenSpaceFluidRenderer::DrawFullScreen(

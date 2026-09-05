@@ -85,6 +85,14 @@ void MapChipPlayer::Initialize(const MapChipField* mapChipField, const Vector3& 
     isShapingSelfDestruct_ = false;
     hardenedBodyReady_ = false;
     deathRequested_ = false;
+    baseGimmick_ = nullptr;
+    isCrushed_ = false;
+    isGrounded_ = false;
+    wasGrounded_ = false;
+    isColliding_ = false;
+    verticalCompression01_ = 0.0f;
+    wallSquash_ = landSquash_ = ceilingSquash_ = 0.0f;
+    fluidCeilingHeight_ = 1000.0f;
     selfDestructRawPull_ = { 0.0f, 0.0f };
     selfDestructPull_ = { 0.0f, 0.0f };
 }

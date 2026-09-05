@@ -19,6 +19,7 @@
 #include "GameOverScene.h"
 #include "App/Game/Gimmick/HardenedFluidSlimeCorpse.h"
 #include <algorithm>
+#include <cmath>
 #include <format>
 #include <string>
 #include <vector>
@@ -195,6 +196,7 @@ void GamePlayScene::Initialize()
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     isDeathTransitionActive_ = false;
     deathTransitionTime_ = 0.0f;
+    remainingLives_ = kInitialLives;
 
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
@@ -320,6 +322,14 @@ void GamePlayScene::Initialize()
     collisionText_->SetOutlineWidth(2.0f);
     UpdateCollisionText();
 
+    livesText_ = std::make_unique<Text>();
+    livesText_->Initialize(kDefaultFont);
+    livesText_->SetAnchorPoint({ 1.0f, 0.0f });
+    livesText_->SetFontSize(32.0f);
+    livesText_->SetOutlineColor({ 0.02f, 0.10f, 0.08f, 1.0f });
+    livesText_->SetOutlineWidth(3.0f);
+    UpdateLivesText();
+
     // メニューUIの初期化
     TextureManager::GetInstance()->LoadTexture(kWhiteTexture);
 
@@ -380,14 +390,15 @@ void GamePlayScene::Update()
     Input* input = Input::GetInstance();
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
 
-    if (input->IsKeyTrigger(DIK_R)) {
-        SceneManager::GetInstance()->SetNextScene(
-            std::make_unique<GamePlayScene>());
+    UpdateLivesText();
+    if (isDeathTransitionActive_) {
+        UpdateDeathTransition(TimeManager::GetInstance()->GetUnscaledDeltaTime());
         return;
     }
 
-    if (isDeathTransitionActive_) {
-        UpdateDeathTransition(TimeManager::GetInstance()->GetDeltaTime());
+    if (input->IsKeyTrigger(DIK_R)) {
+        SceneManager::GetInstance()->SetNextScene(
+            std::make_unique<GamePlayScene>());
         return;
     }
 
@@ -432,7 +443,8 @@ void GamePlayScene::Update()
     mapChipStage_.Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
     bool hardenedThisFrame = false;
     if (player_->ConsumeDeathRequest()) {
-        RespawnPlayerLeavingCorpse();
+        LoseLife();
+        if (isDeathTransitionActive_) return;
         hardenedThisFrame = true;
     }
 
@@ -451,12 +463,14 @@ void GamePlayScene::Update()
 
     AABB hardenedBody;
     if (player_->ConsumeHardenedBody(hardenedBody)) {
-        RespawnPlayerLeavingCorpse();
+        LoseLife();
+        if (isDeathTransitionActive_) return;
         hardenedThisFrame = true;
     }
-     if (player_->IsCrushed()) {
-      StartDeathTransition();
-      return;
+    if (!hardenedThisFrame && (player_->IsCrushed() || player_->GetPosition().y < -10.0f)) {
+        LoseLife();
+        if (isDeathTransitionActive_) return;
+        hardenedThisFrame = true;
     }
 
     if (gpuSphFluid_) {
@@ -550,6 +564,8 @@ void GamePlayScene::Update()
 void GamePlayScene::Draw2D()
 {
     if (isDeathTransitionActive_) {
+        TextRenderer::GetInstance()->PreDraw();
+        livesText_->Draw();
         return;
     }
     if (showForces_) {
@@ -559,6 +575,7 @@ void GamePlayScene::Draw2D()
     TextRenderer::GetInstance()->PreDraw();
     instructionText_->Draw();
     collisionText_->Draw();
+    livesText_->Draw();
     pageReveal_.Draw();
 
     // メニュー表示中は最前面に暗幕とメニューパネルを描画
@@ -627,7 +644,32 @@ void GamePlayScene::RespawnPlayerLeavingCorpse()
         playerScale.y * (1.7f * kNeoWorldScale),
         playerScale.z * (2.4f * kNeoWorldScale) };
     gpuSphFluid_->SetLiquidated(false);
+    gpuSphFluid_->SetDeathEyes(false);
     gpuSphFluid_->Reset(respawnSettings);
+}
+
+void GamePlayScene::UpdateLivesText()
+{
+    if (!livesText_) return;
+    const float width = static_cast<float>((std::max)(WinApp::GetInstance()->GetClientWidth(), 1));
+    livesText_->SetPosition({ width - 32.0f, 108.0f });
+    livesText_->SetText("残機 × " + std::to_string(remainingLives_));
+    livesText_->SetColor(remainingLives_ <= 2
+        ? Vector4{ 1.0f, 0.40f, 0.30f, 1.0f }
+        : Vector4{ 0.30f, 1.0f, 0.72f, 1.0f });
+    livesText_->Update();
+}
+
+void GamePlayScene::LoseLife()
+{
+    if (isDeathTransitionActive_ || remainingLives_ <= 0) return;
+    --remainingLives_;
+    UpdateLivesText();
+    if (remainingLives_ == 0) {
+        StartDeathTransition();
+    } else {
+        RespawnPlayerLeavingCorpse();
+    }
 }
 
 void GamePlayScene::StartDeathTransition()
@@ -638,6 +680,49 @@ void GamePlayScene::StartDeathTransition()
     isDeathTransitionActive_ = true;
     deathTransitionTime_ = 0.0f;
     isMenuOpen_ = false;
+    remainingLives_ = 0;
+    UpdateLivesText();
+    if (selfDestructSlowActive_) {
+        TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
+        selfDestructSlowActive_ = false;
+    }
+
+    // Keep the player camera still while the actual body breaks into liquid.
+    debugCameraController_.SetDebugMode(false);
+    UpdateFollowCamera();
+    camera_->Update();
+    skyBox_->Update(camera_.get());
+    auto particles = gpuSphFluid_->GetParticlesCPU();
+    auto settings = gpuSphFluid_->GetSettings();
+    const Vector3 center = settings.corePosition;
+    settings.gravity = { 0.0f, -2.0f, 0.0f };
+    settings.liquidGravityScale = 1.0f;
+    settings.liquidShapeAttraction = 0.0f;
+    settings.liquidVelocityAttraction = 0.0f;
+    settings.liquidViscosity = 0.0f;
+    settings.liquidSurfaceTension = 0.0f;
+    settings.liquidDamping = 0.0f;
+    settings.floorHeight = center.y - 30.0f;
+    settings.boundsMin = { center.x - 40.0f, center.y - 40.0f, -40.0f };
+    settings.boundsMax = { center.x + 40.0f, center.y + 40.0f, 40.0f };
+    gpuSphFluid_->SetLiquidated(true);
+    gpuSphFluid_->SetDeathEyes(true);
+    gpuSphFluid_->Reset(settings);
+    gpuSphFluid_->SetWallBoundaries(center.x - 40.0f, center.x + 40.0f,
+        -40.0f, 40.0f, center.y - 40.0f, center.y + 40.0f);
+    gpuSphFluid_->SetGrounded(false);
+    gpuSphFluid_->SetEmitter(false, center, { 0.0f, 0.0f, 0.0f });
+    for (size_t i = 0; i < particles.size(); ++i) {
+        auto& particle = particles[i];
+        const float angle = static_cast<float>(i) * 2.39996323f;
+        const float spread = 1.5f + static_cast<float>(i % 17) * 0.24f;
+        // Front-facing droplets reach the lens around 0.6 seconds after rupture.
+        particle.velocity = { std::cos(angle) * spread,
+            std::sin(angle) * spread + 1.0f,
+            i % 3 == 0 ? -18.0f - static_cast<float>(i % 7) : 2.0f * std::sin(angle) };
+        particle.padding = 5.0f;
+    }
+    gpuSphFluid_->SetParticlesCPU(particles);
     SceneManager* sceneManager = SceneManager::GetInstance();
     const Vector3 position = player_->GetPosition();
     sceneManager->SetPaintSeed(position.x * 17.31f + position.y * 7.13f);
@@ -649,8 +734,11 @@ void GamePlayScene::StartDeathTransition()
 void GamePlayScene::UpdateDeathTransition(float deltaTime)
 {
     constexpr float kCoverDuration = 2.1f;
+    constexpr float kFlightDuration = 0.55f;
     deathTransitionTime_ += deltaTime;
-    const float progress = std::clamp(deathTransitionTime_ / kCoverDuration, 0.0f, 1.0f);
+    gpuSphFluid_->Update(deltaTime);
+    const float progress = std::clamp(
+        (deathTransitionTime_ - kFlightDuration) / kCoverDuration, 0.0f, 1.0f);
     SceneManager::GetInstance()->SetSlimeScreenProgress(progress);
     if (progress >= 1.0f) {
         PageTransition::RequestSlimeReveal();

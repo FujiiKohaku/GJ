@@ -128,6 +128,10 @@ private:
         float eyeHalfHeightPixels;
         float eyeVisibility;
         Vector2 eyeGazeDirection;
+        float deathEyes;
+        Vector3 paddingEyes;
+        Vector2 eyeCenterUv;
+        Vector2 paddingEyeCenter;
     };
 
     static constexpr uint32_t kDefaultFirstRtvIndex = 8;
