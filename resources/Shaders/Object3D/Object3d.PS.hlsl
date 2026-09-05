@@ -196,6 +196,33 @@ float3 StoneTileColor(float3 worldPosition, float3 normal)
     return stone;
 }
 
+float3 GrassGroundColor(float3 worldPosition)
+{
+    // Continuous world-space layers avoid stretching across the large floor plane.
+    float2 position = worldPosition.xz;
+    float broad = TerrainNoise(position * 0.10f + 7.3f);
+    float patches = TerrainNoise(position * 0.42f + 31.9f);
+    float blades = TerrainNoise(floor(position * 11.0f) * 0.73f + 63.1f);
+
+    float3 darkGrass = float3(0.48f, 0.64f, 0.34f);
+    float3 lightGrass = float3(0.82f, 0.96f, 0.56f);
+    float3 grass = lerp(darkGrass, lightGrass, broad * 0.64f + patches * 0.36f);
+    grass *= 0.92f + (floor(blades * 4.0f) / 3.0f) * 0.14f;
+
+    // Sparse soft soil patches break up the green without reading as a tiled texture.
+    float soilMask = smoothstep(0.79f, 0.94f, TerrainNoise(position * 0.21f + 94.7f));
+    float3 soil = lerp(float3(0.37f, 0.29f, 0.17f),
+        float3(0.51f, 0.42f, 0.24f), patches);
+    grass = lerp(grass, soil, soilMask * 0.72f);
+
+    // Tiny mineral flecks are deliberately rare and remain subordinate to gameplay.
+    float fleck = TerrainNoise(floor(position * 18.0f) + 117.4f);
+    if (fleck > 0.965f) {
+        grass = lerp(grass, float3(0.44f, 0.45f, 0.40f), 0.58f);
+    }
+    return grass;
+}
+
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
@@ -251,6 +278,15 @@ PixelShaderOutput main(VertexShaderOutput input)
         }
         output.color = float4(base * illumination * saturate(occlusion) +
             float3(1.0f, 0.78f, 0.42f) * specular, gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 9)
+    {
+        float3 normal = normalize(input.normal);
+        float faceLight = 0.82f + saturate(dot(normal,
+            normalize(-gDirectionalLight.direction))) * 0.18f;
+        output.color = float4(
+            gMaterial.color.rgb * GrassGroundColor(input.worldPosition) * faceLight,
+            gMaterial.color.a);
     }
     else if (gMaterial.enableLighting == 8)
     {
@@ -355,7 +391,8 @@ PixelShaderOutput main(VertexShaderOutput input)
     }
 
     if (gMaterial.enableEnvironmentMap != 0 && gMaterial.enableLighting != 6 &&
-        gMaterial.enableLighting != 7 && gMaterial.enableLighting != 8)
+        gMaterial.enableLighting != 7 && gMaterial.enableLighting != 8 &&
+        gMaterial.enableLighting != 9)
     {
         float3 N = normalize(input.normal);
         float3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);
