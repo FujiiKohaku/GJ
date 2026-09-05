@@ -1,6 +1,7 @@
 #pragma once
 
 #include "App/Game/Map/MapChipStage.h"
+#include "App/Game/Background/RuinsBackground.h"
 #include "App/Game/Player/MapChipPlayer.h"
 #include "BaseScene.h"
 #ifdef USE_IMGUI
@@ -40,6 +41,7 @@ private:
     std::unique_ptr<Text> instructionText_;
     std::unique_ptr<Text> collisionText_;
     MapChipStage mapChipStage_;
+    RuinsBackground ruinsBackground_;
     std::unique_ptr<MapChipPlayer> player_;
     std::unique_ptr<GpuSphFluid> gpuSphFluid_;
     std::unique_ptr<FluidForceRenderer> fluidForceRenderer_;
