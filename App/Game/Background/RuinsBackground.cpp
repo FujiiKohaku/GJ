@@ -59,6 +59,7 @@ void RuinsBackground::Initialize(const Settings& settings)
     CreateGrass();
     CreateRocks();
     CreateRuins();
+    CreateTallBackground();
 }
 
 void RuinsBackground::Update()
@@ -98,11 +99,13 @@ float RuinsBackground::Random01(uint32_t index) const
     return static_cast<float>(value & 0x00FFFFFFu) / 16777215.0f;
 }
 
-Model* RuinsBackground::LoadWhiteModel(const std::string& path) const
+Model* RuinsBackground::LoadModel(const std::string& path, bool useModelTextures) const
 {
     Model* model = ModelManager::GetInstance()->Load(path);
-    for (uint32_t index = 0; index < model->GetModelData().materials.size(); ++index) {
-        model->SetTexture(kWhiteTexture, index);
+    if (!useModelTextures) {
+        for (uint32_t index = 0; index < model->GetModelData().materials.size(); ++index) {
+            model->SetTexture(kWhiteTexture, index);
+        }
     }
     return model;
 }
@@ -112,11 +115,12 @@ void RuinsBackground::AddObject(
     const Vector3& position,
     float scale,
     const Vector4& color,
-    bool lighting)
+    bool lighting,
+    bool useModelTextures)
 {
     auto object = std::make_unique<Object3d>();
     object->Initialize(Object3dManager::GetInstance());
-    object->SetModel(LoadWhiteModel(modelPath));
+    object->SetModel(LoadModel(modelPath, useModelTextures));
     object->SetTranslate({ position.x, GroundHeight(position.z) + position.y, position.z });
     object->SetRotate({ -groundAngle_, 0.0f, 0.0f });
     object->SetScale({ scale, scale, scale });
@@ -180,5 +184,19 @@ void RuinsBackground::CreateRuins()
             { static_cast<float>(index) * 42.0f, 0.0f, 46.0f },
             0.82f + Random01(index + 501u) * 0.22f,
             { 0.58f, 0.60f, 0.61f, 1.0f }, false);
+    }
+}
+
+void RuinsBackground::CreateTallBackground()
+{
+    // Tall silhouettes continue above the ground-level ruins when the camera rises.
+    const uint32_t towerCount =
+        static_cast<uint32_t>(std::ceil(settings_.mapLength / 38.0f)) + 1;
+    for (uint32_t index = 0; index < towerCount; ++index) {
+        const float x = 13.0f + static_cast<float>(index) * 38.0f +
+            (Random01(index + 701u) - 0.5f) * 6.0f;
+        const float scale = 0.82f + Random01(index + 702u) * 0.22f;
+        AddObject("Ruins/ruin_watchtower.obj", { x, 0.0f, 40.0f }, scale,
+            { 0.80f, 0.82f, 0.80f, 1.0f }, true, true);
     }
 }

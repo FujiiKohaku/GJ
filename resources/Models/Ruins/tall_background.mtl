@@ -1,0 +1,14 @@
+newmtl stone
+Kd 0.58 0.58 0.54
+Ks 0 0 0
+map_Kd ../../Textures/white.png
+
+newmtl stone_dark
+Kd 0.39 0.4 0.38
+Ks 0 0 0
+map_Kd ../../Textures/white.png
+
+newmtl opening
+Kd 0.11 0.13 0.12
+Ks 0 0 0
+map_Kd ../../Textures/white.png

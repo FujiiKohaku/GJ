@@ -27,16 +27,18 @@ public:
 private:
     float GroundHeight(float z) const;
     float Random01(uint32_t index) const;
-    Model* LoadWhiteModel(const std::string& path) const;
+    Model* LoadModel(const std::string& path, bool useModelTextures) const;
     void AddObject(
         const std::string& modelPath,
         const Vector3& position,
         float scale,
         const Vector4& color,
-        bool lighting);
+        bool lighting,
+        bool useModelTextures = false);
     void CreateGrass();
     void CreateRocks();
     void CreateRuins();
+    void CreateTallBackground();
 
     Settings settings_;
     float groundAngle_ = 0.0f;
