@@ -212,6 +212,11 @@ void GamePlayScene::Initialize()
     mapChipStage_.Initialize(levelData);
     mapChipStage_.ApplyMaterialProperties();
 
+    RuinsBackground::Settings backgroundSettings;
+    backgroundSettings.mapLength =
+        static_cast<float>(mapChipStage_.GetField().GetBlockWidth());
+    ruinsBackground_.Initialize(backgroundSettings);
+
     Vector3 playerStartPos = { 0.0f, 0.0f, 0.0f };
     if (!levelData.playerSpawns.empty()) {
         playerStartPos = levelData.playerSpawns[0].translation;
@@ -441,6 +446,7 @@ void GamePlayScene::Update()
     const bool isFreeCameraMode = debugCameraController_.GetDebugMode();
 
     mapChipStage_.Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
+    ruinsBackground_.Update();
     bool hardenedThisFrame = false;
     if (player_->ConsumeDeathRequest()) {
         LoseLife();
@@ -596,6 +602,7 @@ void GamePlayScene::Draw3D()
     skyBox_->Draw(DirectXCommon::GetInstance()->GetCommandList());
 
     Object3dManager::GetInstance()->PreDraw();
+    ruinsBackground_.Draw(true);
     mapChipStage_.Draw();
 }
 

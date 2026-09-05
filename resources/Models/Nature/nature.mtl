@@ -1,0 +1,19 @@
+newmtl green_0
+Kd 0.43 0.66 0.32
+Ks 0 0 0
+map_Kd ../../resources/Textures/white.png
+
+newmtl green_1
+Kd 0.34 0.59 0.23
+Ks 0 0 0
+map_Kd ../../resources/Textures/white.png
+
+newmtl green_2
+Kd 0.53 0.74 0.34
+Ks 0 0 0
+map_Kd ../../resources/Textures/white.png
+
+newmtl green_3
+Kd 0.39 0.63 0.25
+Ks 0 0 0
+map_Kd ../../resources/Textures/white.png

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "App/Game/Map/MapChipStage.h"
+#include "App/Game/Background/RuinsBackground.h"
 #include "App/Game/Player/MapChipPlayer.h"
 #include "BaseScene.h"
 #ifdef USE_IMGUI
@@ -45,6 +46,7 @@ private:
     static constexpr int kInitialLives = 5;
     int remainingLives_ = kInitialLives;
     MapChipStage mapChipStage_;
+    RuinsBackground ruinsBackground_;
     std::unique_ptr<MapChipPlayer> player_;
     std::unique_ptr<GpuSphFluid> gpuSphFluid_;
     std::unique_ptr<FluidForceRenderer> fluidForceRenderer_;

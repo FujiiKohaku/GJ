@@ -10,6 +10,8 @@
 #include "Engine/PostEffect/PostEffectType.h"
 #include "PageTransition.h"
 #include "App/Effect/DeathSlimeShower.h"
+#include "App/Game/Map/MapChipStage.h"
+#include "App/Game/Background/RuinsBackground.h"
 
 #include <memory>
 #include <array>
@@ -42,7 +44,10 @@ private:
 private:
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
-    std::unique_ptr<Object3d> backdrop_;
+    RuinsBackground ruinsBackground_;
+    MapChipStage stagePreview_;
+    bool showStageBlocks_ = true;
+    bool showLabFloor_ = true;
     std::unique_ptr<Text> titleText_;
     std::unique_ptr<Text> instructionText_;
     std::vector<PostEffectToggle> postEffectToggles_;

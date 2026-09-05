@@ -31,6 +31,9 @@
     <ClCompile Include="App\Scene\GameLabScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="App\Game\Background\RuinsBackground.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="App\Game\Map\MapChipField.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -673,6 +676,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="App\Scene\GameLabScene.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Background\RuinsBackground.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="App\Game\Map\MapChipField.h">
