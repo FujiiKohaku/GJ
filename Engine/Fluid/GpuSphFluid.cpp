@@ -39,6 +39,9 @@ void GpuSphFluid::Initialize(
     previousCorePosition_ = settings_.corePosition;
     hasPreviousCorePosition_ = false;
     coreVelocity_ = { 0.0f, 0.0f, 0.0f };
+    idleDuration_ = 0.0f;
+    idleStillDuration_ = 0.0f;
+    idleExpressionBlend_ = 0.0f;
     liquidBlend_ = isLiquidated_ ? 1.0f : 0.0f;
     emitCursor_ = 0;
     pendingEmitCount_ = 0;
@@ -64,6 +67,9 @@ void GpuSphFluid::Reset(const Settings& settings)
     previousCorePosition_ = settings_.corePosition;
     hasPreviousCorePosition_ = false;
     coreVelocity_ = { 0.0f, 0.0f, 0.0f };
+    idleDuration_ = 0.0f;
+    idleStillDuration_ = 0.0f;
+    idleExpressionBlend_ = 0.0f;
     liquidBlend_ = isLiquidated_ ? 1.0f : 0.0f;
     liquidationBurstStrength_ = 0.0f;
     emitCursor_ = 0;
@@ -92,11 +98,15 @@ void GpuSphFluid::SetControlState(
 void GpuSphFluid::SetEmitter(
     bool enabled,
     const Vector3& position,
-    const Vector3& velocity)
+    const Vector3& velocity,
+    float rateScale,
+    float lifetimeScale)
 {
     emitterEnabled_ = enabled;
     emitterPosition_ = position;
     emitterVelocity_ = velocity;
+    emitterRateScale_ = std::clamp(rateScale, 0.0f, 1.0f);
+    emitterLifetimeScale_ = (std::max)(lifetimeScale, 0.05f);
 }
 
 void GpuSphFluid::TriggerEmitBurst(uint32_t count)
@@ -536,7 +546,8 @@ void GpuSphFluid::UpdateSimulationParameter(float deltaTime, bool includeEmissio
     simulationParameterData_->emitStartIndex = emitCursor_;
     simulationParameterData_->emitCount = includeEmission ? pendingEmitCount_ : 0;
     simulationParameterData_->obstacleCount = obstacleCount_;
-    simulationParameterData_->particleLifetime = settings_.particleLifetime;
+    simulationParameterData_->particleLifetime =
+        settings_.particleLifetime * emitterLifetimeScale_;
     simulationParameterData_->emitterPosition = emitterPosition_;
     simulationParameterData_->emitterRadius = settings_.emitterRadius;
     simulationParameterData_->emitterVelocity = emitterVelocity_;
@@ -577,9 +588,33 @@ void GpuSphFluid::UpdateFrameState(float deltaTime)
     }
     previousCorePosition_ = settings_.corePosition;
 
+    const float targetSpeedSquared =
+        settings_.targetVelocity.x * settings_.targetVelocity.x +
+        settings_.targetVelocity.y * settings_.targetVelocity.y +
+        settings_.targetVelocity.z * settings_.targetVelocity.z;
+    const bool isIdle = !isLiquidated_ && targetSpeedSquared < 0.01f;
+    if (isIdle) {
+        idleDuration_ = (std::min)(idleDuration_ + safeDeltaTime, 60.0f);
+        idleStillDuration_ = (std::min)(idleStillDuration_ + safeDeltaTime, 60.0f);
+    } else {
+        idleStillDuration_ = 0.0f;
+    }
+
+    const float targetIdleExpression = idleStillDuration_ >= 0.75f ? 1.0f : 0.0f;
+    const float blendSpeed = targetIdleExpression > idleExpressionBlend_
+        ? 2.0f : 3.0f;
+    idleExpressionBlend_ = MoveTowards(
+        idleExpressionBlend_, targetIdleExpression, safeDeltaTime * blendSpeed);
+    // Keep the final gaze phase during the fade-out, then reset it only after
+    // the eyes have naturally returned to their normal center position.
+    if (!isIdle && idleExpressionBlend_ <= 0.0f) {
+        idleDuration_ = 0.0f;
+    }
+
     pendingEmitCount_ = 0;
     if (emitterEnabled_ && safeDeltaTime > 0.0f) {
-        emitAccumulator_ += settings_.emitterRate * safeDeltaTime;
+        emitAccumulator_ +=
+            settings_.emitterRate * emitterRateScale_ * safeDeltaTime;
         pendingEmitCount_ =
             (std::min<uint32_t>)(
                 static_cast<uint32_t>(emitAccumulator_),

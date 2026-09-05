@@ -1,0 +1,47 @@
+{
+  "ResourcePoolReserve": 1,
+  "Emitter": {
+    "Shape": "Circle",
+    "Count": 2,
+    "Radius": 0.16,
+    "Frequency": 0.075
+  },
+  "Particle": {
+    "MaxParticles": 48,
+    "LifeTime": 1.05,
+    "StartScale": 0.22,
+    "EndScale": 0.68,
+    "StartRotation": 0.0,
+    "RotationSpeed": 0.36,
+    "Velocity": [0.0, 0.16, 0.0],
+    "StartColor": [0.12, 0.92, 0.70, 0.86],
+    "EndColor": [0.46, 0.20, 0.92, 0.0]
+  },
+  "Simulation": {
+    "EnableGravity": true,
+    "Gravity": -0.34,
+    "EnableDrag": true,
+    "Drag": 0.965,
+    "EnableNoise": true,
+    "NoiseStrength": 0.18,
+    "EnableAttraction": false
+  },
+  "Render": {
+    "Type": "Mesh",
+    "MeshType": "Board",
+    "Texture": "resources/Effects/Smoke/Smoke.png",
+    "BlendMode": "Normal",
+    "DepthTest": true,
+    "DepthWrite": false,
+    "CullMode": "None",
+    "Loop": true,
+    "Duration": -1.0,
+    "StopTailDuration": 1.05
+  },
+  "Shaders": {
+    "Emit": "Emit.CS.hlsl",
+    "Update": "Update.CS.hlsl",
+    "Vertex": "resources/Shaders/Effects/Common/Particle.VS.hlsl",
+    "Pixel": "Dust.PS.hlsl"
+  }
+}
