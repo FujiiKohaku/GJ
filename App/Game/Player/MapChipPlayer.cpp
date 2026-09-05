@@ -568,19 +568,24 @@ void MapChipPlayer::UpdateVerticalConfinement(const std::vector<BaseMapChipGimmi
 {
     float floorTop = -1000.0f;
     float ceilingBottom = 1000.0f;
+    bool floorIsHardenedSlime = false;
+    bool ceilingIsHardenedSlime = false;
 
     const float pMinX = position_.x - kPlayerHalfHeight + 0.08f;
     const float pMaxX = position_.x + kPlayerHalfHeight - 0.08f;
 
-    auto checkObstacle = [&](float bMinX, float bMaxX, float bMinY, float bMaxY) {
+    auto checkObstacle = [&](float bMinX, float bMaxX, float bMinY, float bMaxY,
+        bool isHardenedSlime) {
         if (bMaxX <= pMinX || bMinX >= pMaxX) {
             return;
         }
         if (bMaxY <= position_.y && bMaxY > floorTop) {
             floorTop = bMaxY;
+            floorIsHardenedSlime = isHardenedSlime;
         }
         if (bMinY >= position_.y && bMinY < ceilingBottom) {
             ceilingBottom = bMinY;
+            ceilingIsHardenedSlime = isHardenedSlime;
         }
     };
 
@@ -600,7 +605,8 @@ void MapChipPlayer::UpdateVerticalConfinement(const std::vector<BaseMapChipGimmi
                 blockPos.x - 0.5f,
                 blockPos.x + 0.5f,
                 blockPos.y - 0.5f,
-                blockPos.y + 0.5f);
+                blockPos.y + 0.5f,
+                false);
         }
     }
 
@@ -611,7 +617,8 @@ void MapChipPlayer::UpdateVerticalConfinement(const std::vector<BaseMapChipGimmi
                 box.center.x - box.size.x * 0.5f,
                 box.center.x + box.size.x * 0.5f,
                 box.center.y - box.size.y * 0.5f,
-                box.center.y + box.size.y * 0.5f);
+                box.center.y + box.size.y * 0.5f,
+                gimmick->IsHardenedSlime());
         }
     }
 
@@ -624,7 +631,10 @@ void MapChipPlayer::UpdateVerticalConfinement(const std::vector<BaseMapChipGimmi
     if (floorTop > -999.0f && ceilingBottom < 999.0f) {
         const float gap = ceilingBottom - floorTop;
         verticalCompression01_ = Saturate((kPlayerSize - gap) / kPlayerSize);
-        if (gap <= kPlayerSize - kCollisionEpsilon) {
+        // A hardened slime corpse can be used as a platform or ceiling, but
+        // must never turn a narrow gap into an instant player death.
+        if (gap <= kPlayerSize - kCollisionEpsilon &&
+            !floorIsHardenedSlime && !ceilingIsHardenedSlime) {
             isCrushed_ = true;
         }
     }
