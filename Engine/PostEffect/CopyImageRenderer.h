@@ -76,6 +76,8 @@ public:
         float outlineSoftness;
         float slimeScreenProgress;
         Vector3 paddingSlimeScreen;
+        float fantasyMenuStrength;
+        Vector3 paddingFantasyMenu;
     };
     void Initialize(DirectXCommon* dxCommon);
     void Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureHandle, D3D12_GPU_DESCRIPTOR_HANDLE depthTextureHandle);

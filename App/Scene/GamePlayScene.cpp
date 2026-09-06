@@ -28,6 +28,8 @@ namespace {
 constexpr const char* kSkyBoxTexture = "resources/Textures/skybox.dds";
 constexpr const char* kMapChipTexture = "resources/Textures/checkerboard.png";
 constexpr const char* kWhiteTexture = "resources/Textures/white.png";
+constexpr const char* kFantasyMenuMaterial =
+    "resources/Shaders/Sprite/FantasyMenu";
 constexpr const char* kStage1Json = "resources/Maps/stage1.json";
 constexpr float kCameraDistance = 12.0f;
 constexpr const char* kDefaultFont =
@@ -35,6 +37,21 @@ constexpr const char* kDefaultFont =
 constexpr float kFluidRenderZ = 0.0f;
 constexpr float kNeoWorldScale = 0.36f;
 constexpr Vector3 kSlimeRenderForward = { 0.0f, 0.0f, 1.0f };
+constexpr float kMenuButtonX = 440.0f;
+constexpr float kMenuButtonWidth = 400.0f;
+constexpr float kMenuButtonHeight = 58.0f;
+constexpr float kMenuResumeY = 285.0f;
+constexpr float kMenuGameOverY = 365.0f;
+constexpr float kMenuStageSelectY = 445.0f;
+constexpr float kStageSelectFadeDuration = 0.45f;
+constexpr float kFantasyMenuBlendDuration = 0.20f;
+
+bool IsPointInMenuButton(const Vector2& point, float y)
+{
+    return point.x >= kMenuButtonX &&
+        point.x <= kMenuButtonX + kMenuButtonWidth &&
+        point.y >= y && point.y <= y + kMenuButtonHeight;
+}
 
 Vector3 MakeFluidCorePosition(const MapChipPlayer& player)
 {
@@ -182,6 +199,7 @@ void GamePlayScene::Initialize()
     SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
     SceneManager::GetInstance()->SetArchiveApproach(0.0f);
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
+    SceneManager::GetInstance()->SetFantasyMenuStrength(0.0f);
     isDeathTransitionActive_ = false;
     deathTransitionTime_ = 0.0f;
     remainingLives_ = kInitialLives;
@@ -301,7 +319,7 @@ void GamePlayScene::Initialize()
     instructionText_->SetText(
         "MOVE : A/D OR LEFT/RIGHT   JUMP : SPACE/W/UP   "
         "T : SLOW/SHAPE, T AGAIN : SELF-DESTRUCT   R : RESTART   "
-        "F1 : FREE CAM   TAB : MENU   BACKSPACE : STAGE SELECT");
+        "F1 : FREE CAM   TAB : MENU");
     instructionText_->SetPosition({ 32.0f, 32.0f });
     instructionText_->SetFontSize(24.0f);
     instructionText_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
@@ -333,14 +351,28 @@ void GamePlayScene::Initialize()
     menuBackgroundSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
     menuBackgroundSprite_->SetSize({ 1280.0f, 720.0f });
     menuBackgroundSprite_->SetPosition({ 0.0f, 0.0f });
-    menuBackgroundSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.65f });
+    menuBackgroundSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.42f });
 
     // 中央パネル
     menuPanelSprite_ = std::make_unique<Sprite>();
     menuPanelSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+    menuPanelSprite_->SetMaterial(kFantasyMenuMaterial);
     menuPanelSprite_->SetSize({ 640.0f, 380.0f });
     menuPanelSprite_->SetPosition({ 320.0f, 170.0f });
-    menuPanelSprite_->SetColor({ 0.08f, 0.12f, 0.16f, 0.95f });
+    menuPanelSprite_->SetColor({ 0.10f, 0.20f, 0.15f, 0.97f });
+
+    const auto createMenuButton = [](float y) {
+        auto button = std::make_unique<Sprite>();
+        button->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+        button->SetMaterial(kFantasyMenuMaterial);
+        button->SetSize({ kMenuButtonWidth, kMenuButtonHeight });
+        button->SetPosition({ kMenuButtonX, y });
+        button->SetColor({ 0.15f, 0.25f, 0.22f, 1.0f });
+        return button;
+    };
+    menuResumeButtonSprite_ = createMenuButton(kMenuResumeY);
+    menuGameOverButtonSprite_ = createMenuButton(kMenuGameOverY);
+    menuStageSelectButtonSprite_ = createMenuButton(kMenuStageSelectY);
 
     // メニュータイトル
     menuTitleText_ = std::make_unique<Text>();
@@ -351,14 +383,26 @@ void GamePlayScene::Initialize()
     menuTitleText_->SetFontSize(44.0f);
     menuTitleText_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
-    // メニュー説明文
-    menuInstructionText_ = std::make_unique<Text>();
-    menuInstructionText_->Initialize(kDefaultFont);
-    menuInstructionText_->SetText("TAB : RESUME GAME\n\nG : GAME OVER\n\nBACKSPACE : STAGE SELECT");
-    menuInstructionText_->SetPosition({ 640.0f, 360.0f });
-    menuInstructionText_->SetAnchorPoint({ 0.5f, 0.5f });
-    menuInstructionText_->SetFontSize(24.0f);
-    menuInstructionText_->SetColor({ 0.8f, 0.88f, 0.95f, 1.0f });
+    const auto createMenuText = [](const char* label, float y) {
+        auto text = std::make_unique<Text>();
+        text->Initialize(kDefaultFont);
+        text->SetText(label);
+        text->SetPosition({ 640.0f, y + kMenuButtonHeight * 0.5f });
+        text->SetAnchorPoint({ 0.5f, 0.5f });
+        text->SetFontSize(25.0f);
+        text->SetColor({ 0.90f, 0.96f, 0.93f, 1.0f });
+        return text;
+    };
+    menuResumeText_ = createMenuText("RESUME GAME  [TAB]", kMenuResumeY);
+    menuGameOverText_ = createMenuText("GAME OVER  [G]", kMenuGameOverY);
+    menuStageSelectText_ = createMenuText("STAGE SELECT  [BACKSPACE]", kMenuStageSelectY);
+
+    menuTransitionFadeSprite_ = std::make_unique<Sprite>();
+    menuTransitionFadeSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+    menuTransitionFadeSprite_->SetSize({ 1280.0f, 720.0f });
+    menuTransitionFadeSprite_->SetPosition({ 0.0f, 0.0f });
+    menuTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+    menuTransitionFadeSprite_->Update();
 
     pageReveal_.InitializeIfRequested();
 }
@@ -370,7 +414,9 @@ void GamePlayScene::Finalize()
         selfDestructSlowActive_ = false;
     }
     SceneManager::GetInstance()->RemovePostEffect(PostEffectType::SlimeScreen);
+    SceneManager::GetInstance()->RemovePostEffect(PostEffectType::FantasyMenu);
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
+    SceneManager::GetInstance()->SetFantasyMenuStrength(0.0f);
     debugCameraController_.SetTargetCamera(nullptr);
     SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
     SceneManager::GetInstance()->ClearExtraScreenSpaceFluids();
@@ -387,9 +433,15 @@ void GamePlayScene::Finalize()
 void GamePlayScene::Update()
 {
     Input* input = Input::GetInstance();
+    const float unscaledDeltaTime = TimeManager::GetInstance()->GetUnscaledDeltaTime();
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
+    UpdateFantasyMenuEffect(unscaledDeltaTime);
 
     UpdateLivesText();
+    if (isStageSelectTransitionActive_) {
+        UpdateStageSelectTransition(TimeManager::GetInstance()->GetUnscaledDeltaTime());
+        return;
+    }
     if (isDeathTransitionActive_) {
         UpdateDeathTransition(TimeManager::GetInstance()->GetUnscaledDeltaTime());
         return;
@@ -405,33 +457,55 @@ void GamePlayScene::Update()
     if (Input::GetInstance()->IsKeyTrigger(DIK_TAB) &&
         !player_->IsShapingSelfDestruct()) {
         isMenuOpen_ = !isMenuOpen_;
+        if (isMenuOpen_) {
+            SceneManager::GetInstance()->AddPostEffect(
+                PostEffectType::FantasyMenu, PostEffectStage::AfterParticle);
+        }
     }
 
     // メニューが開いているときはゲーム内処理を行わずに早期リターン
     if (isMenuOpen_) {
-        if (Input::GetInstance()->IsKeyTrigger(DIK_G)) {
+        const Vector2 mousePosition = input->GetMousePosition();
+        const bool resumeHovered = IsPointInMenuButton(mousePosition, kMenuResumeY);
+        const bool gameOverHovered = IsPointInMenuButton(mousePosition, kMenuGameOverY);
+        const bool stageSelectHovered = IsPointInMenuButton(mousePosition, kMenuStageSelectY);
+        const bool clicked = input->IsMouseTrigger(0);
+
+        menuResumeButtonSprite_->SetColor(resumeHovered
+            ? Vector4 { 0.25f, 0.48f, 0.34f, 1.0f }
+            : Vector4 { 0.15f, 0.25f, 0.22f, 1.0f });
+        menuGameOverButtonSprite_->SetColor(gameOverHovered
+            ? Vector4 { 0.55f, 0.25f, 0.22f, 1.0f }
+            : Vector4 { 0.29f, 0.17f, 0.17f, 1.0f });
+        menuStageSelectButtonSprite_->SetColor(stageSelectHovered
+            ? Vector4 { 0.30f, 0.38f, 0.54f, 1.0f }
+            : Vector4 { 0.17f, 0.21f, 0.30f, 1.0f });
+
+        if (clicked && resumeHovered) {
+            isMenuOpen_ = false;
+            return;
+        }
+        if (input->IsKeyTrigger(DIK_G) || (clicked && gameOverHovered)) {
             StartDeathTransition();
             return;
         }
-        if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
-            SceneManager::GetInstance()->SetNextScene(
-                std::make_unique<ArchiveScene>());
+        if (input->IsKeyTrigger(DIK_BACKSPACE) || (clicked && stageSelectHovered)) {
+            StartStageSelectTransition();
             return;
         }
 
         menuBackgroundSprite_->Update();
         menuPanelSprite_->Update();
+        menuResumeButtonSprite_->Update();
+        menuGameOverButtonSprite_->Update();
+        menuStageSelectButtonSprite_->Update();
         menuTitleText_->Update();
-        menuInstructionText_->Update();
+        menuResumeText_->Update();
+        menuGameOverText_->Update();
+        menuStageSelectText_->Update();
         return;
     }
 
-    if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
-        SceneManager::GetInstance()->SetNextScene(
-            std::make_unique<ArchiveScene>());
-        return;
-    }
-    
     if (input->IsKeyTrigger(DIK_Y)) {
         showForces_ = !showForces_;
     }
@@ -450,8 +524,30 @@ void GamePlayScene::Update()
 
     //player_->Update(mapChipStage_.GetGimmicks());
     if (!hardenedThisFrame &&
-        (!isFreeCameraMode || player_->IsShapingSelfDestruct())) {
+        (!isFreeCameraMode || player_->IsShapingSelfDestruct()) &&
+        !isLifeRelayActive_) {
         player_->Update(mapChipStage_.GetGimmicks());
+    }
+
+    if (isLifeRelayActive_) {
+        lifeRelayTimer_ += TimeManager::GetInstance()->GetDeltaTime();
+        float t = lifeRelayTimer_ / lifeRelayDuration_;
+        if (t > 1.0f) {
+            t = 1.0f;
+        }
+
+        float smoothT = t * t * (3.0f - 2.0f * t);
+        lifeRelayOrbCurrentPosition_ = Lerp(lifeRelayOrbStartPosition_, playerStartPosition_, smoothT);
+
+        if (EffectManager::GetInstance()->IsEffectAlive(lifeRelayOrbEffectHandle_)) {
+            EffectManager::GetInstance()->SetEffectPosition(lifeRelayOrbEffectHandle_, lifeRelayOrbCurrentPosition_);
+        } else {
+            lifeRelayOrbEffectHandle_ = EffectManager::GetInstance()->PlayLoopEffect("FlameCore", lifeRelayOrbCurrentPosition_);
+        }
+
+        if (t >= 1.0f) {
+            FinishLifeRelay();
+        }
     }
 
     if (player_->IsShapingSelfDestruct() && !selfDestructSlowActive_) {
@@ -488,84 +584,92 @@ void GamePlayScene::Update()
             }
         }
 
-        gpuSphFluid_->SetObstacles(
-            BuildFluidObstacles(mapChipStage_, gimmicks, deltaTime));
-        gpuSphFluid_->SetFloorHeight(player_->GetFluidFloorHeight());
-        gpuSphFluid_->SetGrounded(player_->IsGrounded());
-        const Vector3 playerScale = player_->GetVisualScale();
-        const Vector3 targetRadii = {
-            playerScale.x * (2.4f * kNeoWorldScale),
-            playerScale.y * (1.7f * kNeoWorldScale),
-            playerScale.z * (2.4f * kNeoWorldScale) };
-        gpuSphFluid_->SetBlobRadii(targetRadii);
-        float minX = -1000.0f, maxX = 1000.0f, maxY = 1000.0f;
-        player_->GetWallBoundaries(minX, maxX, maxY, gimmicks);
-        Vector3 corePos = MakeFluidCorePosition(*player_);
-        const float zEnvelope = targetRadii.z * 1.2f;
-        float minZ = corePos.z - zEnvelope;
-        float maxZ = corePos.z + zEnvelope;
-        gpuSphFluid_->SetWallBoundaries(minX, maxX, minZ, maxZ, -1000.0f, maxY);
-        gpuSphFluid_->SetLiquidated(false);
-        constexpr float kEyeMaximumOffset = 0.075f;
-        constexpr float kEyeFollowSpeed = 0.90f;
-        const float desiredEyeOffset = std::clamp(
-            player_->GetVelocity().x / 5.0f,
-            -1.0f,
-            1.0f) * kEyeMaximumOffset;
-        const float eyeDelta = std::clamp(
-            desiredEyeOffset - eyeOffsetX_,
-            -kEyeFollowSpeed * deltaTime,
-            kEyeFollowSpeed * deltaTime);
-        eyeOffsetX_ += eyeDelta;
-        const Vector2 shapeEyeOffset = player_->GetEyeOffset();
-        gpuSphFluid_->SetEyeOffsetX(eyeOffsetX_ + shapeEyeOffset.x);
-        gpuSphFluid_->SetEyeOffsetY(shapeEyeOffset.y);
-        gpuSphFluid_->SetControlState(
-            MakeFluidCorePosition(*player_),
-            MakeFluidTargetVelocity(player_->GetVelocity()),
-            kSlimeRenderForward);
-        const float horizontalSpeed = std::abs(player_->GetVelocity().x);
-        const bool emitWalkingTrail =
-            player_->IsGrounded() &&
-            horizontalSpeed > 0.25f;
-        const float movementDirection =
-            player_->GetVelocity().x >= 0.0f ? 1.0f : -1.0f;
-        Vector3 trailPosition = MakeFluidCorePosition(*player_);
-        trailPosition.x -= movementDirection * targetRadii.x * 0.92f;
-        trailPosition.y = player_->GetFluidFloorHeight() + 0.07f;
-        const Vector3 trailVelocity = {
-            -movementDirection * (0.70f + horizontalSpeed * 0.12f),
-            0.10f,
-            0.0f };
-        gpuSphFluid_->SetEmitter(
-            false,
-            corePos,
-            { 0.0f, 0.0f, 0.0f });
-        gpuSphFluid_->Update(deltaTime);
+        if (!isLifeRelayActive_) {
+            gpuSphFluid_->SetObstacles(
+                BuildFluidObstacles(mapChipStage_, gimmicks, deltaTime));
+            gpuSphFluid_->SetFloorHeight(player_->GetFluidFloorHeight());
+            gpuSphFluid_->SetGrounded(player_->IsGrounded());
+            const Vector3 playerScale = player_->GetVisualScale();
+            const Vector3 targetRadii = {
+                playerScale.x * (2.4f * kNeoWorldScale),
+                playerScale.y * (1.7f * kNeoWorldScale),
+                playerScale.z * (2.4f * kNeoWorldScale) };
+            gpuSphFluid_->SetBlobRadii(targetRadii);
+            float minX = -1000.0f, maxX = 1000.0f, maxY = 1000.0f;
+            player_->GetWallBoundaries(minX, maxX, maxY, gimmicks);
+            Vector3 corePos = MakeFluidCorePosition(*player_);
+            const float zEnvelope = targetRadii.z * 1.2f;
+            float minZ = corePos.z - zEnvelope;
+            float maxZ = corePos.z + zEnvelope;
+            gpuSphFluid_->SetWallBoundaries(minX, maxX, minZ, maxZ, -1000.0f, maxY);
+            gpuSphFluid_->SetLiquidated(false);
+            constexpr float kEyeMaximumOffset = 0.075f;
+            constexpr float kEyeFollowSpeed = 0.90f;
+            const float desiredEyeOffset = std::clamp(
+                player_->GetVelocity().x / 5.0f,
+                -1.0f,
+                1.0f) * kEyeMaximumOffset;
+            const float eyeDelta = std::clamp(
+                desiredEyeOffset - eyeOffsetX_,
+                -kEyeFollowSpeed * deltaTime,
+                kEyeFollowSpeed * deltaTime);
+            eyeOffsetX_ += eyeDelta;
+            const Vector2 shapeEyeOffset = player_->GetEyeOffset();
+            gpuSphFluid_->SetEyeOffsetX(eyeOffsetX_ + shapeEyeOffset.x);
+            gpuSphFluid_->SetEyeOffsetY(shapeEyeOffset.y);
+            gpuSphFluid_->SetControlState(
+                MakeFluidCorePosition(*player_),
+                MakeFluidTargetVelocity(player_->GetVelocity()),
+                kSlimeRenderForward);
+            const float horizontalSpeed = std::abs(player_->GetVelocity().x);
+            const bool emitWalkingTrail =
+                player_->IsGrounded() &&
+                horizontalSpeed > 0.25f;
+            const float movementDirection =
+                player_->GetVelocity().x >= 0.0f ? 1.0f : -1.0f;
+            Vector3 trailPosition = MakeFluidCorePosition(*player_);
+            trailPosition.x -= movementDirection * targetRadii.x * 0.92f;
+            trailPosition.y = player_->GetFluidFloorHeight() + 0.07f;
+            const Vector3 trailVelocity = {
+                -movementDirection * (0.70f + horizontalSpeed * 0.12f),
+                0.10f,
+                0.0f };
+            gpuSphFluid_->SetEmitter(
+                false,
+                corePos,
+                { 0.0f, 0.0f, 0.0f });
+            gpuSphFluid_->Update(deltaTime);
 
-        // 流体とは無関係な土埃エフェクト。低い位置から後方へ短く舞い上がる。
-        EffectManager* effects = EffectManager::GetInstance();
-        const bool emitWalkingDust =
-            player_->IsGrounded() && horizontalSpeed > 0.45f;
-        if (emitWalkingDust) {
-            Vector3 dustPosition = trailPosition;
-            // 地面の内部に埋まらない高さから、足元で土煙を見せる。
-            dustPosition.y = player_->GetFluidFloorHeight() + 0.14f;
-            if (!effects->IsEffectAlive(walkingDustEffectHandle_)) {
-                walkingDustEffectHandle_ = effects->PlayLoopEffect(
-                    "WalkDust", dustPosition);
+            // 流体とは無関係な土埃エフェクト。低い位置から後方へ短く舞い上がる。
+            EffectManager* effects = EffectManager::GetInstance();
+            const bool emitWalkingDust =
+                player_->IsGrounded() && horizontalSpeed > 0.45f;
+            if (emitWalkingDust) {
+                Vector3 dustPosition = trailPosition;
+                // 地面の内部に埋まらない高さから、足元で土煙を見せる。
+                dustPosition.y = player_->GetFluidFloorHeight() + 0.14f;
+                if (!effects->IsEffectAlive(walkingDustEffectHandle_)) {
+                    walkingDustEffectHandle_ = effects->PlayLoopEffect(
+                        "WalkDust", dustPosition);
+                }
+                effects->SetEffectPosition(walkingDustEffectHandle_, dustPosition);
+                effects->SetEffectVelocity(
+                    walkingDustEffectHandle_,
+                    {
+                        -movementDirection * (0.30f + horizontalSpeed * 0.08f),
+                        0.16f,
+                        0.0f,
+                    });
+            } else if (effects->IsEffectAlive(walkingDustEffectHandle_)) {
+                effects->StopEffect(walkingDustEffectHandle_);
+                walkingDustEffectHandle_ = kInvalidEffectHandle;
             }
-            effects->SetEffectPosition(walkingDustEffectHandle_, dustPosition);
-            effects->SetEffectVelocity(
-                walkingDustEffectHandle_,
-                {
-                    -movementDirection * (0.30f + horizontalSpeed * 0.08f),
-                    0.16f,
-                    0.0f,
-                });
-        } else if (effects->IsEffectAlive(walkingDustEffectHandle_)) {
-            effects->StopEffect(walkingDustEffectHandle_);
-            walkingDustEffectHandle_ = kInvalidEffectHandle;
+        } else {
+            EffectManager* effects = EffectManager::GetInstance();
+            if (effects->IsEffectAlive(walkingDustEffectHandle_)) {
+                effects->StopEffect(walkingDustEffectHandle_);
+                walkingDustEffectHandle_ = kInvalidEffectHandle;
+            }
         }
     }
     if (!isFreeCameraMode) {
@@ -602,10 +706,19 @@ void GamePlayScene::Draw2D()
         SpriteManager::GetInstance()->PreDraw();
         menuBackgroundSprite_->Draw();
         menuPanelSprite_->Draw();
+        menuResumeButtonSprite_->Draw();
+        menuGameOverButtonSprite_->Draw();
+        menuStageSelectButtonSprite_->Draw();
 
         TextRenderer::GetInstance()->PreDraw();
         menuTitleText_->Draw();
-        menuInstructionText_->Draw();
+        menuResumeText_->Draw();
+        menuGameOverText_->Draw();
+        menuStageSelectText_->Draw();
+    }
+    if (isStageSelectTransitionActive_) {
+        SpriteManager::GetInstance()->PreDraw();
+        menuTransitionFadeSprite_->Draw();
     }
 }
 
@@ -632,7 +745,59 @@ void GamePlayScene::DrawImGui()
 {
 }
 
+void GamePlayScene::StartStageSelectTransition()
+{
+    if (isStageSelectTransitionActive_) {
+        return;
+    }
+    isStageSelectTransitionActive_ = true;
+    stageSelectTransitionTime_ = 0.0f;
+    menuTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+    menuTransitionFadeSprite_->Update();
+}
+
+void GamePlayScene::UpdateFantasyMenuEffect(float deltaTime)
+{
+    const float targetStrength = isMenuOpen_ ? 1.0f : 0.0f;
+    const float step = deltaTime / kFantasyMenuBlendDuration;
+    if (fantasyMenuEffectStrength_ < targetStrength) {
+        fantasyMenuEffectStrength_ = (std::min)(
+            fantasyMenuEffectStrength_ + step, targetStrength);
+    } else if (fantasyMenuEffectStrength_ > targetStrength) {
+        fantasyMenuEffectStrength_ = (std::max)(
+            fantasyMenuEffectStrength_ - step, targetStrength);
+    }
+
+    SceneManager* sceneManager = SceneManager::GetInstance();
+    sceneManager->SetFantasyMenuStrength(fantasyMenuEffectStrength_);
+    if (!isMenuOpen_ && fantasyMenuEffectStrength_ <= 0.0f) {
+        sceneManager->RemovePostEffect(PostEffectType::FantasyMenu);
+    }
+}
+
+void GamePlayScene::UpdateStageSelectTransition(float deltaTime)
+{
+    stageSelectTransitionTime_ += deltaTime;
+    const float progress = std::clamp(
+        stageSelectTransitionTime_ / kStageSelectFadeDuration, 0.0f, 1.0f);
+    const float alpha = progress * progress * (3.0f - 2.0f * progress);
+    menuTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha });
+    menuTransitionFadeSprite_->Update();
+
+    if (progress >= 1.0f) {
+        PageTransition::RequestReveal(
+            { 0.0f, 0.0f, 0.0f, 1.0f }, kStageSelectFadeDuration);
+        SceneManager::GetInstance()->SetNextScene(
+            std::make_unique<ArchiveScene>());
+    }
+}
+
 void GamePlayScene::RespawnPlayerLeavingCorpse()
+{
+    StartLifeRelay();
+}
+
+void GamePlayScene::StartLifeRelay()
 {
     if (selfDestructSlowActive_) {
         TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
@@ -652,10 +817,34 @@ void GamePlayScene::RespawnPlayerLeavingCorpse()
         mapChipStage_.AddGimmick(std::move(corpse));
     }
 
+    GpuSphFluid::Settings hiddenSettings = gpuSphFluid_->GetSettings();
+    hiddenSettings.corePosition = { 0.0f, 10000.0f, 0.0f };
+    gpuSphFluid_->Reset(hiddenSettings);
+    SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
+    
+    isLifeRelayActive_ = true;
+    lifeRelayTimer_ = 0.0f;
+    lifeRelayOrbStartPosition_ = MakeFluidCorePosition(*player_);
+    lifeRelayOrbCurrentPosition_ = lifeRelayOrbStartPosition_;
+    
+    lifeRelayOrbEffectHandle_ = EffectManager::GetInstance()->PlayLoopEffect("FlameCore", lifeRelayOrbCurrentPosition_);
+}
+
+void GamePlayScene::FinishLifeRelay()
+{
+    isLifeRelayActive_ = false;
+    
+    if (EffectManager::GetInstance()->IsEffectAlive(lifeRelayOrbEffectHandle_)) {
+        EffectManager::GetInstance()->StopEffect(lifeRelayOrbEffectHandle_);
+        lifeRelayOrbEffectHandle_ = kInvalidEffectHandle;
+    }
+
+    EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks", playerStartPosition_);
+
     player_->Initialize(&mapChipStage_.GetField(), playerStartPosition_);
     eyeOffsetX_ = 0.0f;
 
-    GpuSphFluid::Settings respawnSettings = currentSettings;
+    GpuSphFluid::Settings respawnSettings = gpuSphFluid_->GetSettings();
     respawnSettings.corePosition = MakeFluidCorePosition(*player_);
     respawnSettings.floorHeight = player_->GetFluidFloorHeight();
     respawnSettings.targetVelocity = { 0.0f, 0.0f, 0.0f };
@@ -667,6 +856,7 @@ void GamePlayScene::RespawnPlayerLeavingCorpse()
     gpuSphFluid_->SetLiquidated(false);
     gpuSphFluid_->SetDeathEyes(false);
     gpuSphFluid_->Reset(respawnSettings);
+    SceneManager::GetInstance()->SetScreenSpaceFluid(gpuSphFluid_.get());
 }
 
 void GamePlayScene::UpdateLivesText()
@@ -689,7 +879,7 @@ void GamePlayScene::LoseLife()
     if (remainingLives_ == 0) {
         StartDeathTransition();
     } else {
-        RespawnPlayerLeavingCorpse();
+        StartLifeRelay();
     }
 }
 
@@ -774,10 +964,14 @@ void GamePlayScene::UpdateFollowCamera()
     if (!player_) {
         return;
     }
-    const Vector3 playerPosition = player_->GetPosition();
+    Vector3 targetPosition = player_->GetPosition();
+    if (isLifeRelayActive_) {
+        targetPosition = lifeRelayOrbCurrentPosition_;
+    }
+    
     camera_->LookAt(
-        { playerPosition.x, playerPosition.y, -kCameraDistance },
-        { playerPosition.x, playerPosition.y, 0.0f });
+        { targetPosition.x, targetPosition.y, -kCameraDistance },
+        { targetPosition.x, targetPosition.y, 0.0f });
 }
 
 void GamePlayScene::UpdateCollisionText()

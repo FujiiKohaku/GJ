@@ -218,6 +218,8 @@ void PostEffectManager::UpdatePostEffectParameters(
         sceneManager->GetPaintColor();
     postEffectParameter.slimeScreenProgress =
         sceneManager->GetSlimeScreenProgress();
+    postEffectParameter.fantasyMenuStrength =
+        sceneManager->GetFantasyMenuStrength();
 }
 
 void PostEffectManager::Apply(SceneManager* sceneManager, D3D12_GPU_DESCRIPTOR_HANDLE sceneColorHandle)

@@ -38,6 +38,13 @@ private:
     void UpdateDeathTransition(float deltaTime);
     void RespawnPlayerLeavingCorpse();
 
+    void StartLifeRelay();
+    void FinishLifeRelay();
+
+    void StartStageSelectTransition();
+    void UpdateStageSelectTransition(float deltaTime);
+    void UpdateFantasyMenuEffect(float deltaTime);
+
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
     std::unique_ptr<SkyBox> skyBox_;
@@ -58,8 +65,17 @@ private:
     bool isMenuOpen_ = false;
     std::unique_ptr<Sprite> menuBackgroundSprite_;
     std::unique_ptr<Sprite> menuPanelSprite_;
+    std::unique_ptr<Sprite> menuResumeButtonSprite_;
+    std::unique_ptr<Sprite> menuGameOverButtonSprite_;
+    std::unique_ptr<Sprite> menuStageSelectButtonSprite_;
     std::unique_ptr<Text> menuTitleText_;
-    std::unique_ptr<Text> menuInstructionText_;
+    std::unique_ptr<Text> menuResumeText_;
+    std::unique_ptr<Text> menuGameOverText_;
+    std::unique_ptr<Text> menuStageSelectText_;
+    std::unique_ptr<Sprite> menuTransitionFadeSprite_;
+    bool isStageSelectTransitionActive_ = false;
+    float stageSelectTransitionTime_ = 0.0f;
+    float fantasyMenuEffectStrength_ = 0.0f;
     bool isDeathTransitionActive_ = false;
     float deathTransitionTime_ = 0.0f;
     bool showForces_ = false;
@@ -68,4 +84,11 @@ private:
     Vector3 playerStartPosition_ = { 0.0f, 0.0f, 0.0f };
     bool selfDestructSlowActive_ = false;
     float timeScaleBeforeSelfDestruct_ = 1.0f;
+
+    bool isLifeRelayActive_ = false;
+    float lifeRelayTimer_ = 0.0f;
+    float lifeRelayDuration_ = 1.5f;
+    Vector3 lifeRelayOrbStartPosition_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 lifeRelayOrbCurrentPosition_ = { 0.0f, 0.0f, 0.0f };
+    EffectHandle lifeRelayOrbEffectHandle_ = kInvalidEffectHandle;
 };
