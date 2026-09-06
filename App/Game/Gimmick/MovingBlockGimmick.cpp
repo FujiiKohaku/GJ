@@ -6,6 +6,10 @@
 #include "Engine/Time/TimeManager.h"
 #include <cmath>
 
+namespace {
+constexpr int32_t kMovingBlockWoodMaterialMode = 14;
+}
+
 bool MovingBlockGimmick::Initialize(
     const Vector3& position,
     const std::string& texturePath,
@@ -35,10 +39,26 @@ bool MovingBlockGimmick::Initialize(
     object_->Initialize(Object3dManager::GetInstance());
     object_->SetModel(model);
     object_->SetTranslate(basePosition_);
-    object_->SetColor({ 1.0f, 0.45f, 0.1f, 1.0f });
-    object_->SetEnableLighting(true);
+    ApplyWoodMaterial();
     object_->Update();
     return true;
+}
+
+void MovingBlockGimmick::ApplyWoodMaterial()
+{
+    if (!object_) {
+        return;
+    }
+    object_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+    Material* material = object_->GetMaterial();
+    material->enableLighting = kMovingBlockWoodMaterialMode;
+    material->enableEnvironmentMap = 0;
+    material->environmentCoefficient = 0.0f;
+}
+
+void MovingBlockGimmick::EnableToonLighting()
+{
+    ApplyWoodMaterial();
 }
 
 void MovingBlockGimmick::Update()
