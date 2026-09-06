@@ -30,6 +30,7 @@ bool HardenedFluidSlimeCorpse::InitializeFromParticles(
 
     fluid_ = std::make_unique<GpuSphFluid>();
     fluid_->Initialize(dxCommon, srvManager, corpseSettings);
+    fluid_->SetHideEyes(true);
 
     std::vector<GpuSphFluid::Particle> frozenParticles = sourceParticles;
     for (auto& p : frozenParticles) {

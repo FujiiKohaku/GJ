@@ -113,6 +113,8 @@ public:
     float GetIdleExpressionBlend() const { return idleExpressionBlend_; }
     void SetDeathEyes(bool enabled) { deathEyes_ = enabled; }
     bool HasDeathEyes() const { return deathEyes_; }
+    void SetHideEyes(bool hidden) { hideEyes_ = hidden; }
+    bool IsEyeHidden() const { return hideEyes_; }
     void SetWallBoundaries(float wallMinX, float wallMaxX, float wallMinZ = -0.3f, float wallMaxZ = 0.3f, float wallMinY = -1000.0f, float wallMaxY = 1000.0f);
     void TriggerLiquidationBurst(float strength = 8.0f);
     void SetLiquidated(bool liquidated) { isLiquidated_ = liquidated; }
@@ -235,6 +237,7 @@ private:
     Settings settings_ {};
     bool needsReset_ = true;
     bool isLiquidated_ = false;
+    bool hideEyes_ = false;
     bool isGrounded_ = false;
     bool hasPreviousCorePosition_ = false;
     bool emitterEnabled_ = false;

@@ -592,7 +592,7 @@ void ScreenSpaceFluidRenderer::UpdateCompositeParameter(
     compositeData_->eyeWorldPosition.z = 0.0f;
     compositeData_->eyeHalfWidthPixels = 9.0f;
     compositeData_->eyeHalfHeightPixels = 22.0f;
-    compositeData_->eyeVisibility = 1.0f;
+    compositeData_->eyeVisibility = fluid.IsEyeHidden() ? 0.0f : 1.0f;
     const Vector3& gazeVelocity = fluid.GetSettings().targetVelocity;
     const float gazeSpeed = std::sqrt(
         gazeVelocity.x * gazeVelocity.x +
