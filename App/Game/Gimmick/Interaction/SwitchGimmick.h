@@ -5,6 +5,8 @@
 #pragma once
 #include "App/Game/Gimmick/BaseMapChipGimmick.h"
 #include "App/Game/Gimmick/Interaction/SwitchParam.h"
+#include "Engine/Effect/EffectManager.h"
+#include <vector>
 #include <memory>
 
 class Object3d;
@@ -39,6 +41,15 @@ public:
     static Vector3 s_pressurePlateAABBOffset;
     static Vector3 s_pressurePlateAABBSize;
 
+    // 篝火エフェクト用のグローバル設定
+    static Vector3 s_bonfireEffectOffset;
+    static float s_bonfireEffectScale;
+
+private:
+    void StartFireEffects();
+    void StopFireEffects();
+    void UpdateFireEffects();
+
 private:
     std::unique_ptr<Object3d> object_;
     std::unique_ptr<SwitchParam> param_;
@@ -49,4 +60,7 @@ private:
     
     bool isEditorMode_;
     bool isActive_; ///< スイッチがオン状態かどうか
+    
+    // エフェクト管理
+    std::vector<EffectHandle> fireEffects_;
 };

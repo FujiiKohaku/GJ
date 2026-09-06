@@ -15,6 +15,9 @@
 Vector3 SwitchGimmick::s_pressurePlateAABBOffset = { 0.0f, -0.4f, 0.0f };
 Vector3 SwitchGimmick::s_pressurePlateAABBSize = { 0.8f, 0.2f, 0.8f };
 
+Vector3 SwitchGimmick::s_bonfireEffectOffset = { 0.0f, 0.1f, 0.0f };
+float SwitchGimmick::s_bonfireEffectScale = 0.2f;
+
 SwitchGimmick::SwitchGimmick()
     : stage_(nullptr)
     , position_({0, 0, 0})
@@ -24,7 +27,10 @@ SwitchGimmick::SwitchGimmick()
 {
 }
 
-SwitchGimmick::~SwitchGimmick() = default;
+SwitchGimmick::~SwitchGimmick()
+{
+    StopFireEffects();
+}
 
 bool SwitchGimmick::Initialize(
     const Vector3& position,
@@ -65,6 +71,10 @@ bool SwitchGimmick::Initialize(
     object_->SetEnableLighting(true);
     object_->Update();
 
+    if (param_->switchType_ == 2 && !isEditorMode_) {
+        StartFireEffects();
+    }
+
     return true;
 }
 
@@ -81,9 +91,10 @@ void SwitchGimmick::Update()
 
     // Typeに応じた動作
     if (param_->switchType_ == 2) {
-        // 篝火(着火源)の場合：毎フレーム（または適度な間隔で）周囲に着火判定を出す
-        // ガスエリアが存在すれば誘爆する
+        // 篝火(着火源)の場合：毎フレーム周囲に着火判定を出す
         stage_->CreateSpark(position_);
+        // 炎エフェクトの追従更新
+        UpdateFireEffects();
     } else if (param_->switchType_ == 0) {
         // 感圧盤の場合：プレイヤーとの当たり判定をチェックする
         bool isStepped = false;
@@ -133,6 +144,11 @@ void SwitchGimmick::Draw()
 void SwitchGimmick::SetEditorMode(bool isEditorMode)
 {
     isEditorMode_ = isEditorMode;
+    if (isEditorMode_) {
+        StopFireEffects();
+    } else if (param_ && param_->switchType_ == 2) {
+        StartFireEffects();
+    }
 }
 
 AABB SwitchGimmick::GetAABB() const
@@ -160,4 +176,49 @@ std::string SwitchGimmick::GetLinkName() const
 void SwitchGimmick::SetStage(MapChipStage* stage)
 {
     stage_ = stage;
+}
+
+void SwitchGimmick::StartFireEffects()
+{
+    if (!fireEffects_.empty()) return;
+    
+    EffectManager* effects = EffectManager::GetInstance();
+    Vector3 source = position_ + s_bonfireEffectOffset;
+    
+    // 4つのエフェクトを合成してリッチな篝火を表現する
+    const char* effectNames[] = { "Flame", "FlameCore", "FlameSmoke", "FlameSparks" };
+    for (const char* name : effectNames) {
+        EffectHandle handle = effects->PlayLoopEffect(name, source);
+        if (handle != kInvalidEffectHandle) {
+            effects->SetEffectScale(handle, s_bonfireEffectScale);
+            fireEffects_.push_back(handle);
+        }
+    }
+}
+
+void SwitchGimmick::StopFireEffects()
+{
+    if (fireEffects_.empty()) return;
+    
+    EffectManager* effects = EffectManager::GetInstance();
+    for (EffectHandle handle : fireEffects_) {
+        effects->StopEffect(handle);
+    }
+    fireEffects_.clear();
+}
+
+void SwitchGimmick::UpdateFireEffects()
+{
+    if (fireEffects_.empty()) return;
+    
+    EffectManager* effects = EffectManager::GetInstance();
+    Vector3 source = position_ + s_bonfireEffectOffset;
+    
+    for (EffectHandle handle : fireEffects_) {
+        if (effects->IsEffectAlive(handle)) {
+            effects->SetEffectPosition(handle, source);
+            // グローバルスケールの反映
+            effects->SetEffectScale(handle, s_bonfireEffectScale);
+        }
+    }
 }
