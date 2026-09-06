@@ -22,6 +22,7 @@ enum class MapChipType {
     Wall = 11,
     Door = 12,
     Foundation = 13,
+    Gear = 14,
 };
 
 struct MapChipConfig {

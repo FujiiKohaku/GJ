@@ -6,6 +6,7 @@
 #include "Trap/LaserGimmick.h"
 #include "SwingingBridgeGimmick.h"
 #include "Interaction/DoorGimmick.h"
+#include "Trap/GearGimmick.h"
 
 std::unique_ptr<BaseMapChipGimmick> MapChipGimmickFactory::Create(
     MapChipType type,
@@ -30,6 +31,9 @@ std::unique_ptr<BaseMapChipGimmick> MapChipGimmickFactory::Create(
         break;
     case MapChipType::Door:
         gimmick = std::make_unique<DoorGimmick>();
+        break;
+    case MapChipType::Gear:
+        gimmick = std::make_unique<GearGimmick>();
         break;
     default:
         return nullptr;

@@ -17,6 +17,8 @@
 #include "App/Game/Gimmick/Trap/SpikeGimmick.h"
 #include "App/Game/Gimmick/Interaction/GasEmitterParam.h"
 #include "App/Game/Gimmick/Interaction/DoorParam.h"
+#include "App/Game/Gimmick/Trap/GearParam.h"
+#include "App/Game/Gimmick/Trap/GearGimmick.h"
 #include "Engine/ImGuiManager/ImGuiManager.h"
 #include "Engine/3D/ModelManager.h"
 #include "Engine/Debug/DebugRenderer.h"
@@ -404,6 +406,30 @@ void EditorScene::Draw3D()
             {1,0,0}, {0,1,0}, {0,0,1},
             {1.0f, 0.0f, 0.0f, 1.0f}, 2.0f); // 赤色
     }
+
+    // Gearの当たり判定（平面円）の視覚化
+    if (selectedGimmick && selectedGimmick->type == "Gear") {
+        if (selectedGimmick->gimmickParam) {
+            if (auto* param = dynamic_cast<GearParam*>(selectedGimmick->gimmickParam.get())) {
+                Vector3 center = selectedGimmick->translation;
+                float r = param->collisionRadius_;
+                Vector4 color = { 1.0f, 0.0f, 1.0f, 1.0f }; // マゼンタ色
+                float thick = 2.0f;
+                
+                auto dr = DebugRenderer::GetInstance();
+                const int segments = 32;
+                for (int i = 0; i < segments; ++i) {
+                    float theta1 = (2.0f * 3.1415926535f * i) / segments;
+                    float theta2 = (2.0f * 3.1415926535f * (i + 1)) / segments;
+                    
+                    Vector3 p1 = { center.x + r * std::cos(theta1), center.y + r * std::sin(theta1), center.z };
+                    Vector3 p2 = { center.x + r * std::cos(theta2), center.y + r * std::sin(theta2), center.z };
+                    
+                    dr->AddLine(p1, p2, color, thick);
+                }
+            }
+        }
+    }
     
     // イベント連携の視覚化（オレンジ色の線）
     for (const auto& emitter : currentLevelData_.objects) {
@@ -764,7 +790,8 @@ void EditorScene::UpdateRaycastEdit()
                                         type == MapChipType::Spike ||
                                         type == MapChipType::LaserEmitter ||
                                         type == MapChipType::SwingingBridge ||
-                                        type == MapChipType::Door) {
+                                        type == MapChipType::Door ||
+                                        type == MapChipType::Gear) {
                                         
                                         LevelData::ObjectData newData;
                                         newData.translation = newPos;
@@ -840,6 +867,12 @@ void EditorScene::UpdateRaycastEdit()
                                             newData.type = "Door";
                                             metaKey = "Door";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Door");
+                                        }
+                                        else if (type == MapChipType::Gear) {
+                                            newData.name = "Gear";
+                                            newData.type = "Gear";
+                                            metaKey = "Gear";
+                                            newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Gear");
                                         }
                                         
                                         if (!metaKey.empty()) {

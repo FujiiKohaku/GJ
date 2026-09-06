@@ -169,6 +169,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="App\Game\Gimmick\Trap\SpikeParam.cpp" />
     <ClCompile Include="App\Game\Gimmick\Trap\LaserGimmick.cpp" />
     <ClCompile Include="App\Game\Gimmick\Trap\LaserParam.cpp" />
+    <ClCompile Include="App\Game\Gimmick\Trap\GearGimmick.cpp" />
+    <ClCompile Include="App\Game\Gimmick\Trap\GearParam.cpp" />
     <ClCompile Include="Engine\Event\EventManager.cpp" />
     <ClCompile Include="App\Game\Gimmick\Interaction\SwitchParam.cpp" />
     <ClCompile Include="App\Game\Gimmick\Interaction\DoorGimmick.cpp" />

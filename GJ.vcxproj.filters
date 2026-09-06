@@ -64,6 +64,12 @@
     <ClCompile Include="App\Game\Gimmick\Trap\SpikeParam.cpp">
       <Filter>App\Game\Gimmick\Trap</Filter>
     </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Trap\GearGimmick.cpp">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClCompile>
+    <ClCompile Include="App\Game\Gimmick\Trap\GearParam.cpp">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClCompile>
     <ClCompile Include="App\Game\Gimmick\Trap\LaserGimmick.cpp">
       <Filter>App\Game\Gimmick\Trap</Filter>
     </ClCompile>
@@ -712,6 +718,12 @@
       <Filter>App\Game\Gimmick\Trap</Filter>
     </ClInclude>
     <ClInclude Include="App\Game\Gimmick\Trap\SpikeParam.h">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Trap\GearGimmick.h">
+      <Filter>App\Game\Gimmick\Trap</Filter>
+    </ClInclude>
+    <ClInclude Include="App\Game\Gimmick\Trap\GearParam.h">
       <Filter>App\Game\Gimmick\Trap</Filter>
     </ClInclude>
     <ClInclude Include="App\Game\Gimmick\Trap\LaserGimmick.h">

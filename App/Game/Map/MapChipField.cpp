@@ -137,6 +137,9 @@ void MapChipRegistry::Initialize()
     Register(MapChipType::DestructibleWall, "DestructibleWall", false, true, ""); // ギミックで判定するため地形としては透過(false)にする
     
     Register(MapChipType::Door, "Door", false, true, ""); // ドア（ギミック）は自身で当たり判定を持つため地形としては透過(false)にする
+
+    // 歯車障害物（Gear）の登録: モデルはGear/Gear.obj、地形ではなくギミックとして処理(isSolid = false)
+    Register(MapChipType::Gear, "Gear", false, true, "Gear/Gear.obj");
 }
 
 const MapChipConfig& MapChipRegistry::GetConfig(MapChipType type)
