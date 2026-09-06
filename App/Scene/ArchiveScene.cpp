@@ -25,6 +25,10 @@ constexpr const char* kDefaultFont ="resources/Fonts/NotoSansJP/NotoSansJP-Varia
 constexpr const char* kPrintedPageDirectory =
     "resources/Models/StageSelectBook/Pages";
 constexpr const char* kBookLeather = "resources/Models/StageSelectBook/BookLeather.png";
+constexpr const char* kTitleLogoTexture =
+    "resources/Textures/TitleLogo/title-logo.png";
+constexpr const char* kTitleLogoMaterial =
+    "resources/Shaders/Sprite/TitleLogo";
 constexpr const char* kStageCardModel ="StageSelectBook/StageCard.obj";
 constexpr const char* kPageTurnSoundName = "StageSelect.PageTurn";
 constexpr const char* kPageFlipSoundName = "StageSelect.PageFlip";
@@ -67,6 +71,7 @@ enum class ArchiveMaterialMode : int32_t {
     Paper = 3,
     Leather = 4,
     Brass = 5,
+    StageCard = 13,
 };
 
 // 本・紙・金具に資料庫専用の質感を設定する補助関数。
@@ -218,8 +223,8 @@ void ArchiveScene::InitializeBookObjects()
     stageCard_->SetModel(modelManager->Load(kStageCardModel));
     stageCard_->SetScale({ 3.85f, 2.30f, 0.18f });
     stageCard_->SetTranslate({ 0.0f, kCardHiddenY, -0.70f });
-    stageCard_->SetColor({ 0.08f, 0.36f, 0.43f, 1.0f });
-    stageCard_->SetEnableLighting(false);
+    stageCard_->SetColor({ 1.0f, 0.96f, 0.86f, 1.0f });
+    SetArchiveMaterial(stageCard_.get(), ArchiveMaterialMode::StageCard);
 
     stageCardShadow_ = std::make_unique<Object3d>();
     stageCardShadow_->Initialize(objectManager);
@@ -285,9 +290,18 @@ void ArchiveScene::InitializeOpeningPages()
 
 void ArchiveScene::InitializeInterface()
 {
+    titleLogoSprite_ = std::make_unique<Sprite>();
+    titleLogoSprite_->Initialize(SpriteManager::GetInstance(), kTitleLogoTexture);
+    titleLogoSprite_->SetMaterial(kTitleLogoMaterial);
+    titleLogoSprite_->SetAnchorPoint({ 0.5f, 0.5f });
+    titleLogoSprite_->SetPosition({ 640.0f, 330.0f });
+    titleLogoSprite_->SetSize({ 700.0f, 300.0f });
+    titleLogoSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+    titleLogoSprite_->Update();
+
     titleText_ = std::make_unique<Text>();
     titleText_->Initialize(kDefaultFont);
-    titleText_->SetText("GJ");
+    titleText_->SetText("");
     titleText_->SetPosition({ 640.0f, 150.0f });
     titleText_->SetPosition({ 640.0f, 68.0f });
     titleText_->SetAnchorPoint({ 0.5f, 0.5f });
@@ -301,7 +315,7 @@ void ArchiveScene::InitializeInterface()
     stageText_->SetPosition({ 640.0f, 318.0f });
     stageText_->SetAnchorPoint({ 0.5f, 0.5f });
     stageText_->SetFontSize(32.0f);
-    stageText_->SetColor({ 0.93f, 0.98f, 1.0f, 0.0f });
+    stageText_->SetColor({ 0.04f, 0.03f, 0.02f, 0.0f });
     stageText_->SetOutlineColor({ 0.0f, 0.03f, 0.05f, 1.0f });
     stageText_->SetOutlineWidth(2.0f);
 
@@ -310,14 +324,14 @@ void ArchiveScene::InitializeInterface()
     descriptionText_->SetPosition({ 640.0f, 365.0f });
     descriptionText_->SetAnchorPoint({ 0.5f, 0.5f });
     descriptionText_->SetFontSize(20.0f);
-    descriptionText_->SetColor({ 0.65f, 0.92f, 0.95f, 0.0f });
+    descriptionText_->SetColor({ 0.04f, 0.03f, 0.02f, 0.0f });
 
     pageText_ = std::make_unique<Text>();
     pageText_->Initialize(kDefaultFont);
     pageText_->SetPosition({ 640.0f, 435.0f });
     pageText_->SetAnchorPoint({ 0.5f, 0.5f });
     pageText_->SetFontSize(18.0f);
-    pageText_->SetColor({ 0.82f, 0.74f, 0.55f, 0.0f });
+    pageText_->SetColor({ 0.04f, 0.03f, 0.02f, 0.0f });
 
     instructionText_ = std::make_unique<Text>();
     instructionText_->Initialize(kDefaultFont);
@@ -394,9 +408,10 @@ void ArchiveScene::EnterTitleMode()
     std::fill(openingPageVisible_.begin(), openingPageVisible_.end(), false);
     UpdateCardTransform(0.0f, 0.0f);
 
-    titleText_->SetText("GJ");
+    titleText_->SetText("");
     titleText_->SetFontSize(112.0f);
     titleText_->SetColor({ 0.35f, 0.85f, 1.0f, 1.0f });
+    titleLogoSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
     instructionText_->SetText("ENTER / SPACE : START");
     instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, 1.0f });
 
@@ -419,6 +434,7 @@ void ArchiveScene::StartArchiveApproach()
     titleText_->SetPosition({ 640.0f, 68.0f });
     titleText_->SetFontSize(48.0f);
     titleText_->SetColor({ 0.84f, 0.72f, 0.38f, 0.0f });
+    titleLogoSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
     instructionText_->SetText("A / D OR LEFT / RIGHT : TURN PAGE    ENTER : SELECT    BACKSPACE : TITLE");
     instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, 0.0f });
 }
@@ -458,6 +474,8 @@ void ArchiveScene::UpdateTitleReturn(float deltaTime)
     const float interfaceAlpha = 1.0f - SmoothStep(progress / 0.35f);
     titleText_->SetColor({ 0.84f, 0.72f, 0.38f, interfaceAlpha });
     instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, interfaceAlpha });
+    const float logoAlpha = SmoothStep((progress - 0.55f) / 0.45f);
+    titleLogoSprite_->SetColor({ 1.0f, 1.0f, 1.0f, logoAlpha });
 
     if (progress >= 1.0f) {
         EnterTitleMode();
@@ -590,6 +608,7 @@ void ArchiveScene::UpdateSceneObjects()
     stageCardShadow_->Update();
     stageCard_->Update();
     titleText_->Update();
+    titleLogoSprite_->Update();
     stageText_->Update();
     descriptionText_->Update();
     pageText_->Update();
@@ -621,6 +640,8 @@ void ArchiveScene::UpdateCameraApproach(float deltaTime)
     const float titleAlpha = SmoothStep((progress - 0.55f) / 0.45f);
     titleText_->SetColor({ 0.84f, 0.72f, 0.38f, titleAlpha });
     instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, titleAlpha });
+    const float logoAlpha = 1.0f - SmoothStep(progress / 0.42f);
+    titleLogoSprite_->SetColor({ 1.0f, 1.0f, 1.0f, logoAlpha });
     if (progress >= 1.0f) {
         animationTime_ = 0.0f;
         state_ = BookSelectState::CardOpening;
@@ -948,7 +969,8 @@ void ArchiveScene::UpdateCardTransform(float progress, float alpha)
 {
     float positionY = kCardHiddenY + (kCardRestY - kCardHiddenY) * progress;
     float scaleFactor = 0.12f + 0.88f * progress;
-    float rotateX = (1.0f - Clamp01(progress)) * 0.42f;
+    const float visualProgress = Clamp01(progress);
+    float rotateX = (1.0f - visualProgress) * 0.42f;
 
     stageCard_->SetTranslate({ 0.0f, positionY, -0.70f });
     stageCard_->SetScale({
@@ -966,13 +988,24 @@ void ArchiveScene::UpdateCardTransform(float progress, float alpha)
     });
     stageCardShadow_->SetRotate({ rotateX, 0.0f, 0.0f });
 
-    float textPositionY = 420.0f - 102.0f * Clamp01(progress);
-    stageText_->SetPosition({ 640.0f, textPositionY });
-    descriptionText_->SetPosition({ 640.0f, textPositionY + 47.0f });
-    pageText_->SetPosition({ 640.0f, textPositionY + 117.0f });
-    stageText_->SetColor({ 0.93f, 0.98f, 1.0f, alpha });
-    descriptionText_->SetColor({ 0.65f, 0.92f, 0.95f, alpha });
-    pageText_->SetColor({ 0.82f, 0.74f, 0.55f, alpha });
+    const Vector2 cardCenter = camera_->WorldToScreen({ 0.0f, positionY, -0.70f });
+    const Vector2 openCardCenter = camera_->WorldToScreen({ 0.0f, kCardRestY, -0.70f });
+    const auto followCard = [cardCenter, openCardCenter, visualProgress](const Vector2& openPosition) {
+        return Vector2 {
+            cardCenter.x + (openPosition.x - openCardCenter.x) * visualProgress,
+            cardCenter.y + (openPosition.y - openCardCenter.y) * visualProgress
+        };
+    };
+
+    stageText_->SetPosition(followCard({ 640.0f, 318.0f }));
+    descriptionText_->SetPosition(followCard({ 640.0f, 365.0f }));
+    pageText_->SetPosition(followCard({ 640.0f, 435.0f }));
+    stageText_->SetFontSize(32.0f * scaleFactor);
+    descriptionText_->SetFontSize(20.0f * scaleFactor);
+    pageText_->SetFontSize(18.0f * scaleFactor);
+    stageText_->SetColor({ 0.04f, 0.03f, 0.02f, alpha });
+    descriptionText_->SetColor({ 0.04f, 0.03f, 0.02f, alpha });
+    pageText_->SetColor({ 0.04f, 0.03f, 0.02f, alpha });
 }
 
 void ArchiveScene::ChangeStageIndex()
@@ -1023,11 +1056,10 @@ void ArchiveScene::UpdateStageConfirmed(float deltaTime)
         stageCardShadow_->SetScale({ 4.05f * (1.0f + bump), 2.42f * (1.0f + bump), 0.12f });
     }
 
-    const float goldProgress = SmoothStep((animationTime_ - 0.15f) / 0.40f);
     stageText_->SetColor({
-        0.93f + 0.07f * goldProgress,
-        0.98f - 0.20f * goldProgress,
-        1.0f - 0.62f * goldProgress,
+        0.04f,
+        0.03f,
+        0.02f,
         1.0f - cardSink
     });
 
@@ -1091,6 +1123,8 @@ float ArchiveScene::EaseOutBack(float value)
 
 void ArchiveScene::Draw2D()
 {
+    SpriteManager::GetInstance()->PreDraw();
+    titleLogoSprite_->Draw();
     TextRenderer::GetInstance()->PreDraw();
     titleText_->Draw();
     if (state_ != BookSelectState::TitleIdle &&

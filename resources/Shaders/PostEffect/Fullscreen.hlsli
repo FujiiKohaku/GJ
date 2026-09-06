@@ -62,4 +62,6 @@ cbuffer PostEffectParameter : register(b0)
     float outlineSoftness;
     float slimeScreenProgress;
     float3 paddingSlimeScreen;
+    float fantasyMenuStrength;
+    float3 paddingFantasyMenu;
 };

@@ -136,6 +136,7 @@ private:
     std::unique_ptr<Text> descriptionText_;
     std::unique_ptr<Text> pageText_;
     std::unique_ptr<Text> instructionText_;
+    std::unique_ptr<Sprite> titleLogoSprite_;
     std::unique_ptr<Sprite> transitionPage_;
     PageTransition::RevealOverlay pageReveal_;
 

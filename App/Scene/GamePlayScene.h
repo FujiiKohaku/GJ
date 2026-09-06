@@ -37,6 +37,9 @@ private:
     void StartDeathTransition();
     void UpdateDeathTransition(float deltaTime);
     void RespawnPlayerLeavingCorpse();
+    void StartStageSelectTransition();
+    void UpdateStageSelectTransition(float deltaTime);
+    void UpdateFantasyMenuEffect(float deltaTime);
 
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
@@ -58,8 +61,17 @@ private:
     bool isMenuOpen_ = false;
     std::unique_ptr<Sprite> menuBackgroundSprite_;
     std::unique_ptr<Sprite> menuPanelSprite_;
+    std::unique_ptr<Sprite> menuResumeButtonSprite_;
+    std::unique_ptr<Sprite> menuGameOverButtonSprite_;
+    std::unique_ptr<Sprite> menuStageSelectButtonSprite_;
     std::unique_ptr<Text> menuTitleText_;
-    std::unique_ptr<Text> menuInstructionText_;
+    std::unique_ptr<Text> menuResumeText_;
+    std::unique_ptr<Text> menuGameOverText_;
+    std::unique_ptr<Text> menuStageSelectText_;
+    std::unique_ptr<Sprite> menuTransitionFadeSprite_;
+    bool isStageSelectTransitionActive_ = false;
+    float stageSelectTransitionTime_ = 0.0f;
+    float fantasyMenuEffectStrength_ = 0.0f;
     bool isDeathTransitionActive_ = false;
     float deathTransitionTime_ = 0.0f;
     bool showForces_ = false;

@@ -91,6 +91,8 @@ public:
     float GetWaterEffectIntensity() const { return waterEffectIntensity_; }
     void SetSlimeScreenProgress(float progress) { slimeScreenProgress_ = progress; }
     float GetSlimeScreenProgress() const { return slimeScreenProgress_; }
+    void SetFantasyMenuStrength(float strength) { fantasyMenuStrength_ = strength; }
+    float GetFantasyMenuStrength() const { return fantasyMenuStrength_; }
     void SetScreenSpaceFluid(GpuSphFluid* fluid) {
         screenSpaceFluid_ = fluid;
         extraScreenSpaceFluids_.clear();
@@ -138,6 +140,7 @@ private:
     float paintIntensity_ = 0.0f;
     float paintSeed_ = 0.0f;
     float slimeScreenProgress_ = 0.0f;
+    float fantasyMenuStrength_ = 0.0f;
     int paintPatternType_ = 0;
     Vector3 paintColor_ = { 0.95f, 0.10f, 0.58f };
     GpuSphFluid* screenSpaceFluid_ = nullptr;

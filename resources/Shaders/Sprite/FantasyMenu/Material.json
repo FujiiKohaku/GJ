@@ -1,0 +1,22 @@
+{
+  "Name": "Fantasy Menu Stone",
+  "Pipeline": {
+    "BlendMode": "Normal",
+    "DepthTest": false,
+    "DepthWrite": false,
+    "CullMode": "None"
+  },
+  "Mesh": {
+    "DivisionX": 1,
+    "DivisionY": 1
+  },
+  "Effect": {
+    "Amplitude": 0.035,
+    "Frequency": 7.0,
+    "Speed": 0.35,
+    "Phase": 0.0,
+    "Direction": [1.0, 0.0],
+    "Strength": 0.65,
+    "Threshold": 0.52
+  }
+}

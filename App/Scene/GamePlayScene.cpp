@@ -28,6 +28,8 @@ namespace {
 constexpr const char* kSkyBoxTexture = "resources/Textures/skybox.dds";
 constexpr const char* kMapChipTexture = "resources/Textures/checkerboard.png";
 constexpr const char* kWhiteTexture = "resources/Textures/white.png";
+constexpr const char* kFantasyMenuMaterial =
+    "resources/Shaders/Sprite/FantasyMenu";
 constexpr const char* kStage1Json = "resources/Maps/stage1.json";
 constexpr float kCameraDistance = 12.0f;
 constexpr const char* kDefaultFont =
@@ -35,6 +37,21 @@ constexpr const char* kDefaultFont =
 constexpr float kFluidRenderZ = 0.0f;
 constexpr float kNeoWorldScale = 0.36f;
 constexpr Vector3 kSlimeRenderForward = { 0.0f, 0.0f, 1.0f };
+constexpr float kMenuButtonX = 440.0f;
+constexpr float kMenuButtonWidth = 400.0f;
+constexpr float kMenuButtonHeight = 58.0f;
+constexpr float kMenuResumeY = 285.0f;
+constexpr float kMenuGameOverY = 365.0f;
+constexpr float kMenuStageSelectY = 445.0f;
+constexpr float kStageSelectFadeDuration = 0.45f;
+constexpr float kFantasyMenuBlendDuration = 0.20f;
+
+bool IsPointInMenuButton(const Vector2& point, float y)
+{
+    return point.x >= kMenuButtonX &&
+        point.x <= kMenuButtonX + kMenuButtonWidth &&
+        point.y >= y && point.y <= y + kMenuButtonHeight;
+}
 
 Vector3 MakeFluidCorePosition(const MapChipPlayer& player)
 {
@@ -182,6 +199,7 @@ void GamePlayScene::Initialize()
     SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
     SceneManager::GetInstance()->SetArchiveApproach(0.0f);
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
+    SceneManager::GetInstance()->SetFantasyMenuStrength(0.0f);
     isDeathTransitionActive_ = false;
     deathTransitionTime_ = 0.0f;
     remainingLives_ = kInitialLives;
@@ -301,7 +319,7 @@ void GamePlayScene::Initialize()
     instructionText_->SetText(
         "MOVE : A/D OR LEFT/RIGHT   JUMP : SPACE/W/UP   "
         "T : SLOW/SHAPE, T AGAIN : SELF-DESTRUCT   R : RESTART   "
-        "F1 : FREE CAM   TAB : MENU   BACKSPACE : STAGE SELECT");
+        "F1 : FREE CAM   TAB : MENU");
     instructionText_->SetPosition({ 32.0f, 32.0f });
     instructionText_->SetFontSize(24.0f);
     instructionText_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
@@ -333,14 +351,28 @@ void GamePlayScene::Initialize()
     menuBackgroundSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
     menuBackgroundSprite_->SetSize({ 1280.0f, 720.0f });
     menuBackgroundSprite_->SetPosition({ 0.0f, 0.0f });
-    menuBackgroundSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.65f });
+    menuBackgroundSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.42f });
 
     // 中央パネル
     menuPanelSprite_ = std::make_unique<Sprite>();
     menuPanelSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+    menuPanelSprite_->SetMaterial(kFantasyMenuMaterial);
     menuPanelSprite_->SetSize({ 640.0f, 380.0f });
     menuPanelSprite_->SetPosition({ 320.0f, 170.0f });
-    menuPanelSprite_->SetColor({ 0.08f, 0.12f, 0.16f, 0.95f });
+    menuPanelSprite_->SetColor({ 0.10f, 0.20f, 0.15f, 0.97f });
+
+    const auto createMenuButton = [](float y) {
+        auto button = std::make_unique<Sprite>();
+        button->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+        button->SetMaterial(kFantasyMenuMaterial);
+        button->SetSize({ kMenuButtonWidth, kMenuButtonHeight });
+        button->SetPosition({ kMenuButtonX, y });
+        button->SetColor({ 0.15f, 0.25f, 0.22f, 1.0f });
+        return button;
+    };
+    menuResumeButtonSprite_ = createMenuButton(kMenuResumeY);
+    menuGameOverButtonSprite_ = createMenuButton(kMenuGameOverY);
+    menuStageSelectButtonSprite_ = createMenuButton(kMenuStageSelectY);
 
     // メニュータイトル
     menuTitleText_ = std::make_unique<Text>();
@@ -351,14 +383,26 @@ void GamePlayScene::Initialize()
     menuTitleText_->SetFontSize(44.0f);
     menuTitleText_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
-    // メニュー説明文
-    menuInstructionText_ = std::make_unique<Text>();
-    menuInstructionText_->Initialize(kDefaultFont);
-    menuInstructionText_->SetText("TAB : RESUME GAME\n\nG : GAME OVER\n\nBACKSPACE : STAGE SELECT");
-    menuInstructionText_->SetPosition({ 640.0f, 360.0f });
-    menuInstructionText_->SetAnchorPoint({ 0.5f, 0.5f });
-    menuInstructionText_->SetFontSize(24.0f);
-    menuInstructionText_->SetColor({ 0.8f, 0.88f, 0.95f, 1.0f });
+    const auto createMenuText = [](const char* label, float y) {
+        auto text = std::make_unique<Text>();
+        text->Initialize(kDefaultFont);
+        text->SetText(label);
+        text->SetPosition({ 640.0f, y + kMenuButtonHeight * 0.5f });
+        text->SetAnchorPoint({ 0.5f, 0.5f });
+        text->SetFontSize(25.0f);
+        text->SetColor({ 0.90f, 0.96f, 0.93f, 1.0f });
+        return text;
+    };
+    menuResumeText_ = createMenuText("RESUME GAME  [TAB]", kMenuResumeY);
+    menuGameOverText_ = createMenuText("GAME OVER  [G]", kMenuGameOverY);
+    menuStageSelectText_ = createMenuText("STAGE SELECT  [BACKSPACE]", kMenuStageSelectY);
+
+    menuTransitionFadeSprite_ = std::make_unique<Sprite>();
+    menuTransitionFadeSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+    menuTransitionFadeSprite_->SetSize({ 1280.0f, 720.0f });
+    menuTransitionFadeSprite_->SetPosition({ 0.0f, 0.0f });
+    menuTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+    menuTransitionFadeSprite_->Update();
 
     pageReveal_.InitializeIfRequested();
 }
@@ -370,7 +414,9 @@ void GamePlayScene::Finalize()
         selfDestructSlowActive_ = false;
     }
     SceneManager::GetInstance()->RemovePostEffect(PostEffectType::SlimeScreen);
+    SceneManager::GetInstance()->RemovePostEffect(PostEffectType::FantasyMenu);
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
+    SceneManager::GetInstance()->SetFantasyMenuStrength(0.0f);
     debugCameraController_.SetTargetCamera(nullptr);
     SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
     SceneManager::GetInstance()->ClearExtraScreenSpaceFluids();
@@ -387,9 +433,15 @@ void GamePlayScene::Finalize()
 void GamePlayScene::Update()
 {
     Input* input = Input::GetInstance();
+    const float unscaledDeltaTime = TimeManager::GetInstance()->GetUnscaledDeltaTime();
     pageReveal_.Update(TimeManager::GetInstance()->GetDeltaTime());
+    UpdateFantasyMenuEffect(unscaledDeltaTime);
 
     UpdateLivesText();
+    if (isStageSelectTransitionActive_) {
+        UpdateStageSelectTransition(TimeManager::GetInstance()->GetUnscaledDeltaTime());
+        return;
+    }
     if (isDeathTransitionActive_) {
         UpdateDeathTransition(TimeManager::GetInstance()->GetUnscaledDeltaTime());
         return;
@@ -405,33 +457,55 @@ void GamePlayScene::Update()
     if (Input::GetInstance()->IsKeyTrigger(DIK_TAB) &&
         !player_->IsShapingSelfDestruct()) {
         isMenuOpen_ = !isMenuOpen_;
+        if (isMenuOpen_) {
+            SceneManager::GetInstance()->AddPostEffect(
+                PostEffectType::FantasyMenu, PostEffectStage::AfterParticle);
+        }
     }
 
     // メニューが開いているときはゲーム内処理を行わずに早期リターン
     if (isMenuOpen_) {
-        if (Input::GetInstance()->IsKeyTrigger(DIK_G)) {
+        const Vector2 mousePosition = input->GetMousePosition();
+        const bool resumeHovered = IsPointInMenuButton(mousePosition, kMenuResumeY);
+        const bool gameOverHovered = IsPointInMenuButton(mousePosition, kMenuGameOverY);
+        const bool stageSelectHovered = IsPointInMenuButton(mousePosition, kMenuStageSelectY);
+        const bool clicked = input->IsMouseTrigger(0);
+
+        menuResumeButtonSprite_->SetColor(resumeHovered
+            ? Vector4 { 0.25f, 0.48f, 0.34f, 1.0f }
+            : Vector4 { 0.15f, 0.25f, 0.22f, 1.0f });
+        menuGameOverButtonSprite_->SetColor(gameOverHovered
+            ? Vector4 { 0.55f, 0.25f, 0.22f, 1.0f }
+            : Vector4 { 0.29f, 0.17f, 0.17f, 1.0f });
+        menuStageSelectButtonSprite_->SetColor(stageSelectHovered
+            ? Vector4 { 0.30f, 0.38f, 0.54f, 1.0f }
+            : Vector4 { 0.17f, 0.21f, 0.30f, 1.0f });
+
+        if (clicked && resumeHovered) {
+            isMenuOpen_ = false;
+            return;
+        }
+        if (input->IsKeyTrigger(DIK_G) || (clicked && gameOverHovered)) {
             StartDeathTransition();
             return;
         }
-        if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
-            SceneManager::GetInstance()->SetNextScene(
-                std::make_unique<ArchiveScene>());
+        if (input->IsKeyTrigger(DIK_BACKSPACE) || (clicked && stageSelectHovered)) {
+            StartStageSelectTransition();
             return;
         }
 
         menuBackgroundSprite_->Update();
         menuPanelSprite_->Update();
+        menuResumeButtonSprite_->Update();
+        menuGameOverButtonSprite_->Update();
+        menuStageSelectButtonSprite_->Update();
         menuTitleText_->Update();
-        menuInstructionText_->Update();
+        menuResumeText_->Update();
+        menuGameOverText_->Update();
+        menuStageSelectText_->Update();
         return;
     }
 
-    if (Input::GetInstance()->IsKeyTrigger(DIK_BACKSPACE)) {
-        SceneManager::GetInstance()->SetNextScene(
-            std::make_unique<ArchiveScene>());
-        return;
-    }
-    
     if (input->IsKeyTrigger(DIK_Y)) {
         showForces_ = !showForces_;
     }
@@ -602,10 +676,19 @@ void GamePlayScene::Draw2D()
         SpriteManager::GetInstance()->PreDraw();
         menuBackgroundSprite_->Draw();
         menuPanelSprite_->Draw();
+        menuResumeButtonSprite_->Draw();
+        menuGameOverButtonSprite_->Draw();
+        menuStageSelectButtonSprite_->Draw();
 
         TextRenderer::GetInstance()->PreDraw();
         menuTitleText_->Draw();
-        menuInstructionText_->Draw();
+        menuResumeText_->Draw();
+        menuGameOverText_->Draw();
+        menuStageSelectText_->Draw();
+    }
+    if (isStageSelectTransitionActive_) {
+        SpriteManager::GetInstance()->PreDraw();
+        menuTransitionFadeSprite_->Draw();
     }
 }
 
@@ -630,6 +713,53 @@ void GamePlayScene::DrawParticle()
 
 void GamePlayScene::DrawImGui()
 {
+}
+
+void GamePlayScene::StartStageSelectTransition()
+{
+    if (isStageSelectTransitionActive_) {
+        return;
+    }
+    isStageSelectTransitionActive_ = true;
+    stageSelectTransitionTime_ = 0.0f;
+    menuTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+    menuTransitionFadeSprite_->Update();
+}
+
+void GamePlayScene::UpdateFantasyMenuEffect(float deltaTime)
+{
+    const float targetStrength = isMenuOpen_ ? 1.0f : 0.0f;
+    const float step = deltaTime / kFantasyMenuBlendDuration;
+    if (fantasyMenuEffectStrength_ < targetStrength) {
+        fantasyMenuEffectStrength_ = (std::min)(
+            fantasyMenuEffectStrength_ + step, targetStrength);
+    } else if (fantasyMenuEffectStrength_ > targetStrength) {
+        fantasyMenuEffectStrength_ = (std::max)(
+            fantasyMenuEffectStrength_ - step, targetStrength);
+    }
+
+    SceneManager* sceneManager = SceneManager::GetInstance();
+    sceneManager->SetFantasyMenuStrength(fantasyMenuEffectStrength_);
+    if (!isMenuOpen_ && fantasyMenuEffectStrength_ <= 0.0f) {
+        sceneManager->RemovePostEffect(PostEffectType::FantasyMenu);
+    }
+}
+
+void GamePlayScene::UpdateStageSelectTransition(float deltaTime)
+{
+    stageSelectTransitionTime_ += deltaTime;
+    const float progress = std::clamp(
+        stageSelectTransitionTime_ / kStageSelectFadeDuration, 0.0f, 1.0f);
+    const float alpha = progress * progress * (3.0f - 2.0f * progress);
+    menuTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha });
+    menuTransitionFadeSprite_->Update();
+
+    if (progress >= 1.0f) {
+        PageTransition::RequestReveal(
+            { 0.0f, 0.0f, 0.0f, 1.0f }, kStageSelectFadeDuration);
+        SceneManager::GetInstance()->SetNextScene(
+            std::make_unique<ArchiveScene>());
+    }
 }
 
 void GamePlayScene::RespawnPlayerLeavingCorpse()
