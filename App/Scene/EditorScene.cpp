@@ -114,6 +114,18 @@ namespace {
 
 void EditorScene::Initialize()
 {
+    // カーソルの初期状態を保存し、非表示なら強制表示する
+    CURSORINFO cursorInfo = { sizeof(CURSORINFO) };
+    if (GetCursorInfo(&cursorInfo)) {
+        wasCursorVisible_ = (cursorInfo.flags & CURSOR_SHOWING) != 0;
+    } else {
+        wasCursorVisible_ = false;
+    }
+    
+    if (!wasCursorVisible_) {
+        ShowCursor(TRUE);
+    }
+
     // カメラ設定
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
@@ -186,6 +198,11 @@ void EditorScene::Initialize()
 
 void EditorScene::Finalize()
 {
+    // エディタに入る前にカーソルが非表示だった場合は、元に戻す
+    if (!wasCursorVisible_) {
+        ShowCursor(FALSE);
+    }
+
     Object3dManager::GetInstance()->SetDefaultCamera(nullptr);
     SkinningObject3dManager::GetInstance()->SetDefaultCamera(nullptr);
     

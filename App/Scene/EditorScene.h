@@ -57,6 +57,9 @@ private:
     
     LevelData::ObjectData* GetSelectedGimmick();
 
+    // カーソルの表示状態を保存
+    bool wasCursorVisible_ = false;
+
     // --- Undo / Redo 用の履歴管理 ---
     static const size_t kMaxHistory = 30; // 履歴の最大保存数
     std::list<LevelData> history_;
