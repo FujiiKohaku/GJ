@@ -35,6 +35,7 @@ private:
     std::vector<std::unique_ptr<Object3d>> meadowTrees_;
     std::vector<std::unique_ptr<Object3d>> meadowTreeCanopies_;
     std::vector<std::unique_ptr<Object3d>> meadowMountains_;
+    std::vector<std::unique_ptr<Object3d>> meadowRuins_;
     std::unique_ptr<Object3d> leftBookCover_;
     std::unique_ptr<Object3d> rightBookCover_;
     std::unique_ptr<Object3d> leftPageBlock_;

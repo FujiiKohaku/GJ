@@ -1,0 +1,22 @@
+{
+  "Name": "Title Logo Readability",
+  "Pipeline": {
+    "BlendMode": "Normal",
+    "DepthTest": false,
+    "DepthWrite": false,
+    "CullMode": "None"
+  },
+  "Mesh": {
+    "DivisionX": 1,
+    "DivisionY": 1
+  },
+  "Effect": {
+    "Amplitude": 5.0,
+    "Frequency": 1.0,
+    "Speed": 0.55,
+    "Phase": 0.0,
+    "Direction": [0.7, 1.0],
+    "Strength": 1.0,
+    "Threshold": 0.5
+  }
+}

@@ -50,6 +50,7 @@ enum class PostEffectType {
     HexShield,
     BlackHoleDistortion,
     ArchiveAtmosphere,
+    FantasyMenu,
     SlimeScreen,
 };
 

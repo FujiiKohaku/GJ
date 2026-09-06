@@ -223,6 +223,51 @@ float3 GrassGroundColor(float3 worldPosition)
     return grass;
 }
 
+float3 StageCardColor(float3 localPosition, float3 worldPosition, float3 normal)
+{
+    float2 cardUv = localPosition.xy + 0.5f;
+    float edgeDistance = min(min(cardUv.x, 1.0f - cardUv.x),
+        min(cardUv.y, 1.0f - cardUv.y));
+
+    float broad = TerrainNoise(cardUv * float2(7.0f, 5.0f) + 14.2f);
+    float fibers = TerrainNoise(floor(cardUv * float2(190.0f, 130.0f)) * 0.37f + 61.8f);
+    float stains = TerrainNoise(cardUv * float2(2.8f, 2.1f) + 97.4f);
+    float3 parchment = lerp(float3(0.50f, 0.34f, 0.16f),
+        float3(0.86f, 0.73f, 0.43f), broad * 0.42f + 0.35f);
+    parchment *= 0.93f + fibers * 0.10f;
+    parchment = lerp(parchment, float3(0.37f, 0.20f, 0.08f),
+        smoothstep(0.76f, 0.96f, stains) * 0.16f);
+
+    float edgeWear = 1.0f - smoothstep(0.025f, 0.15f, edgeDistance);
+    parchment = lerp(parchment, float3(0.20f, 0.095f, 0.035f), edgeWear * 0.82f);
+
+    float borderWidth = max(fwidth(edgeDistance), 0.0015f);
+    float brassBorder = 1.0f - smoothstep(borderWidth, borderWidth * 2.8f,
+        abs(edgeDistance - 0.105f));
+    float innerBorder = 1.0f - smoothstep(borderWidth, borderWidth * 2.2f,
+        abs(edgeDistance - 0.125f));
+
+    float2 cornerCell = abs(cardUv - 0.5f) - float2(0.335f, 0.315f);
+    float cornerStud = 1.0f - smoothstep(0.018f, 0.032f, length(cornerCell));
+    float ornament = saturate(brassBorder + innerBorder * 0.36f + cornerStud);
+    float brassGrain = 0.78f + TerrainNoise(cardUv * 90.0f + 23.0f) * 0.32f;
+    float3 brass = float3(0.72f, 0.47f, 0.13f) * brassGrain;
+    parchment = lerp(parchment, brass, ornament * 0.92f);
+
+    float faceSurface = smoothstep(0.38f, 0.48f, abs(localPosition.z));
+    float leatherGrain = TerrainNoise(localPosition.xy * 24.0f + localPosition.z * 7.0f);
+    float3 leather = lerp(float3(0.10f, 0.035f, 0.018f),
+        float3(0.30f, 0.12f, 0.045f), leatherGrain);
+    float3 baseColor = lerp(leather, parchment, faceSurface);
+
+    float3 N = normalize(normal);
+    float3 V = normalize(gCamera.worldPosition - worldPosition);
+    float3 L = normalize(float3(-0.55f, 0.72f, -0.42f));
+    float light = 0.68f + saturate(dot(N, L)) * 0.30f;
+    float glint = pow(saturate(dot(N, normalize(L + V))), 52.0f) * ornament * 0.42f;
+    return baseColor * light + float3(1.0f, 0.72f, 0.28f) * glint;
+}
+
 float3 ApplyRuinsFog(float3 color, float3 worldPosition)
 {
     // Background-only depth fog: foreground grass remains clear while distant
@@ -305,6 +350,13 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color = float4(
             gMaterial.color.rgb * GrassGroundColor(input.worldPosition) * faceLight,
             gMaterial.color.a);
+    }
+    else if (gMaterial.enableLighting == 13)
+    {
+        output.color = float4(
+            gMaterial.color.rgb * StageCardColor(
+                input.localPosition, input.worldPosition, input.normal),
+            gMaterial.color.a * textureColor.a);
     }
     else if (gMaterial.enableLighting == 8)
     {
@@ -425,7 +477,8 @@ PixelShaderOutput main(VertexShaderOutput input)
     if (gMaterial.enableEnvironmentMap != 0 && gMaterial.enableLighting != 6 &&
         gMaterial.enableLighting != 7 && gMaterial.enableLighting != 8 &&
         gMaterial.enableLighting != 9 && gMaterial.enableLighting != 10 &&
-        gMaterial.enableLighting != 11 && gMaterial.enableLighting != 12)
+        gMaterial.enableLighting != 11 && gMaterial.enableLighting != 12 &&
+        gMaterial.enableLighting != 13)
     {
         float3 N = normalize(input.normal);
         float3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);
