@@ -5,6 +5,8 @@
 #pragma once
 #include "App/Game/Gimmick/BaseMapChipGimmick.h"
 #include "App/Game/Gimmick/Interaction/GasEmitterParam.h"
+#include "Engine/Effect/EffectManager.h"
+#include <vector>
 #include <memory>
 
 class Object3d;
@@ -42,10 +44,22 @@ public:
     /**
      * @brief ガスを放出中かどうか
      */
-    bool IsEmitting() const { return isEmitting_; }
+    bool IsEmitting() const { return currentState_ != State::Idle && currentState_ != State::Finished; }
 
 private:
+    enum class State {
+        Idle,       // 停止中
+        Filling,    // 充満中（着火無効）
+        Active,     // 充満完了（着火有効）
+        Ignited,    // 着火済み（爆発待ち）
+        Finished    // 爆発完了
+    };
+
     void StartEmitting();
+    void ChangeState(State nextState);
+    void StartParticles();
+    void StopParticles();
+    void UpdateParticles();
 
 private:
     std::unique_ptr<Object3d> object_;
@@ -56,5 +70,14 @@ private:
     Vector3 size_;
     
     bool isEditorMode_;
-    bool isEmitting_; ///< ガスを放出中かどうか
+    
+    // 状態管理
+    State currentState_ = State::Idle;
+    float stateTimer_ = 0.0f;
+    
+    // エフェクト管理
+    std::vector<EffectHandle> effectHandles_;
+    // 煙が上に昇る性質を考慮し、発生源をブロックの中心より下（-0.5）に設定します。
+    // （これまでは +0.5 だったため、上に1ブロック分ズレているように見えていました）
+    Vector3 particleOffset_ = { 0.0f, -0.5f, 0.0f };
 };
