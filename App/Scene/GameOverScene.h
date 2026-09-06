@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BaseScene.h"
+#include "Engine/2D/Sprite.h"
 #include "Engine/2D/Text/Text.h"
 #include "Engine/3D/Object3d.h"
 #include "Engine/Camera/Camera.h"
@@ -19,6 +20,9 @@ public:
     void DrawImGui() override;
 
 private:
+    void StartTitleTransition();
+    bool UpdateTitleTransition(float deltaTime);
+
     struct FallingProp {
         std::unique_ptr<Object3d> object;
         Vector3 position {};
@@ -37,7 +41,10 @@ private:
     std::unique_ptr<DeathSlimeShower> slimeShower_;
     std::unique_ptr<Text> titleText_;
     std::unique_ptr<Text> instructionText_;
+    std::unique_ptr<Sprite> titleTransitionFadeSprite_;
     float sceneTime_ = 0.0f;
     float slimeRevealTime_ = 0.0f;
+    float titleTransitionTime_ = 0.0f;
     bool slimeRevealActive_ = false;
+    bool titleTransitionActive_ = false;
 };

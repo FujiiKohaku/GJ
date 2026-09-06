@@ -13,6 +13,10 @@
 #include <format>
 #include <numbers>
 
+namespace {
+constexpr int32_t kSwingingBridgeWoodMaterialMode = 15;
+}
+
 bool SwingingBridgeGimmick::Initialize(
     const Vector3& position,
     const std::string& texturePath,
@@ -53,7 +57,11 @@ bool SwingingBridgeGimmick::Initialize(
         platformObject_->Initialize(Object3dManager::GetInstance());
         platformObject_->SetModel(platformModel);
         platformObject_->SetTranslate(basePosition_);
-        platformObject_->SetEnableLighting(true);
+        platformObject_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+        Material* material = platformObject_->GetMaterial();
+        material->enableLighting = kSwingingBridgeWoodMaterialMode;
+        material->enableEnvironmentMap = 0;
+        material->environmentCoefficient = 0.0f;
         platformObject_->Update();
     }
 

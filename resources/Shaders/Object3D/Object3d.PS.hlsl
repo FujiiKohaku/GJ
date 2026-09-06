@@ -268,6 +268,50 @@ float3 StageCardColor(float3 localPosition, float3 worldPosition, float3 normal)
     return baseColor * light + float3(1.0f, 0.72f, 0.28f) * glint;
 }
 
+float3 WoodPlatformColor(float3 localPosition, float3 normal)
+{
+    float3 faceNormal = abs(normal);
+    float2 facePosition = localPosition.xy;
+    if (faceNormal.y >= faceNormal.x && faceNormal.y >= faceNormal.z) {
+        facePosition = localPosition.xz;
+    } else if (faceNormal.x > faceNormal.z) {
+        facePosition = localPosition.zy;
+    }
+
+    float2 woodUv = facePosition + 0.5f;
+    float distortion = TerrainNoise(woodUv * float2(3.0f, 8.0f) + 19.7f) - 0.5f;
+    float grainWave = sin((woodUv.y + distortion * 0.055f) * 54.0f);
+    float fineGrain = TerrainNoise(
+        float2(woodUv.x * 32.0f, woodUv.y * 7.0f) + 43.1f);
+    float grain = saturate(grainWave * 0.24f + fineGrain * 0.42f + 0.45f);
+
+    float3 darkWood = float3(0.20f, 0.075f, 0.022f);
+    float3 lightWood = float3(0.66f, 0.32f, 0.085f);
+    float3 wood = lerp(darkWood, lightWood, grain);
+
+    float plankRate = frac(woodUv.y * 3.0f);
+    float plankEdge = min(plankRate, 1.0f - plankRate);
+    float plankWidth = max(fwidth(plankRate), 0.004f);
+    float seam = 1.0f - smoothstep(plankWidth * 0.8f, plankWidth * 2.8f, plankEdge);
+    wood = lerp(wood, float3(0.075f, 0.023f, 0.009f), seam * 0.88f);
+
+    float2 knotCenter = float2(0.67f, 0.54f);
+    float2 knotDelta = (woodUv - knotCenter) * float2(1.0f, 1.8f);
+    float knotRadius = length(knotDelta);
+    float knotRing = 0.5f + 0.5f * sin(knotRadius * 92.0f);
+    float knotMask = 1.0f - smoothstep(0.055f, 0.19f, knotRadius);
+    wood = lerp(wood, darkWood * (0.72f + knotRing * 0.38f), knotMask * 0.78f);
+
+    float edgeDistance = min(min(woodUv.x, 1.0f - woodUv.x),
+        min(woodUv.y, 1.0f - woodUv.y));
+    float edgeWear = 1.0f - smoothstep(0.025f, 0.105f, edgeDistance);
+    wood = lerp(wood, float3(0.11f, 0.035f, 0.012f), edgeWear * 0.66f);
+
+    float3 L = normalize(float3(-0.55f, 0.78f, -0.35f));
+    float faceLight = 0.66f + saturate(dot(normalize(normal), L)) * 0.34f;
+    return wood * faceLight;
+}
+
 float3 ApplyRuinsFog(float3 color, float3 worldPosition)
 {
     // Background-only depth fog: foreground grass remains clear while distant
@@ -356,6 +400,24 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color = float4(
             gMaterial.color.rgb * StageCardColor(
                 input.localPosition, input.worldPosition, input.normal),
+            gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 14)
+    {
+        output.color = float4(
+            gMaterial.color.rgb * WoodPlatformColor(
+                input.localPosition, input.normal),
+            gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 15)
+    {
+        const float3 bridgeLocalPosition = float3(
+            input.localPosition.x / 3.0f,
+            input.localPosition.y,
+            input.localPosition.z);
+        output.color = float4(
+            gMaterial.color.rgb * WoodPlatformColor(
+                bridgeLocalPosition, input.normal),
             gMaterial.color.a * textureColor.a);
     }
     else if (gMaterial.enableLighting == 8)
@@ -478,7 +540,8 @@ PixelShaderOutput main(VertexShaderOutput input)
         gMaterial.enableLighting != 7 && gMaterial.enableLighting != 8 &&
         gMaterial.enableLighting != 9 && gMaterial.enableLighting != 10 &&
         gMaterial.enableLighting != 11 && gMaterial.enableLighting != 12 &&
-        gMaterial.enableLighting != 13)
+        gMaterial.enableLighting != 13 && gMaterial.enableLighting != 14 &&
+        gMaterial.enableLighting != 15)
     {
         float3 N = normalize(input.normal);
         float3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);
