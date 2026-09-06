@@ -8,6 +8,9 @@
 
 namespace {
 constexpr const char* kWhiteTexture = "resources/Textures/white.png";
+constexpr int32_t kLitFogMaterial = 10;
+constexpr int32_t kUnlitFogMaterial = 11;
+constexpr int32_t kMountainFogMaterial = 12;
 constexpr Vector4 kGrassColors[] = {
     { 0.28f, 0.50f, 0.17f, 1.0f },
     { 0.34f, 0.57f, 0.20f, 1.0f },
@@ -36,14 +39,14 @@ void RuinsBackground::Initialize(const Settings& settings)
 {
     settings_ = settings;
     settings_.mapLength = (std::max)(settings_.mapLength, 1.0f);
-    settings_.groundDepth = (std::max)(settings_.groundDepth, 1.0f);
+    settings_.groundDepth = (std::max)(settings_.groundDepth, 140.0f);
     groundAngle_ = std::atan(settings_.groundSlope);
     objects_.clear();
 
     ground_ = std::make_unique<Object3d>();
     ground_->Initialize(Object3dManager::GetInstance());
     ground_->SetModel(ModelManager::GetInstance()->CreatePlane(kWhiteTexture));
-    const float groundWidth = settings_.mapLength + 24.0f;
+    const float groundWidth = settings_.mapLength + 60.0f;
     ground_->SetScale({ groundWidth,
         settings_.groundDepth * std::sqrt(1.0f + settings_.groundSlope * settings_.groundSlope),
         1.0f });
@@ -60,6 +63,7 @@ void RuinsBackground::Initialize(const Settings& settings)
     CreateRocks();
     CreateRuins();
     CreateTallBackground();
+    CreateMountains();
 }
 
 void RuinsBackground::Update()
@@ -116,7 +120,8 @@ void RuinsBackground::AddObject(
     float scale,
     const Vector4& color,
     bool lighting,
-    bool useModelTextures)
+    bool useModelTextures,
+    int32_t materialMode)
 {
     auto object = std::make_unique<Object3d>();
     object->Initialize(Object3dManager::GetInstance());
@@ -126,20 +131,23 @@ void RuinsBackground::AddObject(
     object->SetScale({ scale, scale, scale });
     object->SetColor(color);
     object->SetEnableLighting(lighting);
+    object->GetMaterial()->enableLighting = materialMode >= 0
+        ? materialMode
+        : (lighting ? kLitFogMaterial : kUnlitFogMaterial);
     object->Update();
     objects_.push_back(std::move(object));
 }
 
 void RuinsBackground::CreateGrass()
 {
-    // Roughly one pair per four map units; jitter avoids a repeated fence-like rhythm.
+    // Keep the foreground soft and readable with dense, irregular grass clumps.
     const uint32_t groupCount = static_cast<uint32_t>(std::ceil(settings_.mapLength / 4.0f)) + 2;
     for (uint32_t group = 0; group < groupCount; ++group) {
         const float centerX = -3.0f + static_cast<float>(group) * 4.0f;
-        for (uint32_t member = 0; member < 2; ++member) {
+        for (uint32_t member = 0; member < 3; ++member) {
             const uint32_t key = group * 11u + member * 37u;
             const float x = centerX + (Random01(key) - 0.5f) * 3.2f;
-            const float z = 12.0f + Random01(key + 1u) * 16.0f;
+            const float z = 7.5f + Random01(key + 1u) * 16.0f;
             const float scale = 0.42f + Random01(key + 2u) * 0.58f;
             const uint32_t colorIndex = static_cast<uint32_t>(Random01(key + 3u) * 3.99f);
             AddObject("Nature/grass_clump.obj", { x, 0.0f, z }, scale,
@@ -150,11 +158,11 @@ void RuinsBackground::CreateGrass()
 
 void RuinsBackground::CreateRocks()
 {
-    const uint32_t count = static_cast<uint32_t>(std::ceil(settings_.mapLength / 10.0f)) + 1;
+    const uint32_t count = static_cast<uint32_t>(std::ceil(settings_.mapLength / 14.0f)) + 1;
     for (uint32_t index = 0; index < count; ++index) {
-        const float x = -2.0f + static_cast<float>(index) * 10.0f +
+        const float x = -2.0f + static_cast<float>(index) * 14.0f +
             (Random01(index + 201u) - 0.5f) * 5.0f;
-        const float z = 14.0f + Random01(index + 202u) * 13.0f;
+        const float z = 21.0f + Random01(index + 202u) * 9.0f;
         const float scale = 0.28f + Random01(index + 203u) * 0.42f;
         const uint32_t colorIndex = static_cast<uint32_t>(Random01(index + 204u) * 2.99f);
         AddObject("Nature/ground_rock.obj", { x, 0.0f, z }, scale,
@@ -170,10 +178,10 @@ void RuinsBackground::CreateRuins()
             (Random01(cluster + 401u) - 0.5f) * 4.0f;
         const uint32_t nearIndex = cluster % static_cast<uint32_t>(std::size(kNearRuins));
         const uint32_t midIndex = (cluster * 2u + 1u) % static_cast<uint32_t>(std::size(kMidRuins));
-        AddObject(kNearRuins[nearIndex], { x - 3.0f, 0.0f, 14.0f },
+        AddObject(kNearRuins[nearIndex], { x - 3.0f, 0.0f, 28.0f },
             0.68f + Random01(cluster + 402u) * 0.28f,
             { 0.60f, 0.59f, 0.55f, 1.0f }, true);
-        AddObject(kMidRuins[midIndex], { x + 3.2f, 0.0f, 25.0f },
+        AddObject(kMidRuins[midIndex], { x + 3.2f, 0.0f, 37.0f },
             0.90f + Random01(cluster + 403u) * 0.32f,
             { 0.68f, 0.68f, 0.65f, 1.0f }, true);
     }
@@ -196,7 +204,42 @@ void RuinsBackground::CreateTallBackground()
         const float x = 13.0f + static_cast<float>(index) * 38.0f +
             (Random01(index + 701u) - 0.5f) * 6.0f;
         const float scale = 0.82f + Random01(index + 702u) * 0.22f;
-        AddObject("Ruins/ruin_watchtower.obj", { x, 0.0f, 40.0f }, scale,
+        AddObject("Ruins/ruin_watchtower.obj", { x, 0.0f, 45.0f }, scale,
             { 0.80f, 0.82f, 0.80f, 1.0f }, true, true);
+    }
+}
+
+void RuinsBackground::CreateMountains()
+{
+    constexpr const char* mountainModels[] = {
+        "Nature/mountain_ridge_low.obj",
+        "Nature/mountain_ridge_wide.obj",
+        "Nature/mountain_peak_tall.obj",
+    };
+
+    // A pale rear layer gives the horizon depth without competing with gameplay.
+    const uint32_t rearCount =
+        static_cast<uint32_t>(std::ceil(settings_.mapLength / 24.0f)) + 2;
+    for (uint32_t index = 0; index < rearCount; ++index) {
+        const float x = -12.0f + static_cast<float>(index) * 24.0f +
+            (Random01(index + 801u) - 0.5f) * 5.0f;
+        const float z = 92.0f + Random01(index + 802u) * 10.0f;
+        const float scale = 2.05f + Random01(index + 803u) * 0.30f;
+        AddObject(mountainModels[(index + 1u) % std::size(mountainModels)],
+            { x, -0.30f, z }, scale, { 0.54f, 0.61f, 0.58f, 1.0f }, true,
+            false, kMountainFogMaterial);
+    }
+
+    // The nearer ridge overlaps the far floor and hides its straight edge.
+    const uint32_t ridgeCount =
+        static_cast<uint32_t>(std::ceil(settings_.mapLength / 21.0f)) + 2;
+    for (uint32_t index = 0; index < ridgeCount; ++index) {
+        const float x = -9.0f + static_cast<float>(index) * 21.0f +
+            (Random01(index + 851u) - 0.5f) * 4.0f;
+        const float z = 70.0f + Random01(index + 852u) * 8.0f;
+        const float scale = 1.70f + Random01(index + 853u) * 0.28f;
+        AddObject(mountainModels[index % std::size(mountainModels)],
+            { x, -0.25f, z }, scale, { 0.46f, 0.55f, 0.49f, 1.0f }, true,
+            false, kMountainFogMaterial);
     }
 }
