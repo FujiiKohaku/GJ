@@ -37,6 +37,8 @@ private:
     void StartDeathTransition();
     void UpdateDeathTransition(float deltaTime);
     void RespawnPlayerLeavingCorpse();
+    void StartLifeRelay();
+    void FinishLifeRelay();
 
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
@@ -68,4 +70,11 @@ private:
     Vector3 playerStartPosition_ = { 0.0f, 0.0f, 0.0f };
     bool selfDestructSlowActive_ = false;
     float timeScaleBeforeSelfDestruct_ = 1.0f;
+
+    bool isLifeRelayActive_ = false;
+    float lifeRelayTimer_ = 0.0f;
+    float lifeRelayDuration_ = 1.5f;
+    Vector3 lifeRelayOrbStartPosition_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 lifeRelayOrbCurrentPosition_ = { 0.0f, 0.0f, 0.0f };
+    EffectHandle lifeRelayOrbEffectHandle_ = kInvalidEffectHandle;
 };

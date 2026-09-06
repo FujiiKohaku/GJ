@@ -450,8 +450,30 @@ void GamePlayScene::Update()
 
     //player_->Update(mapChipStage_.GetGimmicks());
     if (!hardenedThisFrame &&
-        (!isFreeCameraMode || player_->IsShapingSelfDestruct())) {
+        (!isFreeCameraMode || player_->IsShapingSelfDestruct()) &&
+        !isLifeRelayActive_) {
         player_->Update(mapChipStage_.GetGimmicks());
+    }
+
+    if (isLifeRelayActive_) {
+        lifeRelayTimer_ += TimeManager::GetInstance()->GetDeltaTime();
+        float t = lifeRelayTimer_ / lifeRelayDuration_;
+        if (t > 1.0f) {
+            t = 1.0f;
+        }
+
+        float smoothT = t * t * (3.0f - 2.0f * t);
+        lifeRelayOrbCurrentPosition_ = Lerp(lifeRelayOrbStartPosition_, playerStartPosition_, smoothT);
+
+        if (EffectManager::GetInstance()->IsEffectAlive(lifeRelayOrbEffectHandle_)) {
+            EffectManager::GetInstance()->SetEffectPosition(lifeRelayOrbEffectHandle_, lifeRelayOrbCurrentPosition_);
+        } else {
+            lifeRelayOrbEffectHandle_ = EffectManager::GetInstance()->PlayLoopEffect("FlameCore", lifeRelayOrbCurrentPosition_);
+        }
+
+        if (t >= 1.0f) {
+            FinishLifeRelay();
+        }
     }
 
     if (player_->IsShapingSelfDestruct() && !selfDestructSlowActive_) {
@@ -488,84 +510,92 @@ void GamePlayScene::Update()
             }
         }
 
-        gpuSphFluid_->SetObstacles(
-            BuildFluidObstacles(mapChipStage_, gimmicks, deltaTime));
-        gpuSphFluid_->SetFloorHeight(player_->GetFluidFloorHeight());
-        gpuSphFluid_->SetGrounded(player_->IsGrounded());
-        const Vector3 playerScale = player_->GetVisualScale();
-        const Vector3 targetRadii = {
-            playerScale.x * (2.4f * kNeoWorldScale),
-            playerScale.y * (1.7f * kNeoWorldScale),
-            playerScale.z * (2.4f * kNeoWorldScale) };
-        gpuSphFluid_->SetBlobRadii(targetRadii);
-        float minX = -1000.0f, maxX = 1000.0f, maxY = 1000.0f;
-        player_->GetWallBoundaries(minX, maxX, maxY, gimmicks);
-        Vector3 corePos = MakeFluidCorePosition(*player_);
-        const float zEnvelope = targetRadii.z * 1.2f;
-        float minZ = corePos.z - zEnvelope;
-        float maxZ = corePos.z + zEnvelope;
-        gpuSphFluid_->SetWallBoundaries(minX, maxX, minZ, maxZ, -1000.0f, maxY);
-        gpuSphFluid_->SetLiquidated(false);
-        constexpr float kEyeMaximumOffset = 0.075f;
-        constexpr float kEyeFollowSpeed = 0.90f;
-        const float desiredEyeOffset = std::clamp(
-            player_->GetVelocity().x / 5.0f,
-            -1.0f,
-            1.0f) * kEyeMaximumOffset;
-        const float eyeDelta = std::clamp(
-            desiredEyeOffset - eyeOffsetX_,
-            -kEyeFollowSpeed * deltaTime,
-            kEyeFollowSpeed * deltaTime);
-        eyeOffsetX_ += eyeDelta;
-        const Vector2 shapeEyeOffset = player_->GetEyeOffset();
-        gpuSphFluid_->SetEyeOffsetX(eyeOffsetX_ + shapeEyeOffset.x);
-        gpuSphFluid_->SetEyeOffsetY(shapeEyeOffset.y);
-        gpuSphFluid_->SetControlState(
-            MakeFluidCorePosition(*player_),
-            MakeFluidTargetVelocity(player_->GetVelocity()),
-            kSlimeRenderForward);
-        const float horizontalSpeed = std::abs(player_->GetVelocity().x);
-        const bool emitWalkingTrail =
-            player_->IsGrounded() &&
-            horizontalSpeed > 0.25f;
-        const float movementDirection =
-            player_->GetVelocity().x >= 0.0f ? 1.0f : -1.0f;
-        Vector3 trailPosition = MakeFluidCorePosition(*player_);
-        trailPosition.x -= movementDirection * targetRadii.x * 0.92f;
-        trailPosition.y = player_->GetFluidFloorHeight() + 0.07f;
-        const Vector3 trailVelocity = {
-            -movementDirection * (0.70f + horizontalSpeed * 0.12f),
-            0.10f,
-            0.0f };
-        gpuSphFluid_->SetEmitter(
-            false,
-            corePos,
-            { 0.0f, 0.0f, 0.0f });
-        gpuSphFluid_->Update(deltaTime);
+        if (!isLifeRelayActive_) {
+            gpuSphFluid_->SetObstacles(
+                BuildFluidObstacles(mapChipStage_, gimmicks, deltaTime));
+            gpuSphFluid_->SetFloorHeight(player_->GetFluidFloorHeight());
+            gpuSphFluid_->SetGrounded(player_->IsGrounded());
+            const Vector3 playerScale = player_->GetVisualScale();
+            const Vector3 targetRadii = {
+                playerScale.x * (2.4f * kNeoWorldScale),
+                playerScale.y * (1.7f * kNeoWorldScale),
+                playerScale.z * (2.4f * kNeoWorldScale) };
+            gpuSphFluid_->SetBlobRadii(targetRadii);
+            float minX = -1000.0f, maxX = 1000.0f, maxY = 1000.0f;
+            player_->GetWallBoundaries(minX, maxX, maxY, gimmicks);
+            Vector3 corePos = MakeFluidCorePosition(*player_);
+            const float zEnvelope = targetRadii.z * 1.2f;
+            float minZ = corePos.z - zEnvelope;
+            float maxZ = corePos.z + zEnvelope;
+            gpuSphFluid_->SetWallBoundaries(minX, maxX, minZ, maxZ, -1000.0f, maxY);
+            gpuSphFluid_->SetLiquidated(false);
+            constexpr float kEyeMaximumOffset = 0.075f;
+            constexpr float kEyeFollowSpeed = 0.90f;
+            const float desiredEyeOffset = std::clamp(
+                player_->GetVelocity().x / 5.0f,
+                -1.0f,
+                1.0f) * kEyeMaximumOffset;
+            const float eyeDelta = std::clamp(
+                desiredEyeOffset - eyeOffsetX_,
+                -kEyeFollowSpeed * deltaTime,
+                kEyeFollowSpeed * deltaTime);
+            eyeOffsetX_ += eyeDelta;
+            const Vector2 shapeEyeOffset = player_->GetEyeOffset();
+            gpuSphFluid_->SetEyeOffsetX(eyeOffsetX_ + shapeEyeOffset.x);
+            gpuSphFluid_->SetEyeOffsetY(shapeEyeOffset.y);
+            gpuSphFluid_->SetControlState(
+                MakeFluidCorePosition(*player_),
+                MakeFluidTargetVelocity(player_->GetVelocity()),
+                kSlimeRenderForward);
+            const float horizontalSpeed = std::abs(player_->GetVelocity().x);
+            const bool emitWalkingTrail =
+                player_->IsGrounded() &&
+                horizontalSpeed > 0.25f;
+            const float movementDirection =
+                player_->GetVelocity().x >= 0.0f ? 1.0f : -1.0f;
+            Vector3 trailPosition = MakeFluidCorePosition(*player_);
+            trailPosition.x -= movementDirection * targetRadii.x * 0.92f;
+            trailPosition.y = player_->GetFluidFloorHeight() + 0.07f;
+            const Vector3 trailVelocity = {
+                -movementDirection * (0.70f + horizontalSpeed * 0.12f),
+                0.10f,
+                0.0f };
+            gpuSphFluid_->SetEmitter(
+                false,
+                corePos,
+                { 0.0f, 0.0f, 0.0f });
+            gpuSphFluid_->Update(deltaTime);
 
-        // 流体とは無関係な土埃エフェクト。低い位置から後方へ短く舞い上がる。
-        EffectManager* effects = EffectManager::GetInstance();
-        const bool emitWalkingDust =
-            player_->IsGrounded() && horizontalSpeed > 0.45f;
-        if (emitWalkingDust) {
-            Vector3 dustPosition = trailPosition;
-            // 地面の内部に埋まらない高さから、足元で土煙を見せる。
-            dustPosition.y = player_->GetFluidFloorHeight() + 0.14f;
-            if (!effects->IsEffectAlive(walkingDustEffectHandle_)) {
-                walkingDustEffectHandle_ = effects->PlayLoopEffect(
-                    "WalkDust", dustPosition);
+            // 流体とは無関係な土埃エフェクト。低い位置から後方へ短く舞い上がる。
+            EffectManager* effects = EffectManager::GetInstance();
+            const bool emitWalkingDust =
+                player_->IsGrounded() && horizontalSpeed > 0.45f;
+            if (emitWalkingDust) {
+                Vector3 dustPosition = trailPosition;
+                // 地面の内部に埋まらない高さから、足元で土煙を見せる。
+                dustPosition.y = player_->GetFluidFloorHeight() + 0.14f;
+                if (!effects->IsEffectAlive(walkingDustEffectHandle_)) {
+                    walkingDustEffectHandle_ = effects->PlayLoopEffect(
+                        "WalkDust", dustPosition);
+                }
+                effects->SetEffectPosition(walkingDustEffectHandle_, dustPosition);
+                effects->SetEffectVelocity(
+                    walkingDustEffectHandle_,
+                    {
+                        -movementDirection * (0.30f + horizontalSpeed * 0.08f),
+                        0.16f,
+                        0.0f,
+                    });
+            } else if (effects->IsEffectAlive(walkingDustEffectHandle_)) {
+                effects->StopEffect(walkingDustEffectHandle_);
+                walkingDustEffectHandle_ = kInvalidEffectHandle;
             }
-            effects->SetEffectPosition(walkingDustEffectHandle_, dustPosition);
-            effects->SetEffectVelocity(
-                walkingDustEffectHandle_,
-                {
-                    -movementDirection * (0.30f + horizontalSpeed * 0.08f),
-                    0.16f,
-                    0.0f,
-                });
-        } else if (effects->IsEffectAlive(walkingDustEffectHandle_)) {
-            effects->StopEffect(walkingDustEffectHandle_);
-            walkingDustEffectHandle_ = kInvalidEffectHandle;
+        } else {
+            EffectManager* effects = EffectManager::GetInstance();
+            if (effects->IsEffectAlive(walkingDustEffectHandle_)) {
+                effects->StopEffect(walkingDustEffectHandle_);
+                walkingDustEffectHandle_ = kInvalidEffectHandle;
+            }
         }
     }
     if (!isFreeCameraMode) {
@@ -634,6 +664,11 @@ void GamePlayScene::DrawImGui()
 
 void GamePlayScene::RespawnPlayerLeavingCorpse()
 {
+    StartLifeRelay();
+}
+
+void GamePlayScene::StartLifeRelay()
+{
     if (selfDestructSlowActive_) {
         TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
         selfDestructSlowActive_ = false;
@@ -652,10 +687,34 @@ void GamePlayScene::RespawnPlayerLeavingCorpse()
         mapChipStage_.AddGimmick(std::move(corpse));
     }
 
+    GpuSphFluid::Settings hiddenSettings = gpuSphFluid_->GetSettings();
+    hiddenSettings.corePosition = { 0.0f, 10000.0f, 0.0f };
+    gpuSphFluid_->Reset(hiddenSettings);
+    SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
+    
+    isLifeRelayActive_ = true;
+    lifeRelayTimer_ = 0.0f;
+    lifeRelayOrbStartPosition_ = MakeFluidCorePosition(*player_);
+    lifeRelayOrbCurrentPosition_ = lifeRelayOrbStartPosition_;
+    
+    lifeRelayOrbEffectHandle_ = EffectManager::GetInstance()->PlayLoopEffect("FlameCore", lifeRelayOrbCurrentPosition_);
+}
+
+void GamePlayScene::FinishLifeRelay()
+{
+    isLifeRelayActive_ = false;
+    
+    if (EffectManager::GetInstance()->IsEffectAlive(lifeRelayOrbEffectHandle_)) {
+        EffectManager::GetInstance()->StopEffect(lifeRelayOrbEffectHandle_);
+        lifeRelayOrbEffectHandle_ = kInvalidEffectHandle;
+    }
+
+    EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks", playerStartPosition_);
+
     player_->Initialize(&mapChipStage_.GetField(), playerStartPosition_);
     eyeOffsetX_ = 0.0f;
 
-    GpuSphFluid::Settings respawnSettings = currentSettings;
+    GpuSphFluid::Settings respawnSettings = gpuSphFluid_->GetSettings();
     respawnSettings.corePosition = MakeFluidCorePosition(*player_);
     respawnSettings.floorHeight = player_->GetFluidFloorHeight();
     respawnSettings.targetVelocity = { 0.0f, 0.0f, 0.0f };
@@ -667,6 +726,7 @@ void GamePlayScene::RespawnPlayerLeavingCorpse()
     gpuSphFluid_->SetLiquidated(false);
     gpuSphFluid_->SetDeathEyes(false);
     gpuSphFluid_->Reset(respawnSettings);
+    SceneManager::GetInstance()->SetScreenSpaceFluid(gpuSphFluid_.get());
 }
 
 void GamePlayScene::UpdateLivesText()
@@ -689,7 +749,7 @@ void GamePlayScene::LoseLife()
     if (remainingLives_ == 0) {
         StartDeathTransition();
     } else {
-        RespawnPlayerLeavingCorpse();
+        StartLifeRelay();
     }
 }
 
@@ -774,10 +834,14 @@ void GamePlayScene::UpdateFollowCamera()
     if (!player_) {
         return;
     }
-    const Vector3 playerPosition = player_->GetPosition();
+    Vector3 targetPosition = player_->GetPosition();
+    if (isLifeRelayActive_) {
+        targetPosition = lifeRelayOrbCurrentPosition_;
+    }
+    
     camera_->LookAt(
-        { playerPosition.x, playerPosition.y, -kCameraDistance },
-        { playerPosition.x, playerPosition.y, 0.0f });
+        { targetPosition.x, targetPosition.y, -kCameraDistance },
+        { targetPosition.x, targetPosition.y, 0.0f });
 }
 
 void GamePlayScene::UpdateCollisionText()
