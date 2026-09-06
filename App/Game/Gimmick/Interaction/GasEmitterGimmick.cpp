@@ -148,11 +148,12 @@ void GasEmitterGimmick::OnSpark(const Vector3& origin)
 
     if (inRangeX && inRangeY && inRangeZ) {
         // ガスに引火！大爆発を発生させる
-        // 爆発の半径はガスエリアより少し広いか、同等とする
-        float explosionRadius = (std::max)({gasArea.size.x, gasArea.size.y, gasArea.size.z});
-        
-        // 爆発を発生させる
-        stage_->CreateExplosion(position_, explosionRadius);
+        if (param_) {
+            stage_->CreateExplosionGrid(position_, param_->leftBlocks_, param_->rightBlocks_, param_->upBlocks_, param_->downBlocks_);
+        } else {
+            // フォールバック
+            stage_->CreateExplosion(position_, 3.0f);
+        }
         
         // 爆発後、ガスは消滅する（または放出元が壊れる）
         isEmitting_ = false;

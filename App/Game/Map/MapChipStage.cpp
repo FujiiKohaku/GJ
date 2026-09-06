@@ -322,3 +322,44 @@ void MapChipStage::CreateExplosion(const Vector3& origin, float radius)
         target->OnExplosion(origin, radius);
     }
 }
+
+void MapChipStage::CreateExplosionGrid(const Vector3& origin, uint32_t left, uint32_t right, uint32_t up, uint32_t down)
+{
+    const float blockSize = 1.0f;
+    
+    int iLeft = -static_cast<int>(left);
+    int iRight = static_cast<int>(right);
+    int iDown = -static_cast<int>(down);
+    int iUp = static_cast<int>(up);
+
+    for (const auto& gimmick : gimmicks_) {
+        Vector3 center = gimmick->GetAABB().center;
+        
+        // origin からの相対距離
+        float diffX = center.x - origin.x;
+        float diffY = center.y - origin.y;
+        
+        // Z座標が同じ平面上にあるか確認（高さ違いのギミックを巻き込まないため）
+        if (std::abs(center.z - origin.z) > 0.5f) {
+            continue;
+        }
+        
+        // 座標から相対マス目インデックス（何マス離れているか）を算出
+        int dx = static_cast<int>(std::round(diffX / blockSize));
+        int dy = static_cast<int>(std::round(diffY / blockSize));
+
+        // そのギミックがガスの範囲（矩形）のX軸・Y軸それぞれに収まっているか
+        bool inGasX = (dx >= iLeft && dx <= iRight);
+        bool inGasY = (dy >= iDown && dy <= iUp);
+        
+        // 十字方向で外側に1マスだけ面しているか（隣接判定）
+        bool isAdjacentX = inGasY && (dx == iLeft - 1 || dx == iRight + 1);
+        bool isAdjacentY = inGasX && (dy == iDown - 1 || dy == iUp + 1);
+        
+        // ガス範囲内、または十字方向に隣接するマスであれば爆破対象
+        if ((inGasX && inGasY) || isAdjacentX || isAdjacentY) {
+            float dist = Vector3Length(center - origin);
+            gimmick->OnExplosion(origin, dist);
+        }
+    }
+}
