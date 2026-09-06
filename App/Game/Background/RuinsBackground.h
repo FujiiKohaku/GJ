@@ -34,11 +34,13 @@ private:
         float scale,
         const Vector4& color,
         bool lighting,
-        bool useModelTextures = false);
+        bool useModelTextures = false,
+        int32_t materialMode = -1);
     void CreateGrass();
     void CreateRocks();
     void CreateRuins();
     void CreateTallBackground();
+    void CreateMountains();
 
     Settings settings_;
     float groundAngle_ = 0.0f;

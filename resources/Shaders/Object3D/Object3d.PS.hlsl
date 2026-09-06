@@ -223,6 +223,24 @@ float3 GrassGroundColor(float3 worldPosition)
     return grass;
 }
 
+float3 ApplyRuinsFog(float3 color, float3 worldPosition)
+{
+    // Background-only depth fog: foreground grass remains clear while distant
+    // ruins merge into the hazy green-gray horizon.
+    const float fogStart = 20.0f;
+    const float fogEnd = 48.0f;
+    const float3 fogColor = float3(0.67f, 0.73f, 0.66f);
+    float fogAmount = smoothstep(fogStart, fogEnd, worldPosition.z);
+    return lerp(color, fogColor, fogAmount);
+}
+
+float3 ApplyMountainFog(float3 color, float3 worldPosition)
+{
+    const float3 fogColor = float3(0.67f, 0.73f, 0.66f);
+    float fogAmount = 0.26f + smoothstep(64.0f, 125.0f, worldPosition.z) * 0.66f;
+    return lerp(color, fogColor, fogAmount);
+}
+
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
@@ -310,6 +328,10 @@ PixelShaderOutput main(VertexShaderOutput input)
             gMaterial.color.rgb * textureColor.rgb * ToonIllumination(input.normal, input.worldPosition),
             gMaterial.color.a * textureColor.a);
     }
+    else if (gMaterial.enableLighting == 11)
+    {
+        output.color = gMaterial.color * textureColor;
+    }
     else if (gMaterial.enableLighting != 0)
     {
         float3 baseColor = gMaterial.color.rgb * textureColor.rgb;
@@ -390,9 +412,20 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color = gMaterial.color * textureColor;
     }
 
+    if (gMaterial.enableLighting == 9 || gMaterial.enableLighting == 10 ||
+        gMaterial.enableLighting == 11)
+    {
+        output.color.rgb = ApplyRuinsFog(output.color.rgb, input.worldPosition);
+    }
+    else if (gMaterial.enableLighting == 12)
+    {
+        output.color.rgb = ApplyMountainFog(output.color.rgb, input.worldPosition);
+    }
+
     if (gMaterial.enableEnvironmentMap != 0 && gMaterial.enableLighting != 6 &&
         gMaterial.enableLighting != 7 && gMaterial.enableLighting != 8 &&
-        gMaterial.enableLighting != 9)
+        gMaterial.enableLighting != 9 && gMaterial.enableLighting != 10 &&
+        gMaterial.enableLighting != 11 && gMaterial.enableLighting != 12)
     {
         float3 N = normalize(input.normal);
         float3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);
