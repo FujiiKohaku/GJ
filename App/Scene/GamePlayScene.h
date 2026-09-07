@@ -43,6 +43,8 @@ private:
     void StartLifeRelay();
     void FinishLifeRelay();
     void ResetToLastRespawnPoint();
+    void StartClearCelebration();
+    void UpdateClearCelebration(float unscaledDeltaTime);
 
     void StartStageSelectTransition();
     void UpdateStageSelectTransition(float deltaTime);
@@ -95,4 +97,6 @@ private:
     Vector3 lifeRelayOrbStartPosition_ = { 0.0f, 0.0f, 0.0f };
     Vector3 lifeRelayOrbCurrentPosition_ = { 0.0f, 0.0f, 0.0f };
     EffectHandle lifeRelayOrbEffectHandle_ = kInvalidEffectHandle;
+    bool isClearCelebrationActive_ = false;
+    float clearCelebrationTimer_ = 0.0f;
 };

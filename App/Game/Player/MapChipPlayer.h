@@ -29,6 +29,7 @@ public:
     bool ConsumeHardenedBody(AABB& outBody);
     void RequestDeath() { deathRequested_ = true; }
     bool ConsumeDeathRequest();
+    bool ConsumeGoalReached();
     
     AABB GetAABB() const;
 
@@ -63,6 +64,7 @@ private:
     bool isShapingSelfDestruct_ = false;
     bool hardenedBodyReady_ = false;
     bool deathRequested_ = false;
+    bool goalReached_ = false;
     Vector2 selfDestructRawPull_ = { 0.0f, 0.0f };
     Vector2 selfDestructPull_ = { 0.0f, 0.0f };
     AABB hardenedBody_ = {};
