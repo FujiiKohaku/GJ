@@ -40,9 +40,8 @@ constexpr Vector3 kSlimeRenderForward = { 0.0f, 0.0f, 1.0f };
 constexpr float kMenuButtonX = 440.0f;
 constexpr float kMenuButtonWidth = 400.0f;
 constexpr float kMenuButtonHeight = 58.0f;
-constexpr float kMenuResumeY = 285.0f;
-constexpr float kMenuGameOverY = 365.0f;
-constexpr float kMenuStageSelectY = 445.0f;
+constexpr float kMenuResumeY = 325.0f;
+constexpr float kMenuStageSelectY = 405.0f;
 constexpr float kStageSelectFadeDuration = 0.45f;
 constexpr float kFantasyMenuBlendDuration = 0.20f;
 
@@ -371,7 +370,6 @@ void GamePlayScene::Initialize()
         return button;
     };
     menuResumeButtonSprite_ = createMenuButton(kMenuResumeY);
-    menuGameOverButtonSprite_ = createMenuButton(kMenuGameOverY);
     menuStageSelectButtonSprite_ = createMenuButton(kMenuStageSelectY);
 
     // メニュータイトル
@@ -394,7 +392,6 @@ void GamePlayScene::Initialize()
         return text;
     };
     menuResumeText_ = createMenuText("RESUME GAME  [TAB]", kMenuResumeY);
-    menuGameOverText_ = createMenuText("GAME OVER  [G]", kMenuGameOverY);
     menuStageSelectText_ = createMenuText("STAGE SELECT  [BACKSPACE]", kMenuStageSelectY);
 
     menuTransitionFadeSprite_ = std::make_unique<Sprite>();
@@ -467,26 +464,18 @@ void GamePlayScene::Update()
     if (isMenuOpen_) {
         const Vector2 mousePosition = input->GetMousePosition();
         const bool resumeHovered = IsPointInMenuButton(mousePosition, kMenuResumeY);
-        const bool gameOverHovered = IsPointInMenuButton(mousePosition, kMenuGameOverY);
         const bool stageSelectHovered = IsPointInMenuButton(mousePosition, kMenuStageSelectY);
         const bool clicked = input->IsMouseTrigger(0);
 
         menuResumeButtonSprite_->SetColor(resumeHovered
             ? Vector4 { 0.25f, 0.48f, 0.34f, 1.0f }
             : Vector4 { 0.15f, 0.25f, 0.22f, 1.0f });
-        menuGameOverButtonSprite_->SetColor(gameOverHovered
-            ? Vector4 { 0.55f, 0.25f, 0.22f, 1.0f }
-            : Vector4 { 0.29f, 0.17f, 0.17f, 1.0f });
         menuStageSelectButtonSprite_->SetColor(stageSelectHovered
             ? Vector4 { 0.30f, 0.38f, 0.54f, 1.0f }
             : Vector4 { 0.17f, 0.21f, 0.30f, 1.0f });
 
         if (clicked && resumeHovered) {
             isMenuOpen_ = false;
-            return;
-        }
-        if (input->IsKeyTrigger(DIK_G) || (clicked && gameOverHovered)) {
-            StartDeathTransition();
             return;
         }
         if (input->IsKeyTrigger(DIK_BACKSPACE) || (clicked && stageSelectHovered)) {
@@ -497,11 +486,9 @@ void GamePlayScene::Update()
         menuBackgroundSprite_->Update();
         menuPanelSprite_->Update();
         menuResumeButtonSprite_->Update();
-        menuGameOverButtonSprite_->Update();
         menuStageSelectButtonSprite_->Update();
         menuTitleText_->Update();
         menuResumeText_->Update();
-        menuGameOverText_->Update();
         menuStageSelectText_->Update();
         return;
     }
@@ -707,13 +694,11 @@ void GamePlayScene::Draw2D()
         menuBackgroundSprite_->Draw();
         menuPanelSprite_->Draw();
         menuResumeButtonSprite_->Draw();
-        menuGameOverButtonSprite_->Draw();
         menuStageSelectButtonSprite_->Draw();
 
         TextRenderer::GetInstance()->PreDraw();
         menuTitleText_->Draw();
         menuResumeText_->Draw();
-        menuGameOverText_->Draw();
         menuStageSelectText_->Draw();
     }
     if (isStageSelectTransitionActive_) {
@@ -862,7 +847,7 @@ void GamePlayScene::FinishLifeRelay()
 void GamePlayScene::UpdateLivesText()
 {
     if (!livesText_) return;
-    const float width = static_cast<float>((std::max)(WinApp::GetInstance()->GetClientWidth(), 1));
+    const float width = static_cast<float>(WinApp::GetInstance()->GetRenderWidth());
     livesText_->SetPosition({ width - 32.0f, 108.0f });
     livesText_->SetText("残機 × " + std::to_string(remainingLives_));
     livesText_->SetColor(remainingLives_ <= 2

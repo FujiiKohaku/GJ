@@ -27,6 +27,8 @@ private:
     const std::string& GetPrintedPagePath(uint32_t page) const;
     void SetPrintedPage(Object3d* object, uint32_t page);
     void LaunchFirework();
+    void StartArchiveTransition();
+    bool UpdateArchiveTransition(float deltaTime);
 
     std::unique_ptr<Camera> camera_;
     std::unique_ptr<SkyBox> skyBox_;
@@ -46,10 +48,13 @@ private:
     std::vector<bool> openingPageVisible_;
     std::vector<std::string> printedPagePaths_;
     std::unique_ptr<Sprite> flashSprite_;
+    std::unique_ptr<Sprite> archiveTransitionFadeSprite_;
     std::unique_ptr<Text> titleText_;
     std::unique_ptr<Text> instructionText_;
     float sceneTime_ = 0.0f;
     float fireworkTimer_ = 0.0f;
     int fireworkIndex_ = 0;
     bool meadowRevealed_ = false;
+    float archiveTransitionTime_ = 0.0f;
+    bool archiveTransitionActive_ = false;
 };

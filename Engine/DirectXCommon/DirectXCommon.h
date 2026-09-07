@@ -36,6 +36,7 @@ public:
     void PreDraw();
     // 描画後処理
     void PostDraw();
+    bool ResizeSwapChain(uint32_t width, uint32_t height);
     void SetBackBufferRenderTarget(D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle);
     static void Finalize();
     // Getter達
