@@ -17,6 +17,7 @@
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/Time/TimeManager.h"
 #include "GameOverScene.h"
+#include "ClearScene.h"
 #include "SceneManager.h"
 #include <algorithm>
 #include <cmath>
@@ -419,13 +420,18 @@ void GamePlayScene::Update() {
     return;
   }
 
-  if (input->IsKeyTrigger(DIK_R)) {
+  if (isClearCelebrationActive_) {
+    UpdateClearCelebration(unscaledDeltaTime);
+    if (!isClearCelebrationActive_) return;
+  }
+
+  if (!isClearCelebrationActive_ && input->IsKeyTrigger(DIK_R)) {
     ResetToLastRespawnPoint();
     return;
   }
 
   // TABキーでメニュー開閉
-  if (Input::GetInstance()->IsKeyTrigger(DIK_TAB) &&
+  if (!isClearCelebrationActive_ && Input::GetInstance()->IsKeyTrigger(DIK_TAB) &&
       !player_->IsShapingSelfDestruct()) {
     isMenuOpen_ = !isMenuOpen_;
     if (isMenuOpen_) {
@@ -493,7 +499,7 @@ void GamePlayScene::Update() {
   // 形状調整用のスロー中は、トラップ接触や落下などによる死亡を無効にする。
   // 死亡リクエストは消費しておかないと通常速度へ戻った瞬間に死亡してしまう。
   const bool isSlowMotion = TimeManager::GetInstance()->GetTimeScale() < 0.999f;
-  if (player_->ConsumeDeathRequest()) {
+    if (!isClearCelebrationActive_ && player_->ConsumeDeathRequest()) {
     if (!isSlowMotion) {
       LoseLife();
       if (isDeathTransitionActive_)
@@ -503,10 +509,14 @@ void GamePlayScene::Update() {
   }
 
   // player_->Update(mapChipStage_.GetGimmicks());
-  if (!hardenedThisFrame &&
+    if (!isClearCelebrationActive_ && !hardenedThisFrame &&
       (!isFreeCameraMode || player_->IsShapingSelfDestruct()) &&
       !isLifeRelayActive_) {
-    player_->Update(mapChipStage_.GetGimmicks());
+        player_->Update(mapChipStage_.GetGimmicks());
+
+        if (player_->ConsumeGoalReached()) {
+          StartClearCelebration();
+        }
 
     // 中間地点を通過したら、以降の命のリレー先をここへ更新する。
     for (BaseMapChipGimmick *gimmick : mapChipStage_.GetGimmicks()) {
@@ -544,7 +554,7 @@ void GamePlayScene::Update() {
     }
   }
 
-  if (player_->IsShapingSelfDestruct() && !selfDestructSlowActive_) {
+    if (!isClearCelebrationActive_ && player_->IsShapingSelfDestruct() && !selfDestructSlowActive_) {
     TimeManager *timeManager = TimeManager::GetInstance();
     timeScaleBeforeSelfDestruct_ = timeManager->GetTimeScale();
     timeManager->SetTimeScale(0.08f);
@@ -552,7 +562,7 @@ void GamePlayScene::Update() {
   }
 
   AABB hardenedBody;
-  if (player_->ConsumeHardenedBody(hardenedBody)) {
+    if (!isClearCelebrationActive_ && player_->ConsumeHardenedBody(hardenedBody)) {
     // T による確定自爆はスロー中でも有効にする。
     // スロー中に無効化するのはトラップ・落下などの意図しない死亡だけ。
     LoseLife();
@@ -560,7 +570,7 @@ void GamePlayScene::Update() {
       return;
     hardenedThisFrame = true;
   }
-  if (!isSlowMotion && !hardenedThisFrame &&
+    if (!isClearCelebrationActive_ && !isSlowMotion && !hardenedThisFrame &&
       (player_->IsCrushed() || player_->GetPosition().y < -10.0f)) {
     LoseLife();
     if (isDeathTransitionActive_)
@@ -590,13 +600,30 @@ void GamePlayScene::Update() {
       gpuSphFluid_->SetFloorHeight(player_->GetFluidFloorHeight());
       gpuSphFluid_->SetGrounded(player_->IsGrounded());
       const Vector3 playerScale = player_->GetVisualScale();
-      const Vector3 targetRadii = {playerScale.x * (2.4f * kNeoWorldScale),
-                                   playerScale.y * (1.7f * kNeoWorldScale),
-                                   playerScale.z * (2.4f * kNeoWorldScale)};
-      gpuSphFluid_->SetBlobRadii(targetRadii);
+      Vector3 targetRadii = {playerScale.x * (2.4f * kNeoWorldScale),
+                             playerScale.y * (1.7f * kNeoWorldScale),
+                             playerScale.z * (2.4f * kNeoWorldScale)};
       float minX = -1000.0f, maxX = 1000.0f, maxY = 1000.0f;
       player_->GetWallBoundaries(minX, maxX, maxY, gimmicks);
       Vector3 corePos = MakeFluidCorePosition(*player_);
+      Vector3 targetVelocity = MakeFluidTargetVelocity(player_->GetVelocity());
+      if (isClearCelebrationActive_) {
+        // 喜びのぽよん：左右にステップしながら跳ね上がる。
+        const float bounce = std::abs(std::sin(clearCelebrationTimer_ * 11.0f));
+        const float sideStep = std::sin(clearCelebrationTimer_ * 7.0f);
+        targetRadii.x *= 1.34f - bounce * 0.18f;
+        targetRadii.y *= 1.48f + bounce * 0.52f;
+        targetRadii.z *= 1.26f;
+        corePos.x += sideStep * 1.10f;
+        corePos.y += bounce * 0.72f;
+        targetVelocity = {
+          std::cos(clearCelebrationTimer_ * 7.0f) * 7.7f,
+          std::cos(clearCelebrationTimer_ * 11.0f) * 2.4f,
+          0.0f
+        };
+        gpuSphFluid_->SetGrounded(false);
+      }
+      gpuSphFluid_->SetBlobRadii(targetRadii);
       const float zEnvelope = targetRadii.z * 1.2f;
       float minZ = corePos.z - zEnvelope;
       float maxZ = corePos.z + zEnvelope;
@@ -615,9 +642,9 @@ void GamePlayScene::Update() {
       gpuSphFluid_->SetEyeOffsetX(eyeOffsetX_ + shapeEyeOffset.x);
       gpuSphFluid_->SetEyeOffsetY(shapeEyeOffset.y);
       gpuSphFluid_->SetControlState(
-          MakeFluidCorePosition(*player_),
-          MakeFluidTargetVelocity(player_->GetVelocity()), kSlimeRenderForward);
-      const float horizontalSpeed = std::abs(player_->GetVelocity().x);
+          corePos, targetVelocity, kSlimeRenderForward);
+      const float horizontalSpeed = isClearCelebrationActive_
+          ? 0.0f : std::abs(player_->GetVelocity().x);
       const bool emitWalkingTrail =
           player_->IsGrounded() && horizontalSpeed > 0.25f;
       const float movementDirection =
@@ -850,6 +877,27 @@ void GamePlayScene::ResetToLastRespawnPoint() {
   isLifeRelayActive_ = false;
   lifeRelayTimer_ = 0.0f;
   FinishLifeRelay();
+}
+
+void GamePlayScene::StartClearCelebration() {
+  if (isClearCelebrationActive_) return;
+
+  // 入力を止め、流体だけを弾ませて「喜び」を見せてからクリア画面へ遷移する。
+  isClearCelebrationActive_ = true;
+  clearCelebrationTimer_ = 0.0f;
+  if (selfDestructSlowActive_) {
+    TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
+    selfDestructSlowActive_ = false;
+  }
+  EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks", player_->GetPosition());
+}
+
+void GamePlayScene::UpdateClearCelebration(float unscaledDeltaTime) {
+  clearCelebrationTimer_ += unscaledDeltaTime;
+  if (clearCelebrationTimer_ >= 2.0f) {
+    isClearCelebrationActive_ = false;
+    SceneManager::GetInstance()->SetNextScene(std::make_unique<ClearScene>());
+  }
 }
 
 void GamePlayScene::UpdateLivesText() {

@@ -15,6 +15,7 @@ public:
 
     AABB GetAABB() const override;
     bool IsGoal() const override { return true; }
+    bool IsSolid() const override { return false; }
 
 private:
     std::unique_ptr<Object3d> object_;
