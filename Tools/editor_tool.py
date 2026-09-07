@@ -68,6 +68,7 @@ class EditorTool(tk.Tk):
             (12, "Door"),
             (13, "土台 (Foundation)"),
             (14, "Gear (Obstacle)"),
+            (15, "Checkpoint (Respawn)"),
             (99, "Player Spawn"),
         ]
         

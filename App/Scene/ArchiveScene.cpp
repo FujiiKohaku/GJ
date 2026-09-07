@@ -133,11 +133,11 @@ void ArchiveScene::InitializeStageData()
     gamePlayStage.destination = StageDestination::GamePlay;
     stages_.push_back(gamePlayStage);
 
-    StageData testStage;
-    testStage.name = "STAGE 02  TEST SCENE";
-    testStage.description = "ENGINE FEATURE TEST";
-    testStage.destination = StageDestination::Test;
-    stages_.push_back(testStage);
+    StageData stage2;
+    stage2.name = "STAGE 02  SKY RELAY";
+    stage2.description = "ASCEND THE RUINS AND CROSS THE HIGH PATH";
+    stage2.destination = StageDestination::GamePlay;
+    stages_.push_back(stage2);
 
     StageData gameLabStage;
     gameLabStage.name = "STAGE 03  GAMELAB";
@@ -1081,9 +1081,13 @@ void ArchiveScene::UpdateStageConfirmed(float deltaTime)
 
     if (animationTime_ >= kConfirmSceneChangeTime) {
         PageTransition::RequestReveal();
-        switch (confirmedDestination_) {
-        case StageDestination::GamePlay:
-            SceneManager::GetInstance()->SetNextScene(std::make_unique<GamePlayScene>());
+    switch (confirmedDestination_) {
+    case StageDestination::GamePlay:
+            SceneManager::GetInstance()->SetNextScene(
+                std::make_unique<GamePlayScene>(
+                    currentStageIndex_ == 1
+                        ? "resources/Maps/stage2.json"
+                        : "resources/Maps/stage1.json"));
             break;
         case StageDestination::Test:
             SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());

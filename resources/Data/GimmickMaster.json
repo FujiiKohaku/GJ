@@ -2,6 +2,9 @@
   "Goal": {
     "file_name": "GoalPost/GoalPost.obj"
   },
+  "Checkpoint": {
+    "file_name": "cube"
+  },
   "Spike": {
     "file_name": "Thorn/Thorn.obj"
   },

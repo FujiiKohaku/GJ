@@ -32,6 +32,8 @@ public:
     
     std::vector<BaseMapChipGimmick*> GetGimmicks() const;
     void AddGimmick(std::unique_ptr<BaseMapChipGimmick> gimmick);
+    void LimitHardenedSlimeCount(size_t maximumCount);
+    bool RemoveLatestHardenedSlime();
 
     /**
      * @brief イベントマネージャを取得する
