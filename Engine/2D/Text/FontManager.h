@@ -21,7 +21,7 @@ public:
     static FontManager* GetInstance();
     static void Finalize();
 
-    FontHandle LoadFont(const std::string& fontPath);
+    FontHandle LoadFont(const std::string& fontPath, bool highResolution = false);
     void EnsureGlyphs(FontHandle handle, const std::string& text);
     void FlushAtlasUpdates();
 

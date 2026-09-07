@@ -15,9 +15,9 @@ struct Text::TextLine {
     float width = 0.0f;
 };
 
-void Text::Initialize(const std::string& fontPath)
+void Text::Initialize(const std::string& fontPath, bool highResolution)
 {
-    fontHandle_ = FontManager::GetInstance()->LoadFont(fontPath);
+    fontHandle_ = FontManager::GetInstance()->LoadFont(fontPath, highResolution);
     CreateConstantBuffers();
     geometryDirty_ = true;
 }
