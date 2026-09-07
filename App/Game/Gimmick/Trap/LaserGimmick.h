@@ -3,6 +3,7 @@
 #include "App/Game/Gimmick/BaseMapChipGimmick.h"
 #include "App/Game/Gimmick/Trap/LaserParam.h"
 #include "Engine/3D/Object3d.h"
+#include "Engine/3D/LaserBeamRenderer.h"
 #include <memory>
 
 /**
@@ -49,14 +50,17 @@ public:
 
 private:
     std::unique_ptr<Object3d> emitterObject_; // 発射機本体のモデル
-    std::unique_ptr<Object3d> beamObject_;    // レーザービーム（Cube）モデル
+    // beamObject_ は削除し、LaserBeamRenderer を使用します
+
+    LaserBeamRenderParams beamParams_;        // レーザーの描画パラメータ
 
     std::unique_ptr<LaserParam> param_;       // パラメータ
     MapChipStage* stage_ = nullptr;           // ステージへのポインタ
     Vector3 position_;                        // ギミックの配置座標
 
-    AABB laserAABB_;                          // 現在のレーザービームの当たり判定
     float currentLaserLength_ = 0.0f;         // 現在のレーザーの長さ（マス数）
+    float staticLaserLength_ = 0.0f; // プレイヤーとの判定を行う前の、静的な壁までの距離
+    AABB laserAABB_{};                          // 現在のレーザービームの当たり判定
 
     bool wasPlayerColliding_ = false;         // 前フレームのプレイヤー衝突フラグ
     float playerHitTime_ = 0.0f;              // レーザー接触から死亡までの経過時間
