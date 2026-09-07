@@ -30,6 +30,10 @@ public:
     // ゴール判定用フラグ（デフォルトは偽）
     virtual bool IsGoal() const { return false; }
 
+    // 中間地点判定。プレイヤーが通過した時に復帰地点として有効化する。
+    virtual bool IsCheckpoint() const { return false; }
+    virtual bool TryActivateCheckpoint(const AABB&) { return false; }
+
     // プレイヤーが衝突する（壁として働く）かどうか
     virtual bool IsSolid() const { return true; }
 

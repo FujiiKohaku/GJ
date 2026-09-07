@@ -2,6 +2,7 @@
 
 #include "App/Game/Gimmick/MapChipGimmickFactory.h"
 #include "App/Game/Gimmick/GoalGimmick.h"
+#include "App/Game/Gimmick/CheckpointGimmick.h"
 #include "App/Game/Gimmick/SwingingBridgeGimmick.h"
 #include "App/Game/Gimmick/Interaction/SwitchGimmick.h"
 #include "App/Game/Gimmick/Interaction/GasEmitterGimmick.h"
@@ -116,6 +117,9 @@ void MapChipStage::Initialize(
 
         if (obj.type == "Goal") {
             gimmick = std::make_unique<GoalGimmick>();
+            modelFile = obj.fileName;
+        } else if (obj.type == "Checkpoint") {
+            gimmick = std::make_unique<CheckpointGimmick>();
             modelFile = obj.fileName;
         } else if (obj.type == "Switch") {
             gimmick = std::make_unique<SwitchGimmick>();
@@ -240,6 +244,36 @@ void MapChipStage::AddGimmick(std::unique_ptr<BaseMapChipGimmick> gimmick)
     if (gimmicks_.back()->IsHardenedSlime()) {
         ResolveHardenedSlimeAdhesion(*gimmicks_.back());
     }
+}
+
+void MapChipStage::LimitHardenedSlimeCount(size_t maximumCount)
+{
+    size_t count = 0;
+    for (const auto& gimmick : gimmicks_) {
+        if (gimmick->IsHardenedSlime()) ++count;
+    }
+
+    // gimmicks_ は追加順。先頭から消すことで最も古い死体を先に取り除く。
+    for (auto it = gimmicks_.begin(); count > maximumCount && it != gimmicks_.end();) {
+        if ((*it)->IsHardenedSlime()) {
+            it = gimmicks_.erase(it);
+            --count;
+        } else {
+            ++it;
+        }
+    }
+}
+
+bool MapChipStage::RemoveLatestHardenedSlime()
+{
+    // 末尾ほど新しく追加されたギミックなので、逆順で直近の死体を探す。
+    for (auto it = gimmicks_.rbegin(); it != gimmicks_.rend(); ++it) {
+        if ((*it)->IsHardenedSlime()) {
+            gimmicks_.erase(std::next(it).base());
+            return true;
+        }
+    }
+    return false;
 }
 
 void MapChipStage::ResolveHardenedSlimeAdhesion(
