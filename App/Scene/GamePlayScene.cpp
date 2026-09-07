@@ -40,9 +40,8 @@ constexpr Vector3 kSlimeRenderForward = {0.0f, 0.0f, 1.0f};
 constexpr float kMenuButtonX = 440.0f;
 constexpr float kMenuButtonWidth = 400.0f;
 constexpr float kMenuButtonHeight = 58.0f;
-constexpr float kMenuResumeY = 285.0f;
-constexpr float kMenuGameOverY = 365.0f;
-constexpr float kMenuStageSelectY = 445.0f;
+constexpr float kMenuResumeY = 325.0f;
+constexpr float kMenuStageSelectY = 405.0f;
 constexpr float kStageSelectFadeDuration = 0.45f;
 constexpr float kFantasyMenuBlendDuration = 0.20f;
 
@@ -342,7 +341,6 @@ void GamePlayScene::Initialize() {
     return button;
   };
   menuResumeButtonSprite_ = createMenuButton(kMenuResumeY);
-  menuGameOverButtonSprite_ = createMenuButton(kMenuGameOverY);
   menuStageSelectButtonSprite_ = createMenuButton(kMenuStageSelectY);
 
   // メニュータイトル
@@ -365,7 +363,6 @@ void GamePlayScene::Initialize() {
     return text;
   };
   menuResumeText_ = createMenuText("RESUME GAME  [TAB]", kMenuResumeY);
-  menuGameOverText_ = createMenuText("GAME OVER  [G]", kMenuGameOverY);
   menuStageSelectText_ =
       createMenuText("STAGE SELECT  [BACKSPACE]", kMenuStageSelectY);
 
@@ -386,6 +383,7 @@ void GamePlayScene::Finalize() {
     selfDestructSlowActive_ = false;
   }
   SceneManager::GetInstance()->RemovePostEffect(PostEffectType::SlimeScreen);
+  SceneManager::GetInstance()->RemovePostEffect(PostEffectType::ClearSlimeRise);
   SceneManager::GetInstance()->RemovePostEffect(PostEffectType::FantasyMenu);
   SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
   SceneManager::GetInstance()->SetFantasyMenuStrength(0.0f);
@@ -444,8 +442,6 @@ void GamePlayScene::Update() {
   if (isMenuOpen_) {
     const Vector2 mousePosition = input->GetMousePosition();
     const bool resumeHovered = IsPointInMenuButton(mousePosition, kMenuResumeY);
-    const bool gameOverHovered =
-        IsPointInMenuButton(mousePosition, kMenuGameOverY);
     const bool stageSelectHovered =
         IsPointInMenuButton(mousePosition, kMenuStageSelectY);
     const bool clicked = input->IsMouseTrigger(0);
@@ -453,19 +449,12 @@ void GamePlayScene::Update() {
     menuResumeButtonSprite_->SetColor(resumeHovered
                                           ? Vector4{0.25f, 0.48f, 0.34f, 1.0f}
                                           : Vector4{0.15f, 0.25f, 0.22f, 1.0f});
-    menuGameOverButtonSprite_->SetColor(
-        gameOverHovered ? Vector4{0.55f, 0.25f, 0.22f, 1.0f}
-                        : Vector4{0.29f, 0.17f, 0.17f, 1.0f});
     menuStageSelectButtonSprite_->SetColor(
         stageSelectHovered ? Vector4{0.30f, 0.38f, 0.54f, 1.0f}
                            : Vector4{0.17f, 0.21f, 0.30f, 1.0f});
 
     if (clicked && resumeHovered) {
       isMenuOpen_ = false;
-      return;
-    }
-    if (input->IsKeyTrigger(DIK_G) || (clicked && gameOverHovered)) {
-      StartDeathTransition();
       return;
     }
     if (input->IsKeyTrigger(DIK_BACKSPACE) || (clicked && stageSelectHovered)) {
@@ -476,11 +465,9 @@ void GamePlayScene::Update() {
     menuBackgroundSprite_->Update();
     menuPanelSprite_->Update();
     menuResumeButtonSprite_->Update();
-    menuGameOverButtonSprite_->Update();
     menuStageSelectButtonSprite_->Update();
     menuTitleText_->Update();
     menuResumeText_->Update();
-    menuGameOverText_->Update();
     menuStageSelectText_->Update();
     return;
   }
@@ -723,13 +710,11 @@ void GamePlayScene::Draw2D() {
     menuBackgroundSprite_->Draw();
     menuPanelSprite_->Draw();
     menuResumeButtonSprite_->Draw();
-    menuGameOverButtonSprite_->Draw();
     menuStageSelectButtonSprite_->Draw();
 
     TextRenderer::GetInstance()->PreDraw();
     menuTitleText_->Draw();
     menuResumeText_->Draw();
-    menuGameOverText_->Draw();
     menuStageSelectText_->Draw();
   }
   if (isStageSelectTransitionActive_) {
@@ -885,6 +870,10 @@ void GamePlayScene::StartClearCelebration() {
   // 入力を止め、流体だけを弾ませて「喜び」を見せてからクリア画面へ遷移する。
   isClearCelebrationActive_ = true;
   clearCelebrationTimer_ = 0.0f;
+  SceneManager* sceneManager = SceneManager::GetInstance();
+  sceneManager->SetSlimeScreenProgress(0.0f);
+  sceneManager->AddPostEffect(
+      PostEffectType::ClearSlimeRise, PostEffectStage::AfterParticle);
   if (selfDestructSlowActive_) {
     TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
     selfDestructSlowActive_ = false;
@@ -893,8 +882,17 @@ void GamePlayScene::StartClearCelebration() {
 }
 
 void GamePlayScene::UpdateClearCelebration(float unscaledDeltaTime) {
+  constexpr float kDanceDuration = 2.0f;
+  constexpr float kSlimeRiseDuration = 1.1f;
   clearCelebrationTimer_ += unscaledDeltaTime;
-  if (clearCelebrationTimer_ >= 2.0f) {
+  const float riseProgress = std::clamp(
+      (clearCelebrationTimer_ - kDanceDuration) / kSlimeRiseDuration,
+      0.0f, 1.0f);
+  const float easedProgress =
+      riseProgress * riseProgress * (3.0f - 2.0f * riseProgress);
+  SceneManager::GetInstance()->SetSlimeScreenProgress(easedProgress);
+
+  if (riseProgress >= 1.0f) {
     isClearCelebrationActive_ = false;
     SceneManager::GetInstance()->SetNextScene(std::make_unique<ClearScene>());
   }

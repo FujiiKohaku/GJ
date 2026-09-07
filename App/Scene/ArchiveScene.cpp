@@ -340,6 +340,44 @@ void ArchiveScene::InitializeInterface()
     instructionText_->SetAnchorPoint({ 0.5f, 0.5f });
     instructionText_->SetFontSize(20.0f);
     instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, 1.0f });
+
+    creditsBackgroundSprite_ = std::make_unique<Sprite>();
+    creditsBackgroundSprite_->Initialize(
+        SpriteManager::GetInstance(), "resources/Textures/white.png");
+    creditsBackgroundSprite_->SetAnchorPoint({ 0.5f, 0.5f });
+    creditsBackgroundSprite_->SetPosition({ 640.0f, 360.0f });
+    creditsBackgroundSprite_->SetSize({ 1120.0f, 610.0f });
+    creditsBackgroundSprite_->SetColor({ 0.015f, 0.025f, 0.035f, 0.90f });
+
+    creditsTitleText_ = std::make_unique<Text>();
+    creditsTitleText_->Initialize(kDefaultFont, true);
+    creditsTitleText_->SetText("CREDITS");
+    creditsTitleText_->SetPosition({ 640.0f, 88.0f });
+    creditsTitleText_->SetAnchorPoint({ 0.5f, 0.0f });
+    creditsTitleText_->SetFontSize(42.0f);
+    creditsTitleText_->SetColor({ 0.84f, 0.72f, 0.38f, 1.0f });
+    creditsTitleText_->SetOutlineColor({ 0.04f, 0.03f, 0.02f, 1.0f });
+    creditsTitleText_->SetOutlineWidth(2.0f);
+
+    creditsBodyText_ = std::make_unique<Text>();
+    creditsBodyText_->Initialize(kDefaultFont);
+    creditsBodyText_->SetText(
+        "DOWNLOADED SOUND EFFECTS\n"
+        "UI Sound Effects - Robin Lamb / CC0 1.0\n"
+        "Book Flip Sounds - Voltiment555 / CC0 1.0\n\n"
+        "FONT\n"
+        "Japanese Font - Adobe / SIL Open Font License 1.1");
+    creditsBodyText_->SetPosition({ 640.0f, 175.0f });
+    creditsBodyText_->SetAnchorPoint({ 0.5f, 0.0f });
+    creditsBodyText_->SetMaxWidth(940.0f);
+    creditsBodyText_->SetHorizontalAlignment(TextHorizontalAlignment::Center);
+    creditsBodyText_->SetFontSize(22.0f);
+    creditsBodyText_->SetLineSpacing(10.0f);
+    creditsBodyText_->SetColor({ 0.88f, 0.91f, 0.92f, 1.0f });
+
+    creditsBackgroundSprite_->Update();
+    creditsTitleText_->Update();
+    creditsBodyText_->Update();
 }
 
 void ArchiveScene::InitializeDustMotes()
@@ -412,7 +450,7 @@ void ArchiveScene::EnterTitleMode()
     titleText_->SetFontSize(112.0f);
     titleText_->SetColor({ 0.35f, 0.85f, 1.0f, 1.0f });
     titleLogoSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-    instructionText_->SetText("ENTER / SPACE : START");
+    instructionText_->SetText("ENTER / SPACE : START    C : CREDITS");
     instructionText_->SetColor({ 0.72f, 0.80f, 0.88f, 1.0f });
 
     transitionPage_ = std::make_unique<Sprite>();
@@ -512,9 +550,24 @@ bool ArchiveScene::HandleInput()
 
 	// タイトル画面の処理
     if (state_ == BookSelectState::TitleIdle) {
+		// Cキーでクレジットを表示する。
+        if (input->IsKeyTrigger(DIK_C)) {
+            SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.55f);
+            state_ = BookSelectState::Credits;
+            titleLogoSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 0.12f });
+            instructionText_->SetText("C / BACKSPACE : BACK");
+            return true;
+        }
 		// タイトル画面でEnterまたはSpaceが押されたら資料庫へ移行する。
         if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE)) {
             StartArchiveApproach();
+        }
+	// クレジット画面からタイトルへ戻る。
+    } else if (state_ == BookSelectState::Credits) {
+        if (input->IsKeyTrigger(DIK_C) || input->IsKeyTrigger(DIK_BACKSPACE)) {
+            SoundManager::GetInstance()->PlaySE(kBackSoundName, 0.55f);
+            EnterTitleMode();
+            return true;
         }
 		// タイトル画面でBackspaceが押されたらタイトル画面へ戻る。
     } else if (state_ == BookSelectState::Idle && input->IsKeyTrigger(DIK_BACKSPACE)) {
@@ -543,6 +596,9 @@ void ArchiveScene::UpdateCurrentState(float deltaTime)
     switch (state_) {
     case BookSelectState::TitleIdle:
 		// タイトル画面のIdle状態では、カメラを微妙に揺らす。
+        UpdateTitleIdle();
+        break;
+    case BookSelectState::Credits:
         UpdateTitleIdle();
         break;
     case BookSelectState::CameraApproach:
@@ -613,6 +669,9 @@ void ArchiveScene::UpdateSceneObjects()
     descriptionText_->Update();
     pageText_->Update();
     instructionText_->Update();
+    creditsBackgroundSprite_->Update();
+    creditsTitleText_->Update();
+    creditsBodyText_->Update();
 }
 
 void ArchiveScene::UpdateCameraApproach(float deltaTime)
@@ -1129,13 +1188,21 @@ void ArchiveScene::Draw2D()
 {
     SpriteManager::GetInstance()->PreDraw();
     titleLogoSprite_->Draw();
+    if (state_ == BookSelectState::Credits) {
+        creditsBackgroundSprite_->Draw();
+    }
     TextRenderer::GetInstance()->PreDraw();
     titleText_->Draw();
     if (state_ != BookSelectState::TitleIdle &&
+        state_ != BookSelectState::Credits &&
         state_ != BookSelectState::CameraApproach) {
         stageText_->Draw();
         descriptionText_->Draw();
         pageText_->Draw();
+    }
+    if (state_ == BookSelectState::Credits) {
+        creditsTitleText_->Draw();
+        creditsBodyText_->Draw();
     }
     instructionText_->Draw();
     pageReveal_.Draw();
@@ -1175,7 +1242,9 @@ void ArchiveScene::Draw3D()
             strip->Draw();
         }
     }
-    if (state_ != BookSelectState::CameraApproach && state_ != BookSelectState::TitleIdle) {
+    if (state_ != BookSelectState::CameraApproach &&
+        state_ != BookSelectState::TitleIdle &&
+        state_ != BookSelectState::Credits) {
         stageCardShadow_->Draw();
         stageCard_->Draw();
     }

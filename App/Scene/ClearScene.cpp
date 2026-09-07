@@ -13,6 +13,7 @@
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/Time/TimeManager.h"
 #include "Engine/math/MatrixMath.h"
+#include "PageTransition.h"
 #include "SceneManager.h"
 #include <algorithm>
 #include <cmath>
@@ -35,6 +36,8 @@ constexpr uint32_t kOpeningPageCount = 24;
 constexpr uint32_t kOpeningPageStripCount = 16;
 constexpr float kBookPageWidth = 4.45f;
 constexpr float kBookPageHeight = 5.05f;
+constexpr float kSlimeDrainDuration = 1.2f;
+constexpr float kArchiveTransitionDuration = 0.55f;
 
 enum class ArchiveMaterialMode : int32_t { Paper = 3, Leather = 4, Brass = 5 };
 
@@ -58,7 +61,11 @@ float SmoothStep(float value)
 
 void ClearScene::Initialize()
 {
-    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
+    SceneManager* sceneManager = SceneManager::GetInstance();
+    sceneManager->SetPostEffectType(PostEffectType::Copy);
+    sceneManager->SetSlimeScreenProgress(1.0f);
+    sceneManager->AddPostEffect(
+        PostEffectType::ClearSlimeRise, PostEffectStage::AfterParticle);
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
     camera_->LookAt({ 0.0f, 4.0f, -32.0f }, { 0.0f, -2.0f, 1.0f });
@@ -188,13 +195,20 @@ void ClearScene::Initialize()
     flashSprite_->SetSize({ 1280.0f, 720.0f });
     flashSprite_->SetColor({ 1.0f, 0.94f, 0.70f, 0.0f });
 
+    archiveTransitionFadeSprite_ = std::make_unique<Sprite>();
+    archiveTransitionFadeSprite_->Initialize(
+        SpriteManager::GetInstance(), kWhiteTexture);
+    archiveTransitionFadeSprite_->SetSize({ 1280.0f, 720.0f });
+    archiveTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+    archiveTransitionFadeSprite_->Update();
+
     titleText_ = std::make_unique<Text>();
     titleText_->Initialize(kDefaultFont);
     titleText_->SetText("STAGE CLEAR");
     titleText_->SetPosition({ 640.0f, 190.0f });
     titleText_->SetAnchorPoint({ 0.5f, 0.5f });
     titleText_->SetFontSize(64.0f);
-    titleText_->SetColor({ 1.0f, 0.88f, 0.28f, 0.0f });
+    titleText_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
     titleText_->SetOutlineColor({ 0.10f, 0.20f, 0.04f, 1.0f });
     titleText_->SetOutlineWidth(3.0f);
 
@@ -210,10 +224,14 @@ void ClearScene::Initialize()
     fireworkTimer_ = 0.0f;
     fireworkIndex_ = 0;
     meadowRevealed_ = false;
+    archiveTransitionTime_ = 0.0f;
+    archiveTransitionActive_ = false;
 }
 
 void ClearScene::Finalize()
 {
+    SceneManager::GetInstance()->RemovePostEffect(PostEffectType::ClearSlimeRise);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     EffectManager::GetInstance()->StopAllEffects();
     EffectManager::GetInstance()->SetCamera(nullptr);
     Object3dManager::GetInstance()->SetDefaultCamera(nullptr);
@@ -223,6 +241,16 @@ void ClearScene::Update()
 {
     const float dt = TimeManager::GetInstance()->GetDeltaTime();
     sceneTime_ += dt;
+    if (UpdateArchiveTransition(dt)) {
+        return;
+    }
+
+    const float drainProgress = SmoothStep(sceneTime_ / kSlimeDrainDuration);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(1.0f - drainProgress);
+    if (sceneTime_ >= kSlimeDrainDuration) {
+        SceneManager::GetInstance()->RemovePostEffect(
+            PostEffectType::ClearSlimeRise);
+    }
 
     const float approach = SmoothStep(sceneTime_ / 2.2f);
     if (!meadowRevealed_) {
@@ -261,13 +289,12 @@ void ClearScene::Update()
     if (sceneTime_ >= 5.0f) {
         Input* input = Input::GetInstance();
         if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE)) {
-            SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
-            return;
+            StartArchiveTransition();
         }
     }
 
     const float titleAlpha = SmoothStep((sceneTime_ - 4.35f) / 0.75f);
-    titleText_->SetColor({ 1.0f, 0.88f, 0.28f, titleAlpha });
+    titleText_->SetColor({ 0.0f, 0.0f, 0.0f, titleAlpha });
     instructionText_->SetColor({ 1.0f, 1.0f, 1.0f,
         SmoothStep((sceneTime_ - 5.0f) / 0.65f) });
     camera_->Update();
@@ -293,6 +320,10 @@ void ClearScene::Draw2D()
     TextRenderer::GetInstance()->PreDraw();
     titleText_->Draw();
     instructionText_->Draw();
+    if (archiveTransitionActive_) {
+        SpriteManager::GetInstance()->PreDraw();
+        archiveTransitionFadeSprite_->Draw();
+    }
 }
 
 void ClearScene::Draw3D()
@@ -333,6 +364,35 @@ void ClearScene::DrawParticle()
 
 void ClearScene::DrawImGui()
 {
+}
+
+void ClearScene::StartArchiveTransition()
+{
+    archiveTransitionActive_ = true;
+    archiveTransitionTime_ = 0.0f;
+}
+
+bool ClearScene::UpdateArchiveTransition(float deltaTime)
+{
+    if (!archiveTransitionActive_) {
+        return false;
+    }
+
+    archiveTransitionTime_ += deltaTime;
+    const float progress = std::clamp(
+        archiveTransitionTime_ / kArchiveTransitionDuration, 0.0f, 1.0f);
+    const float alpha = SmoothStep(progress);
+    archiveTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha });
+    archiveTransitionFadeSprite_->Update();
+
+    if (progress < 1.0f) {
+        return false;
+    }
+
+    PageTransition::RequestReveal(
+        { 0.0f, 0.0f, 0.0f, 1.0f }, kArchiveTransitionDuration);
+    SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
+    return true;
 }
 
 void ClearScene::InitializeArchiveBook()

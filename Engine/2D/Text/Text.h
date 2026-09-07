@@ -19,7 +19,7 @@ public:
     Text() = default;
     ~Text();
 
-    void Initialize(const std::string& fontPath);
+    void Initialize(const std::string& fontPath, bool highResolution = false);
     void Update();
     void Draw();
 

@@ -97,14 +97,14 @@ void GameOverScene::Initialize()
     slimeShower_->SpawnRain(60, { 0.0f, 8.0f, 1.5f }, 5.5f);
 
     titleText_ = std::make_unique<Text>();
-    titleText_->Initialize(kDefaultFont);
+    titleText_->Initialize(kDefaultFont, true); // Rasterize at 96px for the 60px title.
     titleText_->SetText("GAME OVER");
     titleText_->SetPosition({ 640.0f, 260.0f });
     titleText_->SetAnchorPoint({ 0.5f, 0.5f });
     titleText_->SetFontSize(60.0f);
     titleText_->SetColor({ 1.0f, 0.35f, 0.40f, 1.0f });
     titleText_->SetOutlineColor({ 0.08f, 0.0f, 0.01f, 1.0f });
-    titleText_->SetOutlineWidth(2.0f);
+    titleText_->SetOutlineWidth(4.0f); // Preserve the outline thickness with the 2x atlas.
 
     instructionText_ = std::make_unique<Text>();
     instructionText_->Initialize(kDefaultFont);

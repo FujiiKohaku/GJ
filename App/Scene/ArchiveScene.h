@@ -24,6 +24,7 @@ public:
 private:
     enum class BookSelectState {
         TitleIdle,
+        Credits,
         CameraApproach,
         CardOpening,
         Idle,
@@ -136,6 +137,9 @@ private:
     std::unique_ptr<Text> descriptionText_;
     std::unique_ptr<Text> pageText_;
     std::unique_ptr<Text> instructionText_;
+    std::unique_ptr<Text> creditsTitleText_;
+    std::unique_ptr<Text> creditsBodyText_;
+    std::unique_ptr<Sprite> creditsBackgroundSprite_;
     std::unique_ptr<Sprite> titleLogoSprite_;
     std::unique_ptr<Sprite> transitionPage_;
     PageTransition::RevealOverlay pageReveal_;

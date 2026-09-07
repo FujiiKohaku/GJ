@@ -105,6 +105,8 @@ void GameLabScene::Initialize()
     isSmokeEnabled_ = false;
     flameEffectHandles_.fill(kInvalidEffectHandle);
     isFlameEnabled_ = false;
+    explosionPreviewTimer_ = 2.0f;
+    autoExplosionEnabled_ = true;
 
     InitializePostEffectList();
 
@@ -197,6 +199,7 @@ void GameLabScene::Update()
     UpdatePostEffectPreviewParameters();
     UpdateSmokePreview();
     UpdateFlamePreview();
+    UpdateExplosionPreview(TimeManager::GetInstance()->GetDeltaTime());
     EffectManager::GetInstance()->Update();
     debugCameraController_.Update();
     debugCameraController_.SetDebugMode(true);
@@ -274,6 +277,24 @@ void GameLabScene::DrawImGui()
         camera_->LookAt(
             { flamePosition_.x + 3.0f, flamePosition_.y + 2.5f, flamePosition_.z - 6.0f },
             { flamePosition_.x, flamePosition_.y + 1.2f, flamePosition_.z });
+        camera_->Update();
+        debugCameraController_.SetTargetCamera(camera_.get());
+    }
+
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(1.0f, 0.48f, 0.10f, 1.0f), "--- EXPLOSION EFFECT ---");
+    ImGui::Checkbox("Auto Explosion", &autoExplosionEnabled_);
+    ImGui::DragFloat3("Explosion Position", &explosionPosition_.x, 0.05f, -20.0f, 20.0f);
+    if (ImGui::Button("PLAY EXPLOSION")) {
+        EffectManager::GetInstance()->PlayEffect("Explosion", explosionPosition_);
+        explosionPreviewTimer_ = 0.0f;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Focus Explosion")) {
+        camera_->LookAt(
+            { explosionPosition_.x + 3.5f, explosionPosition_.y + 2.2f,
+                explosionPosition_.z - 7.0f },
+            explosionPosition_);
         camera_->Update();
         debugCameraController_.SetTargetCamera(camera_.get());
     }
@@ -395,6 +416,23 @@ void GameLabScene::UpdateFlamePreview()
             handle = kInvalidEffectHandle;
         }
     }
+}
+
+void GameLabScene::UpdateExplosionPreview(float deltaTime)
+{
+    if (!autoExplosionEnabled_) {
+        explosionPreviewTimer_ = 0.0f;
+        return;
+    }
+
+    explosionPreviewTimer_ += deltaTime;
+    constexpr float kExplosionPreviewInterval = 2.0f;
+    if (explosionPreviewTimer_ < kExplosionPreviewInterval) {
+        return;
+    }
+
+    explosionPreviewTimer_ = 0.0f;
+    EffectManager::GetInstance()->PlayEffect("Explosion", explosionPosition_);
 }
 
 void GameLabScene::ApplyPostEffectToggle(PostEffectToggle& toggle)

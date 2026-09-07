@@ -11,6 +11,8 @@ const char* GetPostEffectTypeName(PostEffectType type)
         return "FantasyMenu";
     case PostEffectType::SlimeScreen:
         return "SlimeScreen";
+    case PostEffectType::ClearSlimeRise:
+        return "ClearSlimeRise";
     case PostEffectType::GrayScale:
         return "GrayScale";
     case PostEffectType::Vignette:

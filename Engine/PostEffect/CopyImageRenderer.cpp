@@ -225,6 +225,8 @@ const wchar_t* CopyImageRenderer::GetPixelShaderPath(PostEffectType type) const
         return L"resources/Shaders/PostEffect/FantasyMenu.PS.hlsl";
     case PostEffectType::SlimeScreen:
         return L"resources/Shaders/PostEffect/SlimeScreen.PS.hlsl";
+    case PostEffectType::ClearSlimeRise:
+        return L"resources/Shaders/PostEffect/ClearSlimeRise.PS.hlsl";
     case PostEffectType::Bloom:
         [[fallthrough]];
     case PostEffectType::Fog:

@@ -29,6 +29,9 @@ struct FontManager::FontEntry {
     std::vector<uint8_t> fontBytes;
     stbtt_fontinfo fontInfo {};
     float scale = 1.0f;
+    float basePixelHeight = kBasePixelHeight;
+    uint32_t cellSize = kCellSize;
+    uint32_t cellPadding = kCellPadding;
     float ascent = 0.0f;
     float lineHeight = kBasePixelHeight;
     std::vector<uint8_t> atlasAlpha;
@@ -59,9 +62,10 @@ FontManager::FontManager(ConstructorKey)
 
 FontManager::~FontManager() = default;
 
-FontHandle FontManager::LoadFont(const std::string& fontPath)
+FontHandle FontManager::LoadFont(const std::string& fontPath, bool highResolution)
 {
-    const std::string cacheKey = NormalizePath(fontPath);
+    const std::string cacheKey = NormalizePath(fontPath) +
+        (highResolution ? "#96px" : "#48px");
     std::unordered_map<std::string, FontHandle>::const_iterator cached =
         pathCache_.find(cacheKey);
     if (cached != pathCache_.end()) {
@@ -85,6 +89,11 @@ FontHandle FontManager::LoadFont(const std::string& fontPath)
 
     std::unique_ptr<FontEntry> entry = std::make_unique<FontEntry>();
     entry->sourcePath = fontPath;
+    if (highResolution) {
+        entry->basePixelHeight *= 2.0f;
+        entry->cellSize *= 2;
+        entry->cellPadding *= 2;
+    }
     entry->textureKey = "__font_atlas__/" + cacheKey;
     entry->fontBytes.resize(static_cast<size_t>(fileSize));
     if (!file.read(
@@ -103,7 +112,7 @@ FontHandle FontManager::LoadFont(const std::string& fontPath)
         throw std::runtime_error(message);
     }
 
-    entry->scale = stbtt_ScaleForPixelHeight(&entry->fontInfo, kBasePixelHeight);
+    entry->scale = stbtt_ScaleForPixelHeight(&entry->fontInfo, entry->basePixelHeight);
     int ascent = 0;
     int descent = 0;
     int lineGap = 0;
@@ -183,8 +192,7 @@ float FontManager::GetKerning(FontHandle handle, uint32_t left, uint32_t right) 
 
 float FontManager::GetBasePixelHeight(FontHandle handle) const
 {
-    GetEntry(handle);
-    return kBasePixelHeight;
+    return GetEntry(handle).basePixelHeight;
 }
 
 float FontManager::GetAscent(FontHandle handle) const
@@ -237,8 +245,8 @@ bool FontManager::AddGlyph(FontEntry& entry, uint32_t codepoint)
         return false;
     }
 
-    const uint32_t cellsPerRow = kAtlasWidth / kCellSize;
-    const uint32_t cellCapacity = cellsPerRow * (kAtlasHeight / kCellSize);
+    const uint32_t cellsPerRow = kAtlasWidth / entry.cellSize;
+    const uint32_t cellCapacity = cellsPerRow * (kAtlasHeight / entry.cellSize);
     if (entry.nextCell >= cellCapacity) {
         const std::string message =
             "Font atlas is full: " + entry.sourcePath;
@@ -260,7 +268,7 @@ bool FontManager::AddGlyph(FontEntry& entry, uint32_t codepoint)
         &xOffset,
         &yOffset);
 
-    const int usableCellSize = static_cast<int>(kCellSize - kCellPadding * 2);
+    const int usableCellSize = static_cast<int>(entry.cellSize - entry.cellPadding * 2);
     if (width > usableCellSize || height > usableCellSize) {
         if (bitmap != nullptr) {
             stbtt_FreeBitmap(bitmap, nullptr);
@@ -274,8 +282,8 @@ bool FontManager::AddGlyph(FontEntry& entry, uint32_t codepoint)
 
     const uint32_t cellX = entry.nextCell % cellsPerRow;
     const uint32_t cellY = entry.nextCell / cellsPerRow;
-    const uint32_t destinationX = cellX * kCellSize + kCellPadding;
-    const uint32_t destinationY = cellY * kCellSize + kCellPadding;
+    const uint32_t destinationX = cellX * entry.cellSize + entry.cellPadding;
+    const uint32_t destinationY = cellY * entry.cellSize + entry.cellPadding;
 
     if (bitmap != nullptr) {
         for (int row = 0; row < height; ++row) {
@@ -302,12 +310,12 @@ bool FontManager::AddGlyph(FontEntry& entry, uint32_t codepoint)
 
     FontGlyph glyph;
     if (width > 0 && height > 0) {
-        const uint32_t paddedLeft = destinationX - kCellPadding;
-        const uint32_t paddedTop = destinationY - kCellPadding;
+        const uint32_t paddedLeft = destinationX - entry.cellPadding;
+        const uint32_t paddedTop = destinationY - entry.cellPadding;
         const uint32_t paddedRight =
-            destinationX + static_cast<uint32_t>(width) + kCellPadding;
+            destinationX + static_cast<uint32_t>(width) + entry.cellPadding;
         const uint32_t paddedBottom =
-            destinationY + static_cast<uint32_t>(height) + kCellPadding;
+            destinationY + static_cast<uint32_t>(height) + entry.cellPadding;
         glyph.uvMin = {
             static_cast<float>(paddedLeft) / static_cast<float>(kAtlasWidth),
             static_cast<float>(paddedTop) / static_cast<float>(kAtlasHeight)
@@ -317,12 +325,12 @@ bool FontManager::AddGlyph(FontEntry& entry, uint32_t codepoint)
             static_cast<float>(paddedBottom) / static_cast<float>(kAtlasHeight)
         };
         glyph.size = {
-            static_cast<float>(width + static_cast<int>(kCellPadding * 2)),
-            static_cast<float>(height + static_cast<int>(kCellPadding * 2))
+            static_cast<float>(width + static_cast<int>(entry.cellPadding * 2)),
+            static_cast<float>(height + static_cast<int>(entry.cellPadding * 2))
         };
         glyph.bearing = {
-            static_cast<float>(xOffset - static_cast<int>(kCellPadding)),
-            static_cast<float>(yOffset - static_cast<int>(kCellPadding))
+            static_cast<float>(xOffset - static_cast<int>(entry.cellPadding)),
+            static_cast<float>(yOffset - static_cast<int>(entry.cellPadding))
         };
     }
     glyph.advance = static_cast<float>(advanceWidth) * entry.scale;
