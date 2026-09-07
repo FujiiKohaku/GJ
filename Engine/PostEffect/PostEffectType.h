@@ -52,6 +52,7 @@ enum class PostEffectType {
     ArchiveAtmosphere,
     FantasyMenu,
     SlimeScreen,
+    ClearSlimeRise,
 };
 
 const char* GetPostEffectTypeName(PostEffectType type);

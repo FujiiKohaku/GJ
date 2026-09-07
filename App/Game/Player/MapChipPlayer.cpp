@@ -1,9 +1,6 @@
 #include "MapChipPlayer.h"
 #include "App/Game/Gimmick/BaseMapChipGimmick.h"
 #include "Engine/Logger/Logger.h"
-#include "App/Scene/SceneManager.h"
-#include "App/Scene/ArchiveScene.h"
-#include "App/Scene/ClearScene.h"
 
 #include "App/Game/Map/MapChipField.h"
 #include "Engine/3D/Object3d.h"
@@ -85,6 +82,7 @@ void MapChipPlayer::Initialize(const MapChipField* mapChipField, const Vector3& 
     isShapingSelfDestruct_ = false;
     hardenedBodyReady_ = false;
     deathRequested_ = false;
+    goalReached_ = false;
     baseGimmick_ = nullptr;
     isCrushed_ = false;
     isGrounded_ = false;
@@ -441,7 +439,7 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
                 CollisionManager::Intersect(playerBox, gimmick->GetAABB());
             if (goalHit.isHit) {
                 Logger::Log("Goal reached\n");
-                SceneManager::GetInstance()->SetNextScene(std::make_unique<ClearScene>());
+                goalReached_ = true;
                 return true;
             }
         }
@@ -477,6 +475,13 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
     }
     
     return resolved;
+}
+
+bool MapChipPlayer::ConsumeGoalReached()
+{
+    if (!goalReached_) return false;
+    goalReached_ = false;
+    return true;
 }
 
 const Vector3& MapChipPlayer::GetVelocity() const { return velocity_; }

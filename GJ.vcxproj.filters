@@ -168,6 +168,9 @@
     <None Include="resources\Shaders\PostEffect\CyberScanline.PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="App\Game\Gimmick\CheckpointGimmick.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="App\main.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

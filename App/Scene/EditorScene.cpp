@@ -32,6 +32,9 @@
 #include <thread>
 #include <cstdlib>
 #include <cmath>
+#include <filesystem>
+#include <format>
+#include <vector>
 #include "Engine/Debug/DebugRenderer.h"
 #include "Engine/DirectXCommon/DirectXCommon.h"
 #include <windows.h>
@@ -44,6 +47,88 @@ namespace {
     // エディタ専用の巨大キャンバスサイズ
     constexpr uint32_t kEditorCanvasWidth = 256;
     constexpr uint32_t kEditorCanvasHeight = 64;
+
+    std::string FindInstalledPythonw()
+    {
+        const auto findInDirectory = [](const std::filesystem::path& root) {
+            std::filesystem::path newestPythonw;
+            std::error_code error;
+            for (const auto& entry : std::filesystem::directory_iterator(root, error)) {
+                if (error || !entry.is_directory()) {
+                    continue;
+                }
+                const std::filesystem::path candidate = entry.path() / "pythonw.exe";
+                if (std::filesystem::is_regular_file(candidate, error) &&
+                    (newestPythonw.empty() || candidate.string() > newestPythonw.string())) {
+                    newestPythonw = candidate;
+                }
+            }
+            return newestPythonw;
+        };
+
+        char localAppData[MAX_PATH] {};
+        const DWORD length = GetEnvironmentVariableA(
+            "LOCALAPPDATA", localAppData, MAX_PATH);
+        if (length > 0 && length < MAX_PATH) {
+            const std::filesystem::path pythonRoot =
+                std::filesystem::path(localAppData) / "Programs" / "Python";
+            const std::filesystem::path candidate = findInDirectory(pythonRoot);
+            if (!candidate.empty()) {
+                return candidate.string();
+            }
+        }
+
+        // 「全ユーザー向けにインストール」を選んだPythonは Program Files 配下になる。
+        char programFiles[MAX_PATH] {};
+        const DWORD programFilesLength = GetEnvironmentVariableA(
+            "ProgramFiles", programFiles, MAX_PATH);
+        if (programFilesLength > 0 && programFilesLength < MAX_PATH) {
+            const std::filesystem::path candidate = findInDirectory(programFiles);
+            if (!candidate.empty()) {
+                return candidate.string();
+            }
+        }
+
+        // インストール先を変更した場合にも対応するため、Windowsへ登録されたPythonを最後に調べる。
+        constexpr const char* kPythonCoreKey = "SOFTWARE\\Python\\PythonCore";
+        for (HKEY registryRoot : { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE }) {
+            HKEY coreKey = nullptr;
+            if (RegOpenKeyExA(registryRoot, kPythonCoreKey, 0, KEY_READ, &coreKey) != ERROR_SUCCESS) {
+                continue;
+            }
+            for (DWORD index = 0;; ++index) {
+                char versionName[128] {};
+                DWORD versionNameLength = static_cast<DWORD>(sizeof(versionName));
+                if (RegEnumKeyExA(coreKey, index, versionName, &versionNameLength,
+                        nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS) {
+                    break;
+                }
+                const std::string installKeyPath =
+                    std::string(kPythonCoreKey) + "\\" + versionName + "\\InstallPath";
+                HKEY installKey = nullptr;
+                if (RegOpenKeyExA(registryRoot, installKeyPath.c_str(), 0, KEY_READ, &installKey) != ERROR_SUCCESS) {
+                    continue;
+                }
+                char installPath[MAX_PATH] {};
+                DWORD installPathLength = sizeof(installPath);
+                const LSTATUS queryResult = RegQueryValueExA(
+                    installKey, nullptr, nullptr, nullptr,
+                    reinterpret_cast<LPBYTE>(installPath), &installPathLength);
+                RegCloseKey(installKey);
+                if (queryResult == ERROR_SUCCESS) {
+                    const std::filesystem::path candidate =
+                        std::filesystem::path(installPath) / "pythonw.exe";
+                    std::error_code error;
+                    if (std::filesystem::is_regular_file(candidate, error)) {
+                        RegCloseKey(coreKey);
+                        return candidate.string();
+                    }
+                }
+            }
+            RegCloseKey(coreKey);
+        }
+        return {};
+    }
 
     // ロードしたマップデータを巨大キャンバスに左下基準で拡張する
     LevelData::TileMapData ExpandTileMapData(const LevelData::TileMapData& src, uint32_t targetWidth, uint32_t targetHeight) {
@@ -176,19 +261,37 @@ void EditorScene::Initialize()
         Logger::Log("Failed to initialize UdpServer\n");
     }
 
-    // Python ツールの自動起動 (プロセスを管理して終了時にKillするため CreateProcessA を使用)
+    // Python ツールの自動起動。IDEを再起動していなくても動くように、
+    // PATHではなくユーザーの標準Pythonインストール先のpythonw.exeを優先する。
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
+    si.wShowWindow = SW_SHOWNORMAL;
     ZeroMemory(&pi, sizeof(pi));
 
-    char cmd[] = "pythonw Tools/editor_tool.py";
-    if (CreateProcessA(nullptr, cmd, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+    const std::string pythonw = FindInstalledPythonw();
+    if (pythonw.empty()) {
+        Logger::Log("Map Editor tool: pythonw.exe was not found under LOCALAPPDATA.\n");
+    } else {
+        Logger::Log("Map Editor tool Python: " + pythonw + "\n");
+    }
+    const std::string command = pythonw.empty()
+        ? "py -3 Tools\\editor_tool.py"
+        : "\"" + pythonw + "\" Tools\\editor_tool.py";
+    std::vector<char> launcherCommand(command.begin(), command.end());
+    launcherCommand.push_back('\0');
+    if (CreateProcessA(nullptr, launcherCommand.data(), nullptr, nullptr, FALSE,
+            CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
         toolProcessHandle_ = pi.hProcess;
         CloseHandle(pi.hThread);
+        Logger::Log("Map Editor tool started.\n");
+    } else {
+        const DWORD error = GetLastError();
+        Logger::Log(std::format(
+            "Failed to start Map Editor tool. Win32 error={} command={}\n",
+            error, command));
     }
 
     // 初期状態を履歴に保存
@@ -767,6 +870,32 @@ void EditorScene::UpdateRaycastEdit()
                             mapChipStage_.ApplyMaterialProperties();
                             
                             hasUnsavedChanges_ = true;
+                        }
+                        // Checkpoint は複数配置できる独立オブジェクト。タイルは消費しない。
+                        else if (currentPalette_ == 15 && isLeftClick) {
+                            const auto checkpointIt = std::find_if(
+                                currentLevelData_.objects.begin(), currentLevelData_.objects.end(),
+                                [snapX, snapY](const LevelData::ObjectData& o) {
+                                    return o.type == "Checkpoint" &&
+                                        std::abs(o.translation.x - snapX) < 0.1f &&
+                                        std::abs(o.translation.y - snapY) < 0.1f;
+                                });
+                            if (checkpointIt == currentLevelData_.objects.end()) {
+                                LevelData::ObjectData newData;
+                                newData.name = "Checkpoint";
+                                newData.type = "Checkpoint";
+                                newData.translation = newPos;
+                                newData.rotation = { 0, 0, 0 };
+                                newData.scale = { 1, 1, 1 };
+                                if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("Checkpoint")) {
+                                    newData.fileName = metaData->defaultModelPath;
+                                }
+                                currentLevelData_.objects.push_back(std::move(newData));
+                                DirectXCommon::GetInstance()->WaitForGPU();
+                                mapChipStage_.Initialize(currentLevelData_);
+                                mapChipStage_.ApplyMaterialProperties();
+                                hasUnsavedChanges_ = true;
+                            }
                         }
                         // 通常のブロック配置・削除（ドラッグ中でない場合のみ）
                         else if (!isDraggingPlayer_ && !isDraggingGoal_) {

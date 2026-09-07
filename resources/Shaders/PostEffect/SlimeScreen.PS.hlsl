@@ -20,10 +20,10 @@ float Hash(float value)
 
 float3 RandomSlimeColor(uint index)
 {
-    float hue = Hash(float(index) * 2.17f + paintSeed * 13.31f);
-    float3 rgb = saturate(abs(frac(hue + float3(0.0f, 0.6667f, 0.3333f)) * 6.0f - 3.0f) - 1.0f);
-    rgb = rgb * rgb * (3.0f - 2.0f * rgb);
-    return lerp(float3(1.0f, 1.0f, 1.0f), rgb, 0.78f) * 0.92f;
+    const float shade = Hash(float(index) * 2.17f + paintSeed * 13.31f);
+    const float3 deepSlimeBlue = float3(0.025f, 0.12f, 0.32f);
+    const float3 brightSlimeBlue = float3(0.10f, 0.62f, 0.88f);
+    return lerp(deepSlimeBlue, brightSlimeBlue, 0.38f + shade * 0.30f);
 }
 
 float SlimeSplat(float2 uv, uint index, float growth)
