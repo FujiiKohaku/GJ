@@ -132,7 +132,7 @@ void WinApp::initialize()
     // ウィンドウ生成
     hwnd_ = CreateWindow(
         wc_.lpszClassName, // クラス名
-        L"死因:最適解", // タイトル
+        L"死因：最適解", // タイトル
         kWindowStyle, // スタイル
         CW_USEDEFAULT, CW_USEDEFAULT, // 位置（自動）
         wrc.right - wrc.left, // 幅
