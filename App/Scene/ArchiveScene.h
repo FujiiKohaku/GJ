@@ -60,12 +60,11 @@ private:
     enum class StageDestination {
         GamePlay,
         Test,
-        GameLab,
     };
-
     struct StageData {
         std::string name;
         std::string description;
+        std::string levelPath;
         StageDestination destination = StageDestination::GamePlay;
     };
 

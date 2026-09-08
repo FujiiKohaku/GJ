@@ -165,6 +165,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   <ItemGroup>
     <ClCompile Include="App\Game\Gimmick\GoalGimmick.cpp" />
     <ClCompile Include="App\Game\Gimmick\CheckpointGimmick.cpp" />
+    <ClCompile Include="App\Game\Gimmick\CrumblingFloorGimmick.cpp" />
+    <ClCompile Include="App\Game\Gimmick\SpringGimmick.cpp" />
     <ClCompile Include="App\Game\Gimmick\HardenedFluidSlimeCorpse.cpp" />
     <ClCompile Include="App\Game\Gimmick\Trap\SpikeGimmick.cpp" />
     <ClCompile Include="App\Game\Gimmick\Trap\SpikeParam.cpp" />
@@ -182,6 +184,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="App\Game\Gimmick\Interaction\DestructibleWallGimmick.cpp" />
     <ClCompile Include="Engine\Event\EventDispatcher.cpp" />
     <ClInclude Include="App\Game\Gimmick\GoalGimmick.h" />
+    <ClInclude Include="App\Game\Gimmick\CrumblingFloorGimmick.h" />
+    <ClInclude Include="App\Game\Gimmick\SpringGimmick.h" />
     <ClInclude Include="App\Game\Gimmick\Trap\SpikeGimmick.h" />
     <ClInclude Include="App\Game\Gimmick\Trap\SpikeParam.h" />
     <ClInclude Include="App\Game\Gimmick\Trap\LaserGimmick.h" />
@@ -199,7 +203,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="App\Scene\EditorScene.cpp" />
     <ClCompile Include="App\Scene\ArchiveScene.cpp" />
     <ClCompile Include="App\Scene\GamePlayScene.cpp" />
-    <ClCompile Include="App\Scene\GameLabScene.cpp" />
     <ClCompile Include="App\Game\Background\RuinsBackground.cpp" />
     <ClCompile Include="App\Effect\DeathSlimeShower.cpp" />
     <ClCompile Include="App\Game\Map\MapChipField.cpp" />
@@ -443,7 +446,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="App\Scene\ArchiveScene.h" />
     <ClInclude Include="App\Scene\PageTransition.h" />
     <ClInclude Include="App\Scene\GamePlayScene.h" />
-    <ClInclude Include="App\Scene\GameLabScene.h" />
     <ClInclude Include="App\Game\Background\RuinsBackground.h" />
     <ClInclude Include="App\Effect\DeathSlimeShower.h" />
     <ClInclude Include="App\Game\Map\MapChipField.h" />

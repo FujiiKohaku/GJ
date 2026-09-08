@@ -242,6 +242,17 @@ bool MapChipPlayer::ConsumeHardenedBody(AABB& outBody)
     return true;
 }
 
+void MapChipPlayer::LaunchUpward(float speed)
+{
+    if (speed <= 0.0f) {
+        return;
+    }
+    velocity_.y = speed;
+    isGrounded_ = false;
+    baseGimmick_ = nullptr;
+    landSquash_ = (std::max)(landSquash_, 0.55f);
+}
+
 bool MapChipPlayer::ConsumeJustDied()
 {
     if (justDied_) {
@@ -479,6 +490,7 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
                 if (hit.normal.y < 0.0f && velocity_.y <= 0.0f) {
                     isGrounded_ = true;
                     baseGimmick_ = gimmick;
+                    gimmick->OnPlayerStepped();
                 } else if (hit.normal.y > 0.0f) {
                     ceilingSquash_ = (std::max)(ceilingSquash_, 0.35f);
                 }

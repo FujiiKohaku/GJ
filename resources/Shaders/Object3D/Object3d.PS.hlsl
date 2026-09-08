@@ -359,6 +359,55 @@ float DestructibleWallCrack(float3 localPosition, float3 normal)
     return 1.0f - smoothstep(0.003f, 0.007f + antialiasWidth, distanceToCrack);
 }
 
+float3 CrumblingRockColor(float3 localPosition, float3 normal, float seed)
+{
+    float3 faceNormal = abs(normal);
+    float2 facePosition = localPosition.xy;
+    if (faceNormal.y >= faceNormal.x && faceNormal.y >= faceNormal.z) {
+        facePosition = localPosition.xz;
+    } else if (faceNormal.x > faceNormal.z) {
+        facePosition = localPosition.zy;
+    }
+
+    float2 uv = facePosition + 0.5f;
+    float broad = TerrainNoise(floor((uv + seed * 0.013f) * 9.0f) + seed);
+    float grain = TerrainNoise(floor((uv + seed * 0.021f) * 42.0f) + seed * 2.7f);
+    float3 rock = lerp(float3(0.20f, 0.18f, 0.15f),
+        float3(0.48f, 0.43f, 0.34f), broad);
+    rock *= 0.82f + floor(grain * 5.0f) * 0.075f;
+
+    float2 patternPosition = uv * 2.8f;
+    float2 patternCell = floor(patternPosition);
+    float2 patternLocal = frac(patternPosition);
+    float cellNoise = TerrainNoise(patternCell + seed + 33.4f);
+    float horizontalFracture = abs(patternLocal.y -
+        (0.22f + cellNoise * 0.52f + sin((patternLocal.x + cellNoise) * 7.0f) * 0.08f));
+    float verticalFracture = abs(patternLocal.x -
+        (0.18f + cellNoise * 0.58f + sin((patternLocal.y + cellNoise) * 6.0f) * 0.07f));
+    float fractureDistance = horizontalFracture;
+    float verticalEnabled = step(0.44f,
+        TerrainNoise(patternCell * 3.17f + seed + 81.6f));
+    if (verticalEnabled > 0.0f) {
+        fractureDistance = min(fractureDistance, verticalFracture);
+    }
+    float fractureWidth = max(fwidth(fractureDistance), 0.004f);
+    float fracture = 1.0f - smoothstep(0.018f,
+        0.042f + fractureWidth, fractureDistance);
+
+    float edgeDistance = min(min(uv.x, 1.0f - uv.x),
+        min(uv.y, 1.0f - uv.y));
+    float edgeNoise = TerrainNoise(floor(uv * 31.0f) + seed * 4.1f);
+    float damagedEdge = 1.0f - smoothstep(
+        0.018f + edgeNoise * 0.025f,
+        0.055f + edgeNoise * 0.040f,
+        edgeDistance);
+    float pitNoise = TerrainNoise(floor(uv * 54.0f) + seed * 5.3f);
+    float pits = smoothstep(0.87f, 0.97f, pitNoise);
+
+    float damage = saturate(fracture * 0.88f + damagedEdge * 0.62f + pits * 0.36f);
+    return lerp(rock, float3(0.075f, 0.065f, 0.052f), damage);
+}
+
 float3 ApplyRuinsFog(float3 color, float3 worldPosition)
 {
     // Background-only depth fog: foreground grass remains clear while distant
@@ -475,6 +524,16 @@ PixelShaderOutput main(VertexShaderOutput input)
             textureColor.rgb * float3(0.30f, 0.32f, 0.34f), crack * 0.72f);
         output.color = float4(
             gMaterial.color.rgb * crackedTexture *
+                ToonIllumination(normal, input.worldPosition),
+            gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 17)
+    {
+        float3 normal = normalize(input.normal);
+        float3 rock = CrumblingRockColor(
+            input.localPosition, normal, gMaterial.environmentCoefficient);
+        output.color = float4(
+            gMaterial.color.rgb * rock *
                 ToonIllumination(normal, input.worldPosition),
             gMaterial.color.a * textureColor.a);
     }
@@ -599,7 +658,8 @@ PixelShaderOutput main(VertexShaderOutput input)
         gMaterial.enableLighting != 9 && gMaterial.enableLighting != 10 &&
         gMaterial.enableLighting != 11 && gMaterial.enableLighting != 12 &&
         gMaterial.enableLighting != 13 && gMaterial.enableLighting != 14 &&
-        gMaterial.enableLighting != 15 && gMaterial.enableLighting != 16)
+        gMaterial.enableLighting != 15 && gMaterial.enableLighting != 16 &&
+        gMaterial.enableLighting != 17)
     {
         float3 N = normalize(input.normal);
         float3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);

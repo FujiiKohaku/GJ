@@ -41,8 +41,9 @@ constexpr Vector3 kSlimeRenderForward = {0.0f, 0.0f, 1.0f};
 constexpr float kMenuButtonX = 440.0f;
 constexpr float kMenuButtonWidth = 400.0f;
 constexpr float kMenuButtonHeight = 58.0f;
-constexpr float kMenuResumeY = 325.0f;
-constexpr float kMenuStageSelectY = 405.0f;
+constexpr float kMenuResumeY = 300.0f;
+constexpr float kMenuRestartY = 380.0f;
+constexpr float kMenuStageSelectY = 460.0f;
 constexpr float kStageSelectFadeDuration = 0.45f;
 constexpr float kFantasyMenuBlendDuration = 0.20f;
 struct Stage1TutorialStep {
@@ -421,6 +422,7 @@ void GamePlayScene::Initialize() {
     return button;
   };
   menuResumeButtonSprite_ = createMenuButton(kMenuResumeY);
+  menuRestartButtonSprite_ = createMenuButton(kMenuRestartY);
   menuStageSelectButtonSprite_ = createMenuButton(kMenuStageSelectY);
 
   // メニュータイトル
@@ -443,6 +445,7 @@ void GamePlayScene::Initialize() {
     return text;
   };
   menuResumeText_ = createMenuText("RESUME GAME  [TAB]", kMenuResumeY);
+  menuRestartText_ = createMenuText("RETRY STAGE  [R]", kMenuRestartY);
   menuStageSelectText_ =
       createMenuText("STAGE SELECT  [BACKSPACE]", kMenuStageSelectY);
 
@@ -503,7 +506,7 @@ void GamePlayScene::Update() {
     if (!isClearCelebrationActive_) return;
   }
 
-  if (!isClearCelebrationActive_ && input->IsKeyTrigger(DIK_R)) {
+  if (!isClearCelebrationActive_ && !isMenuOpen_ && input->IsKeyTrigger(DIK_R)) {
     ResetToLastRespawnPoint();
     return;
   }
@@ -522,6 +525,7 @@ void GamePlayScene::Update() {
   if (isMenuOpen_) {
     const Vector2 mousePosition = input->GetMousePosition();
     const bool resumeHovered = IsPointInMenuButton(mousePosition, kMenuResumeY);
+    const bool restartHovered = IsPointInMenuButton(mousePosition, kMenuRestartY);
     const bool stageSelectHovered =
         IsPointInMenuButton(mousePosition, kMenuStageSelectY);
     const bool clicked = input->IsMouseTrigger(0);
@@ -529,12 +533,20 @@ void GamePlayScene::Update() {
     menuResumeButtonSprite_->SetColor(resumeHovered
                                           ? Vector4{0.25f, 0.48f, 0.34f, 1.0f}
                                           : Vector4{0.15f, 0.25f, 0.22f, 1.0f});
+    menuRestartButtonSprite_->SetColor(
+        restartHovered ? Vector4{0.30f, 0.38f, 0.54f, 1.0f}
+                       : Vector4{0.17f, 0.21f, 0.30f, 1.0f});
     menuStageSelectButtonSprite_->SetColor(
         stageSelectHovered ? Vector4{0.30f, 0.38f, 0.54f, 1.0f}
                            : Vector4{0.17f, 0.21f, 0.30f, 1.0f});
 
     if (clicked && resumeHovered) {
       isMenuOpen_ = false;
+      return;
+    }
+    if (input->IsKeyTrigger(DIK_R) || (clicked && restartHovered)) {
+      SceneManager::GetInstance()->SetNextScene(
+          std::make_unique<GamePlayScene>(levelPath_));
       return;
     }
     if (input->IsKeyTrigger(DIK_BACKSPACE) || (clicked && stageSelectHovered)) {
@@ -545,9 +557,11 @@ void GamePlayScene::Update() {
     menuBackgroundSprite_->Update();
     menuPanelSprite_->Update();
     menuResumeButtonSprite_->Update();
+    menuRestartButtonSprite_->Update();
     menuStageSelectButtonSprite_->Update();
     menuTitleText_->Update();
     menuResumeText_->Update();
+    menuRestartText_->Update();
     menuStageSelectText_->Update();
     return;
   }
@@ -569,6 +583,20 @@ void GamePlayScene::Update() {
       .Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
   ruinsBackground_.Update();
   bool hardenedThisFrame = false;
+  // 形状調整用のスロー中は、トラップ接触や落下などによる死亡を無効にする。
+  const bool isSlowMotion = TimeManager::GetInstance()->GetTimeScale() < 0.999f;
+  // Trap gimmicks continue updating while the life relay is playing. Consume
+  // their requests so a laser touching the departed player cannot spend more
+  // lives during the respawn animation.
+  const bool deathRequested = player_->ConsumeJustDied();
+  if (!isClearCelebrationActive_ && !isLifeRelayActive_ && deathRequested) {
+    if (!isSlowMotion) {
+      LoseLife();
+      if (isDeathTransitionActive_)
+        return;
+      hardenedThisFrame = true;
+    }
+  }
 
   // player_->Update(mapChipStage_.GetGimmicks());
     if (!isClearCelebrationActive_ && !hardenedThisFrame &&
@@ -828,11 +856,13 @@ void GamePlayScene::Draw2D() {
     menuBackgroundSprite_->Draw();
     menuPanelSprite_->Draw();
     menuResumeButtonSprite_->Draw();
+    menuRestartButtonSprite_->Draw();
     menuStageSelectButtonSprite_->Draw();
 
     TextRenderer::GetInstance()->PreDraw();
     menuTitleText_->Draw();
     menuResumeText_->Draw();
+    menuRestartText_->Draw();
     menuStageSelectText_->Draw();
   }
   if (isStageSelectTransitionActive_) {
@@ -1019,8 +1049,7 @@ void GamePlayScene::UpdateClearCelebration(float unscaledDeltaTime) {
 void GamePlayScene::UpdateLivesText() {
   if (!livesText_)
     return;
-  const float width = static_cast<float>(
-      (std::max)(WinApp::GetInstance()->GetClientWidth(), 1));
+  const float width = static_cast<float>(WinApp::GetInstance()->GetRenderWidth());
   livesText_->SetPosition({width - 32.0f, 108.0f});
   livesText_->SetText("残機 × " + std::to_string(remainingLives_));
   livesText_->SetColor(remainingLives_ <= 2

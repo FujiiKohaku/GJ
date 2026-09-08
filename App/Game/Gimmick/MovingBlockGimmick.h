@@ -4,6 +4,8 @@
 #include "Engine/3D/Object3d.h"
 #include <memory>
 
+class MapChipStage;
+
 class MovingBlockGimmick : public BaseMapChipGimmick {
 public:
     bool Initialize(
@@ -14,6 +16,7 @@ public:
     void Draw() override;
     void EnableToonLighting() override;
     void SetEditorMode(bool isEditorMode) override { isEditorMode_ = isEditorMode; }
+    void SetStage(MapChipStage* stage) override { stage_ = stage; }
     
     AABB GetAABB() const override;
     Vector3 GetDeltaPosition() const override;
@@ -25,7 +28,10 @@ private:
     Vector3 basePosition_ = { 0.0f, 0.0f, 0.0f };
     Vector3 currentPosition_ = { 0.0f, 0.0f, 0.0f };
     Vector3 previousPosition_ = { 0.0f, 0.0f, 0.0f };
-    float elapsedTime_ = 0.0f;
+    MapChipStage* stage_ = nullptr;
+    float phase_ = 0.0f;
+    float phaseDir_ = 1.0f;
+    bool isOverlappingCorpse_ = false;
     
     // ギミックパラメータ
     float speed_ = 2.0f;

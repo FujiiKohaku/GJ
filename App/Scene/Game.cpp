@@ -186,6 +186,18 @@ void Game::Update()
 
     Input::GetInstance()->Update();
 
+    if (Input::GetInstance()->IsKeyTrigger(DIK_F11)) {
+        WinApp* winApp = WinApp::GetInstance();
+        if (winApp->ToggleFullscreen()) {
+            DirectXCommon::GetInstance()->ResizeSwapChain(
+                static_cast<uint32_t>((std::max)(winApp->GetClientWidth(), 1)),
+                static_cast<uint32_t>((std::max)(winApp->GetClientHeight(), 1)));
+            if (!isMouseCursorVisible_) {
+                LockCursorToWindow();
+            }
+        }
+    }
+
     if (Input::GetInstance()->IsKeyTrigger(DIK_F2)) {
 
         isMouseCursorVisible_ = !isMouseCursorVisible_;

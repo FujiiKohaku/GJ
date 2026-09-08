@@ -103,6 +103,58 @@ int32_t WinApp::GetClientHeight() const
     return clientRect.bottom - clientRect.top;
 }
 
+bool WinApp::ToggleFullscreen()
+{
+    if (hwnd_ == nullptr) {
+        return false;
+    }
+
+    if (!isFullscreen_) {
+        windowedStyle_ = static_cast<DWORD>(GetWindowLongPtr(hwnd_, GWL_STYLE));
+        windowedExStyle_ = static_cast<DWORD>(GetWindowLongPtr(hwnd_, GWL_EXSTYLE));
+        windowedPlacement_.length = sizeof(WINDOWPLACEMENT);
+        if (!GetWindowPlacement(hwnd_, &windowedPlacement_)) {
+            return false;
+        }
+
+        MONITORINFO monitorInfo { sizeof(MONITORINFO) };
+        if (!GetMonitorInfo(
+                MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST),
+                &monitorInfo)) {
+            return false;
+        }
+
+        SetWindowLongPtr(hwnd_, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+        SetWindowLongPtr(
+            hwnd_, GWL_EXSTYLE,
+            windowedExStyle_ &
+                ~(WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_DLGMODALFRAME));
+        if (!SetWindowPos(
+                hwnd_, HWND_TOP,
+                monitorInfo.rcMonitor.left,
+                monitorInfo.rcMonitor.top,
+                monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
+                monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top,
+                SWP_FRAMECHANGED | SWP_NOOWNERZORDER)) {
+            return false;
+        }
+        isFullscreen_ = true;
+        return true;
+    }
+
+    SetWindowLongPtr(hwnd_, GWL_STYLE, windowedStyle_);
+    SetWindowLongPtr(hwnd_, GWL_EXSTYLE, windowedExStyle_);
+    if (!SetWindowPlacement(hwnd_, &windowedPlacement_)) {
+        return false;
+    }
+    SetWindowPos(
+        hwnd_, nullptr, 0, 0, 0, 0,
+        SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE |
+        SWP_NOZORDER | SWP_NOOWNERZORDER);
+    isFullscreen_ = false;
+    return true;
+}
+
 //==================================================================
 //  初期化処理
 //  ウィンドウクラス登録・生成・表示
@@ -132,7 +184,7 @@ void WinApp::initialize()
     // ウィンドウ生成
     hwnd_ = CreateWindow(
         wc_.lpszClassName, // クラス名
-        L"死因:最適解", // タイトル
+        L"死因：最適解", // タイトル
         kWindowStyle, // スタイル
         CW_USEDEFAULT, CW_USEDEFAULT, // 位置（自動）
         wrc.right - wrc.left, // 幅
