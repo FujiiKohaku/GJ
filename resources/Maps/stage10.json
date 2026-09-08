@@ -20,33 +20,6 @@
         ],
         "exists": true,
         "range": [
-          3.0,
-          0.0,
-          0.0
-        ],
-        "speed": 2.0,
-        "type": "MovingBlock"
-      },
-      "name": "MovingBlock",
-      "transform": {
-        "translation": [
-          3.0,
-          0.0,
-          1.0
-        ]
-      },
-      "type": "MovingBlock"
-    },
-    {
-      "file_name": "cube",
-      "gimmick": {
-        "axis": [
-          0.0,
-          0.0,
-          1.0
-        ],
-        "exists": true,
-        "range": [
           5.0,
           0.0,
           0.0
@@ -134,25 +107,6 @@
       "transform": {
         "translation": [
           8.0,
-          0.0,
-          1.0
-        ]
-      },
-      "type": "Switch"
-    },
-    {
-      "file_name": "Bonfire/Bonfire.obj",
-      "gimmick": {
-        "exists": true,
-        "fireEventName": "EventName",
-        "requiredWeight": 1,
-        "switchType": 2,
-        "type": "Switch"
-      },
-      "name": "Switch",
-      "transform": {
-        "translation": [
-          13.0,
           0.0,
           1.0
         ]
@@ -364,7 +318,7 @@
       "type": "Gear"
     },
     {
-      "file_name": "cube",
+      "file_name": "Checkpoint/CheckpointStand.obj",
       "name": "Checkpoint",
       "transform": {
         "translation": [
@@ -374,6 +328,27 @@
         ]
       },
       "type": "Checkpoint"
+    },
+    {
+      "file_name": "Vent/Venct.obj",
+      "gimmick": {
+        "downBlocks": 0,
+        "exists": true,
+        "leftBlocks": 1,
+        "listenEventName": "Event_1",
+        "rightBlocks": 1,
+        "type": "GasEmitter",
+        "upBlocks": 1
+      },
+      "name": "GasEmitter",
+      "transform": {
+        "translation": [
+          35.0,
+          0.0,
+          1.0
+        ]
+      },
+      "type": "GasEmitter"
     }
   ],
   "tileMaps": [
@@ -2182,7 +2157,7 @@
         1,
         0,
         0,
-        2,
+        0,
         0,
         0,
         0,
@@ -2192,7 +2167,7 @@
         0,
         0,
         6,
-        7,
+        0,
         8,
         0,
         2,
@@ -2214,7 +2189,7 @@
         0,
         0,
         0,
-        0,
+        6,
         0,
         0,
         0,

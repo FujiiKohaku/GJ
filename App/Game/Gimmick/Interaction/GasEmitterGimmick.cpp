@@ -28,7 +28,7 @@ GasEmitterGimmick::GasEmitterGimmick()
 
 GasEmitterGimmick::~GasEmitterGimmick()
 {
-    StopParticles();
+    StopAllParticles();
 }
 
 bool GasEmitterGimmick::Initialize(
@@ -84,14 +84,18 @@ void GasEmitterGimmick::RestoreFromSnapshot(const IGimmickState* state)
         
         if (currentState_ == State::Active) {
             stateTimer_ = 0.0f;
-            StartParticles();
+            StopAllParticles();
+            StartCloudParticles();
         } else if (currentState_ == State::Finished) {
-            StopParticles();
+            StopAllParticles();
         } else if (currentState_ == State::Ignited) {
             // Ignitedのままスナップショットが取られることはほぼ無いが、フェイルセーフとしてActiveに戻す
             currentState_ = State::Active;
             stateTimer_ = 0.0f;
-            StartParticles();
+            StopAllParticles();
+            StartCloudParticles();
+        } else if (currentState_ == State::Idle) {
+            StopAllParticles();
         }
     }
 }
@@ -103,7 +107,7 @@ void GasEmitterGimmick::Update()
     }
 
     if (isEditorMode_) {
-        StopParticles(); // エディタモードに切り替わったら再生停止
+        StopAllParticles(); // エディタモードに切り替わったら再生停止
         return;
     }
 
@@ -207,13 +211,15 @@ void GasEmitterGimmick::ChangeState(State nextState)
 
     switch (currentState_) {
     case State::Idle:
-        StopParticles();
+        StopAllParticles();
         break;
     case State::Filling:
-        StartParticles(); // 充満開始時に煙を出す
+        StartBurstParticles();
+        StartCloudParticles(); // 充満開始時に両方同時に出し始めることで隙間を無くす
         break;
     case State::Active:
-        // 充満完了、着火待ち（エフェクトは維持）
+        // 充満完了、着火待ち（勢いのある噴き出しだけを停止し、滞留用はそのまま維持）
+        StopBurstParticles();
         break;
     case State::Ignited:
         // 引火演出を追加する場合はここに記述
@@ -225,7 +231,7 @@ void GasEmitterGimmick::ChangeState(State nextState)
         } else {
             stage_->CreateExplosion(position_, 3.0f);
         }
-        StopParticles(); // 爆発と同時にエフェクト停止
+        StopAllParticles(); // 爆発と同時にエフェクト停止
         
         // 視覚的な爆発エフェクト（Explosion）を再生する（Volume Matching）
         if (param_) {
@@ -268,15 +274,15 @@ void GasEmitterGimmick::OnSpark(const Vector3& origin)
     }
 }
 
-void GasEmitterGimmick::StartParticles()
+void GasEmitterGimmick::StartBurstParticles()
 {
-    if (!effectHandles_.empty()) { return; }
+    if (!burstEffectHandles_.empty()) { return; }
     if (!param_) { return; }
     EffectManager* effects = EffectManager::GetInstance();
     
     // ガスが充満する設定範囲（上下左右のブロック数）をループし、
     // 各ブロックの中心座標にエフェクト（Smoke）を敷き詰めます。
-    // ブロックサイズは 2.0f として計算します。
+    // ブロックサイズは 1.0f として計算します。
     for (int y = -static_cast<int>(param_->downBlocks_); y <= static_cast<int>(param_->upBlocks_); ++y) {
         for (int x = -static_cast<int>(param_->leftBlocks_); x <= static_cast<int>(param_->rightBlocks_); ++x) {
             Vector3 offset = {
@@ -284,48 +290,95 @@ void GasEmitterGimmick::StartParticles()
                 static_cast<float>(y) * 1.0f,
                 0.0f
             };
+            // 噴き出し用は下から上へ飛ぶためオフセットを下げる
             Vector3 source = position_ + particleOffset_ + offset;
             
-            // 先ほど作成した毒ガスエフェクト（緑色）を使用します
             EffectHandle handle = effects->PlayLoopEffect("PoisonGas", source);
             if (handle != kInvalidEffectHandle) {
-                effectHandles_.push_back(handle);
+                burstEffectHandles_.push_back(handle);
             }
         }
     }
 }
 
-void GasEmitterGimmick::StopParticles()
+void GasEmitterGimmick::StartCloudParticles()
 {
-    if (!effectHandles_.empty()) {
+    if (!cloudEffectHandles_.empty()) { return; }
+    if (!param_) { return; }
+    EffectManager* effects = EffectManager::GetInstance();
+    
+    for (int y = -static_cast<int>(param_->downBlocks_); y <= static_cast<int>(param_->upBlocks_); ++y) {
+        for (int x = -static_cast<int>(param_->leftBlocks_); x <= static_cast<int>(param_->rightBlocks_); ++x) {
+            Vector3 offset = {
+                static_cast<float>(x) * 1.0f,
+                static_cast<float>(y) * 1.0f,
+                0.0f
+            };
+            // 滞留用はブロックの中心にピッタリ出すためオフセット無し
+            Vector3 source = position_ + offset;
+            
+            EffectHandle handle = effects->PlayLoopEffect("PoisonGasCloud", source);
+            if (handle != kInvalidEffectHandle) {
+                cloudEffectHandles_.push_back(handle);
+            }
+        }
+    }
+}
+
+void GasEmitterGimmick::StopBurstParticles()
+{
+    if (!burstEffectHandles_.empty()) {
         EffectManager* effects = EffectManager::GetInstance();
-        for (EffectHandle handle : effectHandles_) {
+        for (EffectHandle handle : burstEffectHandles_) {
             effects->StopEffect(handle);
         }
-        effectHandles_.clear();
+        burstEffectHandles_.clear();
     }
+}
+
+void GasEmitterGimmick::StopCloudParticles()
+{
+    if (!cloudEffectHandles_.empty()) {
+        EffectManager* effects = EffectManager::GetInstance();
+        for (EffectHandle handle : cloudEffectHandles_) {
+            effects->StopEffect(handle);
+        }
+        cloudEffectHandles_.clear();
+    }
+}
+
+void GasEmitterGimmick::StopAllParticles()
+{
+    StopBurstParticles();
+    StopCloudParticles();
 }
 
 void GasEmitterGimmick::UpdateParticles()
 {
-    if (effectHandles_.empty() || !param_) { return; }
+    if (!param_) { return; }
     EffectManager* effects = EffectManager::GetInstance();
     
-    int index = 0;
-    for (int y = -static_cast<int>(param_->downBlocks_); y <= static_cast<int>(param_->upBlocks_); ++y) {
-        for (int x = -static_cast<int>(param_->leftBlocks_); x <= static_cast<int>(param_->rightBlocks_); ++x) {
-            if (index >= effectHandles_.size()) { break; }
-            EffectHandle handle = effectHandles_[index++];
-            
-            if (effects->IsEffectAlive(handle)) {
-                Vector3 offset = {
-                    static_cast<float>(x) * 1.0f,
-                    static_cast<float>(y) * 1.0f,
-                    0.0f
-                };
-                Vector3 source = position_ + particleOffset_ + offset;
-                effects->SetEffectPosition(handle, source);
+    auto updateHandles = [&](const std::vector<EffectHandle>& handles, const Vector3& globalOffset) {
+        if (handles.empty()) { return; }
+        int index = 0;
+        for (int y = -static_cast<int>(param_->downBlocks_); y <= static_cast<int>(param_->upBlocks_); ++y) {
+            for (int x = -static_cast<int>(param_->leftBlocks_); x <= static_cast<int>(param_->rightBlocks_); ++x) {
+                if (index >= handles.size()) { break; }
+                EffectHandle handle = handles[index++];
+                
+                if (effects->IsEffectAlive(handle)) {
+                    Vector3 offset = {
+                        static_cast<float>(x) * 1.0f,
+                        static_cast<float>(y) * 1.0f,
+                        0.0f
+                    };
+                    Vector3 source = position_ + globalOffset + offset;
+                    effects->SetEffectPosition(handle, source);
+                }
             }
         }
-    }
+    };
+
+    updateHandles(burstEffectHandles_, particleOffset_);
+    updateHandles(cloudEffectHandles_, {0.0f, 0.0f, 0.0f});
 }

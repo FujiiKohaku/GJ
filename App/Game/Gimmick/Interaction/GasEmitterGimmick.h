@@ -64,8 +64,11 @@ public:
 private:
     void StartEmitting();
     void ChangeState(State nextState);
-    void StartParticles();
-    void StopParticles();
+    void StartBurstParticles();
+    void StartCloudParticles();
+    void StopBurstParticles();
+    void StopCloudParticles();
+    void StopAllParticles();
     void UpdateParticles();
 
 private:
@@ -83,7 +86,8 @@ private:
     float stateTimer_ = 0.0f;
     
     // エフェクト管理
-    std::vector<EffectHandle> effectHandles_;
+    std::vector<EffectHandle> burstEffectHandles_;
+    std::vector<EffectHandle> cloudEffectHandles_;
     // 煙が上に昇る性質を考慮し、発生源をブロックの中心より下（-0.5）に設定します。
     // （これまでは +0.5 だったため、上に1ブロック分ズレているように見えていました）
     Vector3 particleOffset_ = { 0.0f, -0.5f, 0.0f };
