@@ -162,12 +162,6 @@ void ArchiveScene::InitializeStageData()
         displayIndex++;
     }
 
-    StageData crumblingFloorTestStage;
-    crumblingFloorTestStage.name = std::format("STAGE {:02}  CRUMBLING TEST", displayIndex);
-    crumblingFloorTestStage.description = "CRUMBLING FLOOR TEST";
-    crumblingFloorTestStage.levelPath = "resources/Maps/stage_test.json";
-    crumblingFloorTestStage.destination = StageDestination::GamePlay;
-    stages_.push_back(crumblingFloorTestStage);
 }
 
 void ArchiveScene::LoadPrintedPagePaths()

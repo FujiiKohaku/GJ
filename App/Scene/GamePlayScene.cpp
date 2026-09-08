@@ -292,11 +292,10 @@ bool GamePlayScene::InitializeNextStep() {
   }
 
   if (initializationStep_ == 1) {
-  LevelDataLoader loader;
   mapChipStage_.Initialize(initializationLevelData_);
   mapChipStage_.ApplyMaterialProperties();
 
-  hasBackMap_ = levelPath_.find("stage_test.json") != std::string::npos;
+  hasBackMap_ = false;
   activeMapIndex_ = 0;
   isCannonTravelActive_ = false;
   cameraLaneDepth_ = 0.0f;
@@ -306,15 +305,6 @@ bool GamePlayScene::InitializeNextStep() {
   cameraTravelStartYOffset_ = kFrontCameraTargetYOffset;
   cameraTravelEndYOffset_ = kFrontCameraTargetYOffset;
   backMapChipStage_.reset();
-  if (hasBackMap_) {
-    LevelData backLevelData = loader.Load("resources/Maps/stage_test_back.json");
-    backMapChipStage_ = std::make_unique<MapChipStage>();
-    backMapChipStage_->Initialize(
-        backLevelData,
-        kMapChipTexture,
-        {0.0f, 0.0f, kBackMapDepth});
-    backMapChipStage_->ApplyMaterialProperties();
-  }
 
   RuinsBackground::Settings backgroundSettings;
   backgroundSettings.mapLength =
