@@ -175,9 +175,13 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
     }
 
     UpdateVisualShape(deltaTime);
-    // 自己死の判定（圧死または落下死）
-    if (isCrushed_ || position_.y < -10.0f) {
+    // 圧死はギミック接触と同じく自滅準備へ入る。
+    if (isCrushed_) {
         Kill();
+    }
+    // 落下死だけはスローに入らず、通常のリスポーンを要求する。
+    if (position_.y < -10.0f) {
+        RequestFallDeath();
     }
 }
 
@@ -284,6 +288,18 @@ void MapChipPlayer::BeginSelfDestructShape()
     selfDestructRawPull_ = { 0.0f, 0.0f };
     selfDestructPull_ = { 0.0f, 0.0f };
     velocity_ = { 0.0f, 0.0f, 0.0f };
+}
+
+void MapChipPlayer::RequestFallDeath()
+{
+    if (state_ == PlayerState::Dead) {
+        return;
+    }
+
+    state_ = PlayerState::Dead;
+    isShapingSelfDestruct_ = false;
+    hardenedBodyReady_ = false;
+    justDied_ = true;
 }
 
 void MapChipPlayer::UpdateSelfDestructShape(float unscaledDeltaTime)

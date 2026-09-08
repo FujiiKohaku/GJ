@@ -44,6 +44,7 @@ public:
     AABB GetAABB() const;
 
 private:
+    void RequestFallDeath();
     void UpdateVisualShape(float deltaTime);
     void UpdateSelfDestructShape(float unscaledDeltaTime);
     void UpdateVerticalConfinement(const std::vector<BaseMapChipGimmick*>& dynamicGimmicks);
