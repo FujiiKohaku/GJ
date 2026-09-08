@@ -70,6 +70,7 @@ class EditorTool(tk.Tk):
             (14, "Gear (Obstacle)"),
             (15, "Checkpoint (Respawn)"),
             (16, "Crumbling Floor"),
+            (17, "Spring (High Jump)"),
             (99, "Player Spawn"),
         ]
         

@@ -143,6 +143,9 @@ void MapChipRegistry::Initialize()
 
     // 一度踏むと振動して崩落する岩床。
     Register(MapChipType::CrumblingFloor, "CrumblingFloor", false, true, "");
+
+    // 着地したスライムを高く打ち上げるばね床。
+    Register(MapChipType::Spring, "Spring", false, true, "Spring/Spring.obj");
 }
 
 const MapChipConfig& MapChipRegistry::GetConfig(MapChipType type)
