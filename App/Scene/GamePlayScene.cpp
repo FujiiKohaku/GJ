@@ -478,6 +478,17 @@ bool GamePlayScene::InitializeNextStep() {
   menuPanelSprite_->SetPosition({320.0f, 170.0f});
   menuPanelSprite_->SetColor({0.10f, 0.20f, 0.15f, 0.97f});
 
+  TextureManager::GetInstance()->LoadTexture("resources/Textures/UI/ResetArrow.png");
+  loopArrowSprite_ = std::make_unique<Sprite>();
+  loopArrowSprite_->Initialize(SpriteManager::GetInstance(), "resources/Textures/UI/ResetArrow.png");
+  loopArrowSprite_->SetGridMesh(800, 1);
+  loopArrowSprite_->SetShaderPaths("resources/Shaders/Sprite/LoopArrow/Render.VS.hlsl", "resources/Shaders/Sprite/LoopArrow/Render.PS.hlsl");
+  // 円のサイズを小さくするため、それに合わせて矢印の太さも120pxに細くする
+  loopArrowSprite_->SetSize({2000.0f, 120.0f});
+  loopArrowSprite_->SetPosition({640.0f, 360.0f});
+  loopArrowSprite_->SetAnchorPoint({0.5f, 0.5f});
+  loopArrowSprite_->SetColor({1.0f, 1.0f, 1.0f, 0.0f});
+
   menuResumeButtonSprite_ = CreateMenuButtonSprite(kMenuResumeY);
   menuRestartButtonSprite_ = CreateMenuButtonSprite(kMenuRestartY);
   menuStageSelectButtonSprite_ = CreateMenuButtonSprite(kMenuStageSelectY);
@@ -935,9 +946,13 @@ void GamePlayScene::Draw2D() {
     menuRestartText_->Draw();
     menuStageSelectText_->Draw();
   }
-  if (isStageSelectTransitionActive_) {
+  if (isStageSelectTransitionActive_ || isHardResetTransitionActive_) {
     SpriteManager::GetInstance()->PreDraw();
     menuTransitionFadeSprite_->Draw();
+  }
+  if (isHardResetTransitionActive_ && loopArrowSprite_) {
+    SpriteManager::GetInstance()->PreDraw();
+    loopArrowSprite_->Draw();
   }
 }
 
@@ -1129,25 +1144,49 @@ void GamePlayScene::StartHardResetTransition() {
   isHardResetTransitionActive_ = true;
   hardResetTransitionTime_ = 0.0f;
   
-  // 【演出追加用フック箇所】
-  // 例: フェードアウト用のSpriteの色を初期化したり、パーティクルを再生したりする
+  if (loopArrowSprite_) {
+      loopArrowSprite_->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
+      loopArrowSprite_->SetEffectPhase(0.0f);
+  }
+  SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
 }
 
 void GamePlayScene::UpdateHardResetTransition(float deltaTime) {
   hardResetTransitionTime_ += deltaTime;
   
-  // 【演出進行用フック箇所】
-  // 例: 時間に応じてフェードのアルファ値を変更する
+  constexpr float kTransitionDuration = 2.4f;
+  float progress = std::clamp(hardResetTransitionTime_ / kTransitionDuration, 0.0f, 1.0f);
   
-  // 演出完了の条件（今回は仮としてすぐにリセットを実行する設定）
-  constexpr float kTransitionDuration = 0.0f; // 後で演出を入れる際にここを調整（例：0.5f）
+  if (loopArrowSprite_) {
+      loopArrowSprite_->SetEffectPhase(progress);
+      loopArrowSprite_->Update();
+  }
+  
+  // 白フェード（後半にかけて徐々に画面を白く飛ばす）
+  float fadeAlpha = std::clamp((progress - 0.5f) * 2.0f, 0.0f, 1.0f);
+  menuTransitionFadeSprite_->SetColor({1.0f, 1.0f, 1.0f, fadeAlpha});
+  menuTransitionFadeSprite_->Update();
+  
+  // 矢印が中央で交差するタイミング付近でショックウェーブを有効化
+  // Shader側のwaveRadius=progress*1.1 に合わせて、0.0〜1.0へ直線的に増加させる
+  if (progress > 0.45f && progress < 0.95f) {
+      SceneManager::GetInstance()->AddPostEffect(PostEffectType::Shockwave, PostEffectStage::AfterParticle);
+      float waveProgress = (progress - 0.45f) / 0.50f;
+      SceneManager::GetInstance()->SetVignetteStrength(waveProgress);
+  } else if (progress >= 0.95f) {
+      SceneManager::GetInstance()->RemovePostEffect(PostEffectType::Shockwave);
+  }
   
   if (hardResetTransitionTime_ >= kTransitionDuration) {
       ExecuteHardReset();
       isHardResetTransitionActive_ = false;
       
-      // 【暗転明け演出追加用フック箇所】
-      // 例: 状態リセット直後に PageTransition::RequestReveal 等を呼び出してフェードインさせる
+      if (loopArrowSprite_) {
+          loopArrowSprite_->SetColor({1.0f, 1.0f, 1.0f, 0.0f});
+      }
+      menuTransitionFadeSprite_->SetColor({0.0f, 0.0f, 0.0f, 0.0f}); // 黒透明に戻す
+      SceneManager::GetInstance()->RemovePostEffect(PostEffectType::Shockwave);
+      PageTransition::RequestReveal({0.0f, 0.0f, 0.0f, 1.0f}, 0.5f);
   }
 }
 

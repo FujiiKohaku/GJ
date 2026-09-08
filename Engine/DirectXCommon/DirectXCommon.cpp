@@ -10,6 +10,7 @@
 #include <format>
 #include <stdexcept>
 #include <wrl.h>
+#include <algorithm>
 
 namespace {
 std::filesystem::path MakeCompiledShaderPath(const std::filesystem::path& hlslPath)
@@ -28,17 +29,18 @@ std::filesystem::path MakeCompiledShaderPath(const std::filesystem::path& hlslPa
 
 std::wstring GetShaderProfile(const std::filesystem::path& sourcePath)
 {
-    const std::wstring fileName = sourcePath.filename().wstring();
-    if (fileName.ends_with(L".VS.hlsl")) {
+    std::wstring fileName = sourcePath.filename().wstring();
+    std::transform(fileName.begin(), fileName.end(), fileName.begin(), ::towlower);
+    if (fileName.ends_with(L".vs.hlsl")) {
         return L"vs_6_0";
     }
-    if (fileName.ends_with(L".PS.hlsl")) {
+    if (fileName.ends_with(L".ps.hlsl")) {
         return L"ps_6_0";
     }
-    if (fileName.ends_with(L".CS.hlsl")) {
+    if (fileName.ends_with(L".cs.hlsl")) {
         return L"cs_6_0";
     }
-    if (fileName.ends_with(L".GS.hlsl")) {
+    if (fileName.ends_with(L".gs.hlsl")) {
         return L"gs_6_0";
     }
     return {};

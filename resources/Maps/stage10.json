@@ -349,6 +349,52 @@
         ]
       },
       "type": "GasEmitter"
+    },
+    {
+      "file_name": "cube",
+      "gimmick": {
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "exists": true,
+        "range": [
+          2.0,
+          0.0,
+          0.0
+        ],
+        "speed": 2.0,
+        "type": "MovingBlock"
+      },
+      "name": "MovingBlock",
+      "transform": {
+        "translation": [
+          3.0,
+          0.0,
+          2.0
+        ]
+      },
+      "type": "MovingBlock"
+    },
+    {
+      "file_name": "Bonfire/Bonfire.obj",
+      "gimmick": {
+        "exists": true,
+        "fireEventName": "EventName",
+        "requiredWeight": 1,
+        "switchType": 2,
+        "type": "Switch"
+      },
+      "name": "Switch",
+      "transform": {
+        "translation": [
+          13.0,
+          0.0,
+          1.0
+        ]
+      },
+      "type": "Switch"
     }
   ],
   "tileMaps": [
@@ -2057,7 +2103,7 @@
         1,
         0,
         0,
-        0,
+        2,
         0,
         0,
         0,
@@ -2167,7 +2213,7 @@
         0,
         0,
         6,
-        0,
+        7,
         8,
         0,
         2,
