@@ -912,7 +912,7 @@ void GamePlayScene::UpdateLivesText() {
 }
 
 void GamePlayScene::LoseLife() {
-  if (isDeathTransitionActive_ || remainingLives_ <= 0)
+  if (isDeathTransitionActive_ || isLifeRelayActive_ || remainingLives_ <= 0)
     return;
   --remainingLives_;
   UpdateLivesText();
