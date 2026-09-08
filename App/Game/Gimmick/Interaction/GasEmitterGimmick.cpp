@@ -189,6 +189,24 @@ void GasEmitterGimmick::ChangeState(State nextState)
             stage_->CreateExplosion(position_, 3.0f);
         }
         StopParticles(); // 爆発と同時にエフェクト停止
+        
+        // 視覚的な爆発エフェクト（Explosion）を再生する（Volume Matching）
+        if (param_) {
+            EffectManager* effects = EffectManager::GetInstance();
+            for (int y = -static_cast<int>(param_->downBlocks_); y <= static_cast<int>(param_->upBlocks_); ++y) {
+                for (int x = -static_cast<int>(param_->leftBlocks_); x <= static_cast<int>(param_->rightBlocks_); ++x) {
+                    Vector3 offset = {
+                        static_cast<float>(x) * 1.0f,
+                        static_cast<float>(y) * 1.0f,
+                        0.0f
+                    };
+                    Vector3 source = position_ + particleOffset_ + offset;
+                    effects->PlayEffect("Explosion", source);
+                }
+            }
+        } else {
+            EffectManager::GetInstance()->PlayEffect("Explosion", position_);
+        }
         break;
     }
 }
