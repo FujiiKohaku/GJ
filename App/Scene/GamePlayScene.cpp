@@ -635,7 +635,8 @@ void GamePlayScene::Update() {
     hardenedThisFrame = true;
   }
 
-    if (!isClearCelebrationActive_ && player_->IsShapingSelfDestruct() && !selfDestructSlowActive_) {
+    if (!isClearCelebrationActive_ && !isLifeRelayActive_ && !isDeathTransitionActive_ &&
+        player_->IsShapingSelfDestruct() && !selfDestructSlowActive_) {
     TimeManager *timeManager = TimeManager::GetInstance();
     timeScaleBeforeSelfDestruct_ = timeManager->GetTimeScale();
     timeManager->SetTimeScale(0.08f);
