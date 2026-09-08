@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "Engine/Audio/SoundManager.h"
 
 struct GamePlaySavePoint {
     Vector3 playerStartPosition;
@@ -158,5 +159,8 @@ private:
     Vector3 lifeRelayOrbCurrentPosition_ = { 0.0f, 0.0f, 0.0f };
     EffectHandle lifeRelayOrbEffectHandle_ = kInvalidEffectHandle;
     bool isClearCelebrationActive_ = false;
+
+    AudioHandle slowWaterSoundHandle_{};
+    AudioHandle slimeMoveSoundHandle_{};
     float clearCelebrationTimer_ = 0.0f;
 };
