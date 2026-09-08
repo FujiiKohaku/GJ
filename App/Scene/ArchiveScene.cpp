@@ -13,7 +13,6 @@
 #include "SceneManager.h"
 #include "PageTransition.h"
 #include "TestScene.h"
-#include "GameLabScene.h"
 #include "EditorScene.h"
 #include <cmath>
 #include <algorithm>
@@ -141,14 +140,8 @@ void ArchiveScene::InitializeStageData()
     stage2.destination = StageDestination::GamePlay;
     stages_.push_back(stage2);
 
-    StageData gameLabStage;
-    gameLabStage.name = "STAGE 03  GAMELAB";
-    gameLabStage.description = "FREE CAMERA ENGINE LAB";
-    gameLabStage.destination = StageDestination::GameLab;
-    stages_.push_back(gameLabStage);
-
     StageData crumblingFloorTestStage;
-    crumblingFloorTestStage.name = "STAGE 04  CRUMBLING TEST";
+    crumblingFloorTestStage.name = "STAGE 03  CRUMBLING TEST";
     crumblingFloorTestStage.description = "CRUMBLING FLOOR TEST";
     crumblingFloorTestStage.levelPath = "resources/Maps/stage_test.json";
     crumblingFloorTestStage.destination = StageDestination::GamePlay;
@@ -1162,9 +1155,6 @@ void ArchiveScene::UpdateStageConfirmed(float deltaTime)
             break;
         case StageDestination::Test:
             SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());
-            break;
-        case StageDestination::GameLab:
-            SceneManager::GetInstance()->SetNextScene(std::make_unique<GameLabScene>());
             break;
         }
     }

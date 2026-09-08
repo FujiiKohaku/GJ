@@ -60,7 +60,6 @@ private:
     enum class StageDestination {
         GamePlay,
         Test,
-        GameLab,
     };
 
     struct StageData {

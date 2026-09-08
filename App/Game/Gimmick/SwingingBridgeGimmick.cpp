@@ -291,7 +291,9 @@ bool SwingingBridgeGimmick::CheckCollision(const AABB& aabb, SwingingBridgeGimmi
                 blockAABB.size = { 1.0f, 1.0f, 1.0f };
 
                 if (shouldLog) {
-                    float dist = std::sqrt(std::pow(aabb.center.x - blockAABB.center.x, 2) + std::pow(aabb.center.y - blockAABB.center.y, 2));
+                    const float deltaX = aabb.center.x - blockAABB.center.x;
+                    const float deltaY = aabb.center.y - blockAABB.center.y;
+                    const float dist = std::sqrt(deltaX * deltaX + deltaY * deltaY);
                     if (dist < 3.0f) { // 近くのブロックだけログ
                         Logger::Log(std::format("  -> vs Block Center({:.2f}, {:.2f}, {:.2f})\n", blockAABB.center.x, blockAABB.center.y, blockAABB.center.z));
                     }

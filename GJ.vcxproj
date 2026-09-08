@@ -201,7 +201,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="App\Scene\EditorScene.cpp" />
     <ClCompile Include="App\Scene\ArchiveScene.cpp" />
     <ClCompile Include="App\Scene\GamePlayScene.cpp" />
-    <ClCompile Include="App\Scene\GameLabScene.cpp" />
     <ClCompile Include="App\Game\Background\RuinsBackground.cpp" />
     <ClCompile Include="App\Effect\DeathSlimeShower.cpp" />
     <ClCompile Include="App\Game\Map\MapChipField.cpp" />
@@ -445,7 +444,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="App\Scene\ArchiveScene.h" />
     <ClInclude Include="App\Scene\PageTransition.h" />
     <ClInclude Include="App\Scene\GamePlayScene.h" />
-    <ClInclude Include="App\Scene\GameLabScene.h" />
     <ClInclude Include="App\Game\Background\RuinsBackground.h" />
     <ClInclude Include="App\Effect\DeathSlimeShower.h" />
     <ClInclude Include="App\Game\Map\MapChipField.h" />

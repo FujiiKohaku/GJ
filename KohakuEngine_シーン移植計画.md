@@ -28,7 +28,7 @@ KohakuEngineはTitleSceneとStageSelectSceneが分離済み。TitleSceneは魚�
 | 資料庫の部屋・本・紙・金具・浮遊する埃 | StageSelectSceneの3D表示へ移植 |
 | カメラ接近・本を開く・ページめくり・決定演出 | StageSelectSceneへ移植 |
 | ReturningToTitle | 戻り演出の完了後にTitleSceneへ遷移 |
-| GJ3固定のGamePlay／Test／GameLab一覧 | KohakuEngineのStageCatalogと既存テスト項目に接続 |
+| GJ3固定のGamePlay／Test一覧 | KohakuEngineのStageCatalogと既存テスト項目に接続 |
 | GJ3のEditorSceneへのF12遷移 | 移植対象外。移植先に不要な依存を持ち込まない |
 
 KohakuEngineの既存ロゴ・操作案内・プレイヤー背景・NeonGlowを維持する。資料庫背景とArchiveAtmosphereはステージセレクト側に限定する。

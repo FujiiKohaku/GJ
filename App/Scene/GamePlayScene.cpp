@@ -489,7 +489,7 @@ void GamePlayScene::Update() {
   // Trap gimmicks continue updating while the life relay is playing. Consume
   // their requests so a laser touching the departed player cannot spend more
   // lives during the respawn animation.
-  const bool deathRequested = player_->ConsumeDeathRequest();
+  const bool deathRequested = player_->ConsumeJustDied();
   if (!isClearCelebrationActive_ && !isLifeRelayActive_ && deathRequested) {
     if (!isSlowMotion) {
       LoseLife();
