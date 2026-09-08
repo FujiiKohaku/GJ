@@ -225,7 +225,10 @@ void EditorScene::Initialize()
     LevelDataLoader loader;
     currentLevelData_ = loader.Load(kStage1Json);
     if (!currentLevelData_.tileMaps.empty()) {
-        LevelData::TileMapData expandedData = ExpandTileMapData(currentLevelData_.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
+        LevelData::TileMapData expandedData = ExpandTileMapData(
+            currentLevelData_.tileMaps[0],
+            kEditorCanvasWidth,
+            kEditorCanvasHeight);
         currentLevelData_.tileMaps[0] = expandedData;
     }
     mapChipStage_.SetEditorMode(true);
@@ -641,7 +644,10 @@ void EditorScene::ProcessUdpCommand(const std::string& command)
         LevelDataLoader loader;
         currentLevelData_ = loader.Load(filename);
         if (!currentLevelData_.tileMaps.empty()) {
-            LevelData::TileMapData expandedData = ExpandTileMapData(currentLevelData_.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
+            LevelData::TileMapData expandedData = ExpandTileMapData(
+                currentLevelData_.tileMaps[0],
+                kEditorCanvasWidth,
+                kEditorCanvasHeight);
             currentLevelData_.tileMaps[0] = expandedData;
             mapChipStage_.Initialize(currentLevelData_);
             mapChipStage_.ApplyMaterialProperties();
@@ -658,8 +664,7 @@ void EditorScene::ProcessUdpCommand(const std::string& command)
         std::string filename = command.substr(5);
         LevelData::TileMapData rawData = mapChipStage_.GetField().GetTileMapData();
         LevelData::TileMapData trimmedData = TrimTileMapData(rawData);
-        
-        // 既存の playerSpawns や objects 情報を保持したまま、tileMaps だけを上書きする
+
         currentLevelData_.tileMaps.clear();
         currentLevelData_.tileMaps.push_back(trimmedData);
         
@@ -749,7 +754,8 @@ void EditorScene::UpdateRaycastEdit()
                     if (mapChipStage_.GetField().GetMapChipTypeByIndex(px, py) != MapChipType::Blank) {
                         mapChipStage_.GetField().SetMapChipTypeByIndex(static_cast<uint32_t>(px), static_cast<uint32_t>(py), MapChipType::Blank);
                         DirectXCommon::GetInstance()->WaitForGPU();
-                        currentLevelData_.tileMaps[0] = mapChipStage_.GetField().GetTileMapData();
+                        currentLevelData_.tileMaps[0] =
+                            mapChipStage_.GetField().GetTileMapData();
                         mapChipStage_.Initialize(currentLevelData_);
                         mapChipStage_.ApplyMaterialProperties();
                         hasUnsavedChanges_ = true;
@@ -789,7 +795,7 @@ void EditorScene::UpdateRaycastEdit()
                         float snapX = xIndex * kChipWidth;
                         float snapY = (static_cast<int>(height) - 1 - yIndex) * kChipHeight;
                         Vector3 newPos = { snapX, snapY, 0.0f };
-                        
+
                         // Ctrlクリックで選択
                         if (isCtrlClick) {
                             selectedX_ = xIndex;
@@ -1036,7 +1042,8 @@ void EditorScene::UpdateRaycastEdit()
                                         selectedY_ = -1;
                                     }
                                     DirectXCommon::GetInstance()->WaitForGPU();
-                                    currentLevelData_.tileMaps[0] = mapChipStage_.GetField().GetTileMapData();
+                                    currentLevelData_.tileMaps[0] =
+                                        mapChipStage_.GetField().GetTileMapData();
                                     mapChipStage_.Initialize(currentLevelData_);
                                     mapChipStage_.ApplyMaterialProperties();
                                 }

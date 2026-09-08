@@ -10,7 +10,7 @@ class EditorTool(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Map Editor")
-        self.geometry("400x550")
+        self.geometry("400x580")
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         
@@ -43,7 +43,7 @@ class EditorTool(tk.Tk):
         
         self.current_file_lbl = tk.Label(file_frame, text="No file selected")
         self.current_file_lbl.pack(side="bottom", anchor="w", pady=5)
-        
+
         # パレット（ブロック種類）フレーム
         palette_frame = tk.LabelFrame(self, text="Palette (Block Type)", padx=10, pady=10)
         palette_frame.pack(fill="both", expand=True, padx=10, pady=5)
@@ -71,6 +71,7 @@ class EditorTool(tk.Tk):
             (15, "Checkpoint (Respawn)"),
             (16, "Crumbling Floor"),
             (17, "Spring (High Jump)"),
+            (18, "Cannon (Map Transfer)"),
             (99, "Player Spawn"),
         ]
         
