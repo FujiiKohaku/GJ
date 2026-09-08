@@ -115,3 +115,18 @@ bool CheckpointGimmick::TryActivateCheckpoint(const AABB& playerAABB)
     isActivated_ = true;
     return true;
 }
+
+std::shared_ptr<IGimmickState> CheckpointGimmick::CreateSnapshot() const
+{
+    auto state = std::make_shared<CheckpointState>();
+    state->isActivated = isActivated_;
+    return state;
+}
+
+void CheckpointGimmick::RestoreFromSnapshot(const IGimmickState* state)
+{
+    if (const auto* checkpointState =
+            dynamic_cast<const CheckpointState*>(state)) {
+        isActivated_ = checkpointState->isActivated;
+    }
+}

@@ -582,7 +582,8 @@ void GamePlayScene::Update() {
     if (!isClearCelebrationActive_) return;
   }
 
-  if (!isClearCelebrationActive_ && !isMenuOpen_ && input->IsKeyTrigger(DIK_R)) {
+  if (!isClearCelebrationActive_ && !isLifeRelayActive_ && !isMenuOpen_ &&
+      input->IsKeyTrigger(DIK_R)) {
     ResetToLastRespawnPoint();
     return;
   }

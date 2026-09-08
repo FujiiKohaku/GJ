@@ -261,6 +261,32 @@ Vector3 SwingingBridgeGimmick::GetDeltaPosition() const
     };
 }
 
+std::shared_ptr<IGimmickState> SwingingBridgeGimmick::CreateSnapshot() const
+{
+    auto state = std::make_shared<SwingingBridgeState>();
+    state->position = currentPosition_;
+    state->elapsedTime = elapsedTime_;
+    state->timeDirection = timeDirection_;
+    state->isStuck = isStuck_;
+    state->isPermanentlyStuck = isPermanentlyStuck_;
+    return state;
+}
+
+void SwingingBridgeGimmick::RestoreFromSnapshot(const IGimmickState* state)
+{
+    const auto* bridgeState = dynamic_cast<const SwingingBridgeState*>(state);
+    if (!bridgeState) {
+        return;
+    }
+
+    currentPosition_ = bridgeState->position;
+    previousPosition_ = currentPosition_;
+    elapsedTime_ = bridgeState->elapsedTime;
+    timeDirection_ = bridgeState->timeDirection;
+    isStuck_ = bridgeState->isStuck;
+    isPermanentlyStuck_ = bridgeState->isPermanentlyStuck;
+}
+
 bool SwingingBridgeGimmick::CheckCollision(const AABB& aabb, SwingingBridgeGimmick** outHitBridge) const
 {
     if (!stage_) {

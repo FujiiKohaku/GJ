@@ -6,6 +6,14 @@
 
 class SwingingBridgeGimmick : public BaseMapChipGimmick {
 public:
+    struct SwingingBridgeState : public IGimmickState {
+        Vector3 position = { 0.0f, 0.0f, 0.0f };
+        float elapsedTime = 0.0f;
+        float timeDirection = 1.0f;
+        bool isStuck = false;
+        bool isPermanentlyStuck = false;
+    };
+
     bool Initialize(
         const Vector3& position,
         const std::string& texturePath,
@@ -17,6 +25,8 @@ public:
     
     AABB GetAABB() const override;
     Vector3 GetDeltaPosition() const override;
+    std::shared_ptr<IGimmickState> CreateSnapshot() const override;
+    void RestoreFromSnapshot(const IGimmickState* state) override;
     
     // 衝突判定用
     bool CheckCollision(const AABB& aabb, class SwingingBridgeGimmick** outHitBridge = nullptr) const;

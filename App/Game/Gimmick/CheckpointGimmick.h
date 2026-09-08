@@ -8,6 +8,10 @@
 // 通過すると次の命のリレー時の復帰地点を更新する中間地点。
 class CheckpointGimmick final : public BaseMapChipGimmick {
 public:
+    struct CheckpointState : public IGimmickState {
+        bool isActivated = false;
+    };
+
     bool Initialize(const Vector3& position, const std::string& texturePath,
         const BaseGimmickParam* gimmickParam = nullptr) override;
     void Update() override;
@@ -17,6 +21,8 @@ public:
     bool IsCheckpoint() const override { return true; }
     bool IsSolid() const override { return false; }
     bool TryActivateCheckpoint(const AABB& playerAABB) override;
+    std::shared_ptr<IGimmickState> CreateSnapshot() const override;
+    void RestoreFromSnapshot(const IGimmickState* state) override;
     const Vector3& GetPosition() const { return position_; }
 
 private:
