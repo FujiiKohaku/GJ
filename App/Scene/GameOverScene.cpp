@@ -3,6 +3,7 @@
 #include "Engine/2D/Text/TextRenderer.h"
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
+#include "Engine/Audio/SoundManager.h"
 #include "Engine/Input/Input.h"
 #include "Engine/PostEffect/PostEffectType.h"
 #include "Engine/Time/TimeManager.h"
@@ -18,11 +19,23 @@ constexpr const char* kBookLeather = "resources/Models/StageSelectBook/BookLeath
 constexpr const char* kPrintedPage = "resources/Models/StageSelectBook/Pages/page_001.png";
 constexpr const char* kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
+constexpr const char* kGameOverSoundName = "Scene.GameOver.Trumpet";
+constexpr const char* kGameOverSoundPath = "resources/Audio/Scene/game_over_trumpet.wav";
+constexpr const char* kImpactSoundName = "Scene.GameOver.Impact";
+constexpr const char* kImpactSoundPath = "resources/Audio/Scene/game_over_impact.wav";
+constexpr const char* kSceneConfirmSoundName = "Scene.Confirm";
+constexpr const char* kSceneConfirmSoundPath = "resources/Audio/Scene/scene_confirm.wav";
 constexpr float kTitleTransitionDuration = 0.55f;
 }
 
 void GameOverScene::Initialize()
 {
+    SoundManager* audio = SoundManager::GetInstance();
+    audio->Load(kGameOverSoundName, kGameOverSoundPath, AudioCategory::SE);
+    audio->Load(kImpactSoundName, kImpactSoundPath, AudioCategory::SE);
+    audio->Load(kSceneConfirmSoundName, kSceneConfirmSoundPath, AudioCategory::SE);
+    audio->PlaySE(kGameOverSoundName, 0.68f);
+
     SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
     SceneManager::GetInstance()->SetArchiveApproach(1.0f);
 
@@ -185,6 +198,10 @@ void GameOverScene::Update()
             const float groundCenter = -7.0f + prop.halfHeight;
             if (prop.position.y <= groundCenter) {
                 prop.position.y = groundCenter;
+                if (!prop.hasPlayedImpact) {
+                    SoundManager::GetInstance()->PlaySE(kImpactSoundName, 0.24f);
+                    prop.hasPlayedImpact = true;
+                }
                 if (std::abs(prop.velocity.y) > 1.0f) {
                     prop.velocity.y = -prop.velocity.y * 0.22f;
                     prop.velocity.x *= 0.55f;
@@ -214,6 +231,10 @@ void GameOverScene::Update()
                     prop.position.y > pedestal.position.y;
                 if (overlapsX && overlapsZ && crossesTop) {
                     prop.position.y = pedestalTop + prop.halfExtent.y + 0.03f;
+                    if (!prop.hasPlayedImpact) {
+                        SoundManager::GetInstance()->PlaySE(kImpactSoundName, 0.20f);
+                        prop.hasPlayedImpact = true;
+                    }
                     prop.velocity.y = (std::max)(prop.velocity.y, 0.0f);
                     const float slideDirection = prop.position.x < pedestal.position.x ? -1.0f : 1.0f;
                     prop.velocity.x += slideDirection * 4.0f * deltaTime;
@@ -243,6 +264,7 @@ void GameOverScene::Update()
 
 void GameOverScene::StartTitleTransition()
 {
+    SoundManager::GetInstance()->PlaySE(kSceneConfirmSoundName, 0.52f);
     titleTransitionActive_ = true;
     titleTransitionTime_ = 0.0f;
 }
