@@ -152,6 +152,13 @@ private:
     std::size_t nextStage1TutorialIndex_ = 0;
     bool stage1ShapeTutorialShown_ = false;
 
+    std::unique_ptr<Sprite> tutorialKeyWSprite_;
+    std::unique_ptr<Sprite> tutorialKeyASprite_;
+    std::unique_ptr<Sprite> tutorialKeySSprite_;
+    std::unique_ptr<Sprite> tutorialKeyDSprite_;
+    std::unique_ptr<Sprite> tutorialMouseSprite_;
+    std::unique_ptr<Text> controlsText_;
+
     bool isLifeRelayActive_ = false;
     float lifeRelayTimer_ = 0.0f;
     float lifeRelayDuration_ = 1.5f;

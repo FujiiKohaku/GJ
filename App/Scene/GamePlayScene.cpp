@@ -246,6 +246,12 @@ constexpr const char *kSlowWaterSoundPath = "resources/Audio/Scene/player/水中
 constexpr const char *kSlimeMoveSoundName = "SlimeMove";
 constexpr const char *kSlimeMoveSoundPath = "resources/Audio/Scene/player/ゾンビの食事.mp3";
 
+constexpr const char *kKeyWTexture = "resources/Textures/W.png";
+constexpr const char *kKeyATexture = "resources/Textures/A.png";
+constexpr const char *kKeySTexture = "resources/Textures/S.png";
+constexpr const char *kKeyDTexture = "resources/Textures/D.png";
+constexpr const char *kMouseTexture = "resources/Textures/mouse.png";
+
 } // namespace
 
 GamePlayScene::GamePlayScene(std::string levelPath)
@@ -466,6 +472,56 @@ bool GamePlayScene::InitializeNextStep() {
   livesNumberText_->SetOutlineWidth(2.0f);
   livesNumberText_->SetShadowColor({0.0f, 0.0f, 0.0f, 0.0f});
   UpdateLivesText();
+
+  if (levelPath_.find("stage1.json") != std::string::npos) {
+    TextureManager::GetInstance()->LoadTexture(kKeyWTexture);
+    TextureManager::GetInstance()->LoadTexture(kKeyATexture);
+    TextureManager::GetInstance()->LoadTexture(kKeySTexture);
+    TextureManager::GetInstance()->LoadTexture(kKeyDTexture);
+    TextureManager::GetInstance()->LoadTexture(kMouseTexture);
+
+    tutorialKeyWSprite_ = std::make_unique<Sprite>();
+    tutorialKeyWSprite_->Initialize(SpriteManager::GetInstance(), kKeyWTexture);
+    tutorialKeyWSprite_->SetSize({48.0f, 48.0f});
+
+    tutorialKeyASprite_ = std::make_unique<Sprite>();
+    tutorialKeyASprite_->Initialize(SpriteManager::GetInstance(), kKeyATexture);
+    tutorialKeyASprite_->SetSize({48.0f, 48.0f});
+
+    tutorialKeySSprite_ = std::make_unique<Sprite>();
+    tutorialKeySSprite_->Initialize(SpriteManager::GetInstance(), kKeySTexture);
+    tutorialKeySSprite_->SetSize({48.0f, 48.0f});
+
+    tutorialKeyDSprite_ = std::make_unique<Sprite>();
+    tutorialKeyDSprite_->Initialize(SpriteManager::GetInstance(), kKeyDTexture);
+    tutorialKeyDSprite_->SetSize({48.0f, 48.0f});
+
+    tutorialMouseSprite_ = std::make_unique<Sprite>();
+    tutorialMouseSprite_->Initialize(SpriteManager::GetInstance(), kMouseTexture);
+    tutorialMouseSprite_->SetSize({72.0f, 96.0f});
+
+    const float width = static_cast<float>(WinApp::GetInstance()->GetRenderWidth());
+    const float height = static_cast<float>(WinApp::GetInstance()->GetRenderHeight());
+    float centerX = width * 0.5f;
+    float baseY = height - 46.0f - 18.0f - 90.0f; // 残機の上
+
+    tutorialKeyWSprite_->SetPosition({centerX - 50.0f, baseY - 50.0f});
+    tutorialKeyASprite_->SetPosition({centerX - 100.0f, baseY});
+    tutorialKeySSprite_->SetPosition({centerX - 50.0f, baseY});
+    tutorialKeyDSprite_->SetPosition({centerX, baseY});
+    tutorialMouseSprite_->SetPosition({centerX + 90.0f, baseY - 32.0f});
+
+    controlsText_ = std::make_unique<Text>();
+    controlsText_->Initialize(kDefaultFont);
+    controlsText_->SetAnchorPoint({0.0f, 1.0f}); // 左下基準
+    controlsText_->SetPosition({20.0f, height - 20.0f});
+    controlsText_->SetFontSize(24.0f);
+    controlsText_->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
+    controlsText_->SetOutlineColor({0.02f, 0.05f, 0.12f, 1.0f});
+    controlsText_->SetOutlineWidth(2.0f);
+    controlsText_->SetText("WASD：移動　SPACE：ジャンプ\n右クリック：自滅スロー\n右クリック(スロー中)：自滅確定\n左クリック長押し＋移動(スロー中)：変形");
+    controlsText_->Update();
+  }
   }
 
   if (initializationStep_ == 6) {
@@ -904,6 +960,27 @@ void GamePlayScene::Update() {
   UpdateStage1Tutorial();
   tutorialPanelSprite_->Update();
   tutorialText_->Update();
+
+  if (tutorialKeyWSprite_) {
+    Input* input = Input::GetInstance();
+    Vector4 normalColor = {1.0f, 1.0f, 1.0f, 0.35f};
+    Vector4 pressColor = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    tutorialKeyWSprite_->SetColor(input->IsKeyPressed(DIK_W) ? pressColor : normalColor);
+    tutorialKeyASprite_->SetColor(input->IsKeyPressed(DIK_A) ? pressColor : normalColor);
+    tutorialKeySSprite_->SetColor(input->IsKeyPressed(DIK_S) ? pressColor : normalColor);
+    tutorialKeyDSprite_->SetColor(input->IsKeyPressed(DIK_D) ? pressColor : normalColor);
+    // 右クリック（スライム変形）を想定してIsMousePress(1)の可能性もあるが、画像が左クリックか右クリックか不明。
+    // スライム変形は通常右クリックなので(1)、両方で反応するようにするか、あるいは左クリック(0)と右クリック(1)の両方で押された感を出す。
+    // 元のコードを見ると「左クリック長押しで…」というメッセージがあるので、左クリック=0。
+    tutorialMouseSprite_->SetColor(input->IsMousePressed(0) ? pressColor : normalColor);
+
+    tutorialKeyWSprite_->Update();
+    tutorialKeyASprite_->Update();
+    tutorialKeySSprite_->Update();
+    tutorialKeyDSprite_->Update();
+    tutorialMouseSprite_->Update();
+  }
 }
 
 void GamePlayScene::UpdateStage1Tutorial() {
@@ -961,9 +1038,20 @@ void GamePlayScene::Draw2D() {
     lifeSprite->Draw();
   }
 
+  if (tutorialKeyWSprite_) {
+    tutorialKeyWSprite_->Draw();
+    tutorialKeyASprite_->Draw();
+    tutorialKeySSprite_->Draw();
+    tutorialKeyDSprite_->Draw();
+    tutorialMouseSprite_->Draw();
+  }
+
   TextRenderer::GetInstance()->PreDraw();
   tutorialText_->Draw();
   livesNumberText_->Draw();
+  if (controlsText_) {
+    controlsText_->Draw();
+  }
   pageReveal_.Draw();
 
   // メニュー表示中は最前面に暗幕とメニューパネルを描画
