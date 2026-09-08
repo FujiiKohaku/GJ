@@ -574,11 +574,6 @@ void GamePlayScene::Update() {
       .Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
   ruinsBackground_.Update();
   bool hardenedThisFrame = false;
-  // 旧形式の死亡通知が残っていても即死させず、自滅準備へ移行する。
-  const bool deathRequested = player_->ConsumeJustDied();
-  if (!isClearCelebrationActive_ && !isLifeRelayActive_ && deathRequested) {
-    player_->BeginSelfDestructShape();
-  }
 
   // player_->Update(mapChipStage_.GetGimmicks());
     if (!isClearCelebrationActive_ && !hardenedThisFrame &&
@@ -628,10 +623,13 @@ void GamePlayScene::Update() {
     }
   }
 
-  // プレイヤー更新中の圧死・落下なども、即死ではなく自滅準備にする。
+  // 落下死はスローに入れず、通常速度のまま残機を消費してリスポーンする。
   if (!isClearCelebrationActive_ && !isLifeRelayActive_ &&
       player_->ConsumeJustDied()) {
-    player_->BeginSelfDestructShape();
+    LoseLife(false);
+    if (isDeathTransitionActive_)
+      return;
+    hardenedThisFrame = true;
   }
 
     if (!isClearCelebrationActive_ && player_->IsShapingSelfDestruct() && !selfDestructSlowActive_) {
@@ -939,22 +937,24 @@ void GamePlayScene::UpdateStageSelectTransition(float deltaTime) {
 
 void GamePlayScene::RespawnPlayerLeavingCorpse() { StartLifeRelay(); }
 
-void GamePlayScene::StartLifeRelay() {
+void GamePlayScene::StartLifeRelay(bool leaveCorpse) {
   if (selfDestructSlowActive_) {
     TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
     selfDestructSlowActive_ = false;
   }
 
-  const GpuSphFluid::Settings currentSettings = gpuSphFluid_->GetSettings();
-  const std::vector<GpuSphFluid::Particle> particles =
-      gpuSphFluid_->GetParticlesCPU();
+  if (leaveCorpse) {
+    const GpuSphFluid::Settings currentSettings = gpuSphFluid_->GetSettings();
+    const std::vector<GpuSphFluid::Particle> particles =
+        gpuSphFluid_->GetParticlesCPU();
 
-  auto corpse = std::make_unique<HardenedFluidSlimeCorpse>();
-  if (corpse->InitializeFromParticles(DirectXCommon::GetInstance(),
-                                      SrvManager::GetInstance(), particles,
-                                      currentSettings)) {
-    mapChipStage_.AddGimmick(std::move(corpse));
-    mapChipStage_.LimitHardenedSlimeCount(10);
+    auto corpse = std::make_unique<HardenedFluidSlimeCorpse>();
+    if (corpse->InitializeFromParticles(DirectXCommon::GetInstance(),
+                                        SrvManager::GetInstance(), particles,
+                                        currentSettings)) {
+      mapChipStage_.AddGimmick(std::move(corpse));
+      mapChipStage_.LimitHardenedSlimeCount(10);
+    }
   }
 
   GpuSphFluid::Settings hiddenSettings = gpuSphFluid_->GetSettings();
@@ -1101,7 +1101,7 @@ void GamePlayScene::UpdateLivesText() {
   }
 }
 
-void GamePlayScene::LoseLife() {
+void GamePlayScene::LoseLife(bool leaveCorpse) {
   if (isDeathTransitionActive_ || isLifeRelayActive_ || remainingLives_ <= 0)
     return;
   --remainingLives_;
@@ -1109,7 +1109,7 @@ void GamePlayScene::LoseLife() {
   if (remainingLives_ == 0) {
     StartDeathTransition();
   } else {
-    StartLifeRelay();
+    StartLifeRelay(leaveCorpse);
   }
 }
 

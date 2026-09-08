@@ -59,12 +59,12 @@ private:
     void UpdateCollisionText();
 
     void UpdateLivesText();
-    void LoseLife();
+    void LoseLife(bool leaveCorpse = true);
     void StartDeathTransition();
     void UpdateDeathTransition(float deltaTime);
     void RespawnPlayerLeavingCorpse();
 
-    void StartLifeRelay();
+    void StartLifeRelay(bool leaveCorpse = true);
     void FinishLifeRelay();
     void ResetToLastRespawnPoint();
     void StartClearCelebration();
