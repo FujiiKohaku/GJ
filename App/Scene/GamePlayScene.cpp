@@ -265,6 +265,11 @@ constexpr const char *kDoorOpenSoundPath = "resources/Audio/Gimmik/590949__rudme
 constexpr const char *kDoorCloseSoundName = "DoorClose";
 constexpr const char *kDoorCloseSoundPath = "resources/Audio/Gimmik/DOORWood_Door slamming 3 (ID 1339)_BigSoundBank.com.wav";
 
+constexpr const char *kGearHitSlimeSoundName = "GearHitSlime";
+constexpr const char *kGearHitSlimeSoundPath = "resources/Audio/Gimmik/433839__archos__slime-28.wav";
+constexpr const char *kSpikeHitSlimeSoundName = "SpikeHitSlime";
+constexpr const char *kSpikeHitSlimeSoundPath = "resources/Audio/Gimmik/751338__qubodup__slime-attack-1.flac";
+
 constexpr const char *kKeyWTexture = "resources/Textures/W.png";
 constexpr const char *kKeyATexture = "resources/Textures/A.png";
 constexpr const char *kKeySTexture = "resources/Textures/S.png";
@@ -332,6 +337,8 @@ bool GamePlayScene::InitializeNextStep() {
   audio->Load(kSwitchReleaseSoundName, kSwitchReleaseSoundPath, AudioCategory::SE);
   audio->Load(kDoorOpenSoundName, kDoorOpenSoundPath, AudioCategory::SE);
   audio->Load(kDoorCloseSoundName, kDoorCloseSoundPath, AudioCategory::SE);
+  audio->Load(kGearHitSlimeSoundName, kGearHitSlimeSoundPath, AudioCategory::SE);
+  audio->Load(kSpikeHitSlimeSoundName, kSpikeHitSlimeSoundPath, AudioCategory::SE);
   }
 
   if (initializationStep_ == 1) {
