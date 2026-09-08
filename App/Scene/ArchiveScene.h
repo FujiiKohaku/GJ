@@ -66,6 +66,7 @@ private:
     struct StageData {
         std::string name;
         std::string description;
+        std::string levelPath;
         StageDestination destination = StageDestination::GamePlay;
     };
 

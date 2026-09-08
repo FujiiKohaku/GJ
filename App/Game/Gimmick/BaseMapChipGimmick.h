@@ -37,6 +37,9 @@ public:
     // プレイヤーが衝突する（壁として働く）かどうか
     virtual bool IsSolid() const { return true; }
 
+    // プレイヤーが上面へ着地した際の通知。
+    virtual void OnPlayerStepped() {}
+
     // 自爆で残った硬化スライム。感圧板などが死体を識別するために使う。
     virtual bool IsHardenedSlime() const { return false; }
 
