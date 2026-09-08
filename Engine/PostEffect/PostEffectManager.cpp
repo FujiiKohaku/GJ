@@ -420,7 +420,7 @@ void PostEffectManager::ApplyAfterParticleDraw(
         screenSpaceFluidRenderer_->SmoothDepth();
 
         fluidCompositionTarget.BeginRender();
-        screenSpaceFluidRenderer_->Composite(*screenSpaceFluids[0], *camera_, inputHandle);
+        screenSpaceFluidRenderer_->Composite(screenSpaceFluids, *camera_, inputHandle);
         fluidCompositionTarget.EndRender();
 
         inputHandle = fluidCompositionTarget.GetSrvHandleGPU();

@@ -18,6 +18,9 @@
 #include <algorithm>
 #include <filesystem>
 #include <numbers>
+#include <map>
+#include <regex>
+#include <format>
 
 namespace {
 constexpr const char* kDefaultFont ="resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
@@ -126,23 +129,42 @@ void ArchiveScene::Finalize()
 
 void ArchiveScene::InitializeStageData()
 {
-    StageData gamePlayStage;
-    gamePlayStage.name = "STAGE 01  GAME PLAY";
-    gamePlayStage.description = "MAP CHIP COLLISION TEST";
-    gamePlayStage.levelPath = "resources/Maps/stage1.json";
-    gamePlayStage.destination = StageDestination::GamePlay;
-    stages_.push_back(gamePlayStage);
+    stages_.clear();
 
-    StageData stage2;
-    stage2.name = "STAGE 02  SKY RELAY";
-    stage2.description = "ASCEND THE RUINS AND CROSS THE HIGH PATH";
-    stage2.levelPath = "resources/Maps/stage2.json";
-    stage2.destination = StageDestination::GamePlay;
-    stages_.push_back(stage2);
+    std::map<int, std::string> foundStages;
+    std::regex stageRegex(R"(stage(\d+)\.json)", std::regex::icase);
+
+    const std::filesystem::path mapDir("resources/Maps");
+    if (std::filesystem::exists(mapDir)) {
+        std::error_code ec;
+        for (const auto& entry : std::filesystem::directory_iterator(mapDir, ec)) {
+            if (entry.is_regular_file()) {
+                std::string filename = entry.path().filename().string();
+                std::smatch match;
+                if (std::regex_match(filename, match, stageRegex)) {
+                    int stageNum = std::stoi(match[1].str());
+                    foundStages[stageNum] = entry.path().string();
+                }
+            }
+        }
+    }
+
+    int displayIndex = 1;
+    for (const auto& [stageNum, path] : foundStages) {
+        StageData stageData;
+        stageData.name = std::format("STAGE {:02}  GAME PLAY", displayIndex);
+        stageData.description = (displayIndex == 1) ? "MAP CHIP COLLISION TEST" :
+                                (displayIndex == 2) ? "ASCEND THE RUINS AND CROSS THE HIGH PATH" :
+                                "USER CREATED STAGE";
+        stageData.destination = StageDestination::GamePlay;
+        stageData.levelPath = path;
+        stages_.push_back(stageData);
+        displayIndex++;
+    }
 
     StageData crumblingFloorTestStage;
-    crumblingFloorTestStage.name = "STAGE 03  DEPTH CANNON";
-    crumblingFloorTestStage.description = "CANNON RELAY BETWEEN FRONT AND BACK MAPS";
+    crumblingFloorTestStage.name = std::format("STAGE {:02}  CRUMBLING TEST", displayIndex);
+    crumblingFloorTestStage.description = "CRUMBLING FLOOR TEST";
     crumblingFloorTestStage.levelPath = "resources/Maps/stage_test.json";
     crumblingFloorTestStage.destination = StageDestination::GamePlay;
     stages_.push_back(crumblingFloorTestStage);
@@ -1150,8 +1172,7 @@ void ArchiveScene::UpdateStageConfirmed(float deltaTime)
     switch (confirmedDestination_) {
     case StageDestination::GamePlay:
             SceneManager::GetInstance()->SetNextScene(
-                std::make_unique<GamePlayScene>(
-                    stages_[currentStageIndex_].levelPath));
+                std::make_unique<GamePlayScene>(stages_[currentStageIndex_].levelPath));
             break;
         case StageDestination::Test:
             SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());

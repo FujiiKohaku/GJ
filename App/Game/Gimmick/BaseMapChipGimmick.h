@@ -5,6 +5,14 @@
 #include "Engine/CollisionManager/CollisionManager.h"
 #include <string>
 #include <vector>
+#include <memory>
+
+/**
+ * @brief ギミックの揮発性状態（使い切り状態）を保存するための基底構造体
+ */
+struct IGimmickState {
+    virtual ~IGimmickState() = default;
+};
 
 class BaseMapChipGimmick {
 public:
@@ -51,6 +59,18 @@ public:
      * @param stage ステージのポインタ
      */
     virtual void SetStage(class MapChipStage* stage) {}
+
+    /**
+     * @brief 現在の揮発性状態（使い切り状態）のスナップショットを作成する
+     * @return 状態を保持したオブジェクト（復元不要なギミックはnullptrを返す）
+     */
+    virtual std::shared_ptr<IGimmickState> CreateSnapshot() const { return nullptr; }
+
+    /**
+     * @brief スナップショットから揮発性状態を復元する
+     * @param state 復元元の状態オブジェクト
+     */
+    virtual void RestoreFromSnapshot(const IGimmickState* state) {}
 
     /**
      * @brief イベントを受信した際の処理

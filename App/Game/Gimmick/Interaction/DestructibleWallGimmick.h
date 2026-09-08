@@ -15,6 +15,10 @@ class MapChipStage;
  */
 class DestructibleWallGimmick : public BaseMapChipGimmick {
 public:
+    struct DestructibleWallState : public IGimmickState {
+        bool isDestroyed;
+    };
+
     DestructibleWallGimmick();
     ~DestructibleWallGimmick() override;
 
@@ -34,6 +38,9 @@ public:
     bool IsSolid() const override { return !isDestroyed_; }
 
     void OnExplosion(const Vector3& origin, float radius) override;
+
+    std::shared_ptr<IGimmickState> CreateSnapshot() const override;
+    void RestoreFromSnapshot(const IGimmickState* state) override;
 
 private:
     std::unique_ptr<Object3d> object_;

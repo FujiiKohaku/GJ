@@ -34,6 +34,9 @@ cbuffer SlimeFluidCompositeParameter : register(b0)
     float32_t idleFaceAmount;
     float32_t idleFaceTime;
     float32_t2 paddingIdleFace;
+    float32_t4 extraEyeCenterUvs[15];
+    uint extraEyeCount;
+    float32_t3 paddingExtraEyes;
 };
 
 float32_t Hash31(float32_t3 value)
@@ -263,21 +266,6 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
         1.0f - smoothstep(-1.0f, 1.0f, leftEyeDistance);
     float32_t rightEyeMask =
         1.0f - smoothstep(-1.0f, 1.0f, rightEyeDistance);
-    // Last-life rupture: replace both capsule eyes with a clear "X" mark.
-    float32_t leftCrossBand = min(abs(leftEyePoint.x - leftEyePoint.y),
-        abs(leftEyePoint.x + leftEyePoint.y));
-    float32_t rightCrossBand = min(abs(rightEyePoint.x - rightEyePoint.y),
-        abs(rightEyePoint.x + rightEyePoint.y));
-    float32_t leftCrossExtent = max(abs(leftEyePoint.x), abs(leftEyePoint.y));
-    float32_t rightCrossExtent = max(abs(rightEyePoint.x), abs(rightEyePoint.y));
-    float32_t leftCrossMask =
-        (1.0f - smoothstep(2.2f, 3.7f, leftCrossBand)) *
-        (1.0f - smoothstep(10.0f, 12.0f, leftCrossExtent));
-    float32_t rightCrossMask =
-        (1.0f - smoothstep(2.2f, 3.7f, rightCrossBand)) *
-        (1.0f - smoothstep(10.0f, 12.0f, rightCrossExtent));
-    leftEyeMask = lerp(leftEyeMask, leftCrossMask, deathEyes);
-    rightEyeMask = lerp(rightEyeMask, rightCrossMask, deathEyes);
     float32_t eyeMask = max(leftEyeMask, rightEyeMask) * eyeVisibility;
     // The eye center can overlap the floor's depth silhouette while grounded.
     // Do not gate it by the local thickness sample: that sample is a soft
@@ -322,12 +310,45 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
             length(eyePointBase - float32_t2(kEyeSeparationPixels, 0.0f) - eyeHighlightCenter));
     float32_t eyeHighlight = max(leftEyeHighlight, rightEyeHighlight);
     finalColor +=
-        float32_t3(0.72f, 0.93f, 1.0f) * eyeHighlight * eyeMask * 0.72f;
+        float32_t3(0.72f, 0.93f, 1.0f) *
+        eyeHighlight * eyeMask * 0.72f;
+
+    // Death marks are rendered through one shared path, including the first
+    // fluid when it is a corpse. This keeps every hardened slime's × identical.
+    float32_t extraEyeMask = 0.0f;
+    [loop]
+    for (uint eyeIndex = 0; eyeIndex < extraEyeCount; ++eyeIndex)
+    {
+        float32_t2 extraEyeBase =
+            (input.texcoord - extraEyeCenterUvs[eyeIndex].xy) / texelSize;
+        float32_t2 extraLeftEye = extraEyeBase + float32_t2(kEyeSeparationPixels, 0.0f);
+        float32_t2 extraRightEye = extraEyeBase - float32_t2(kEyeSeparationPixels, 0.0f);
+        float32_t extraLeftBand = min(abs(extraLeftEye.x - extraLeftEye.y),
+            abs(extraLeftEye.x + extraLeftEye.y));
+        float32_t extraRightBand = min(abs(extraRightEye.x - extraRightEye.y),
+            abs(extraRightEye.x + extraRightEye.y));
+        float32_t extraLeftExtent = max(abs(extraLeftEye.x), abs(extraLeftEye.y));
+        float32_t extraRightExtent = max(abs(extraRightEye.x), abs(extraRightEye.y));
+        float32_t extraLeftMask =
+            (1.0f - smoothstep(2.2f, 3.7f, extraLeftBand)) *
+            (1.0f - smoothstep(10.0f, 12.0f, extraLeftExtent));
+        float32_t extraRightMask =
+            (1.0f - smoothstep(2.2f, 3.7f, extraRightBand)) *
+            (1.0f - smoothstep(10.0f, 12.0f, extraRightExtent));
+        // A transformed corpse can have a core position that is no longer at
+        // the visible particle surface. Keep its × eyes strictly inside the
+        // actual fluid silhouette, so no marks remain on the terrain.
+        float32_t corpseSurfaceMask = smoothstep(0.03f, 0.10f, density);
+        float32_t corpseEyeMask =
+            max(extraLeftMask, extraRightMask) * corpseSurfaceMask;
+        extraEyeMask = max(extraEyeMask, corpseEyeMask);
+        finalColor = lerp(finalColor, eyeCoreColor, corpseEyeMask * 0.98f);
+    }
 
     float32_t3 background = gSceneColor.SampleLevel(gSampler, input.texcoord, 0).rgb;
     // Keep the eye visible even when its pixel lands in a low-thickness part
     // of a grounded metaball. The eye mask itself supplies the coverage there.
-    float32_t eyeAwareEdge = max(edgeAA, eyeMask);
+    float32_t eyeAwareEdge = max(edgeAA, max(eyeMask, extraEyeMask));
     float32_t3 result = lerp(background, finalColor, alpha * eyeAwareEdge);
 
     return float32_t4(result, 1.0f);

@@ -174,6 +174,46 @@ bool CrumblingFloorGimmick::IsSolid() const
     return true;
 }
 
+std::shared_ptr<IGimmickState> CrumblingFloorGimmick::CreateSnapshot() const
+{
+    auto state = std::make_shared<CrumblingFloorState>();
+    state->state = state_;
+    state->stateTime = stateTime_;
+    return state;
+}
+
+void CrumblingFloorGimmick::RestoreFromSnapshot(const IGimmickState* state)
+{
+    if (const auto* floorState = dynamic_cast<const CrumblingFloorState*>(state)) {
+        state_ = floorState->state;
+        stateTime_ = floorState->stateTime;
+        
+        // Idle または Gone の状態に応じて位置を初期化・非表示化する
+        // Fallingの途中の状態の復元までは求められていないため、安全にIdleかGoneにスナップする
+        if (state_ == State::Idle || state_ == State::Shaking) {
+            state_ = State::Idle;
+            stateTime_ = 0.0f;
+            for (size_t index = 0; index < kPieceCount; ++index) {
+                if (pieces_[index]) {
+                    pieces_[index]->SetTranslate(GetPieceBasePosition(index));
+                    pieces_[index]->SetScale({ kPieceWidth, kPieceHeight, 1.0f });
+                    pieces_[index]->SetRotate({ 0.0f, 0.0f, 0.0f });
+                    pieces_[index]->Update();
+                }
+            }
+        } else {
+            state_ = State::Gone;
+            stateTime_ = 0.0f;
+            for (size_t index = 0; index < kPieceCount; ++index) {
+                if (pieces_[index]) {
+                    pieces_[index]->SetScale({ 0.0f, 0.0f, 0.0f });
+                    pieces_[index]->Update();
+                }
+            }
+        }
+    }
+}
+
 void CrumblingFloorGimmick::OnPlayerStepped()
 {
     if (!isEditorMode_ && state_ == State::Idle) {

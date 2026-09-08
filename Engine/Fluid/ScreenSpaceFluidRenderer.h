@@ -5,6 +5,7 @@
 #include "Engine/SrvManager/SrvManager.h"
 
 #include <cstdint>
+#include <vector>
 #include <wrl.h>
 
 class Camera;
@@ -37,7 +38,7 @@ public:
     void RenderDepth(const GpuSphFluid& fluid, const Camera& camera);
     void SmoothDepth();
     void Composite(
-        const GpuSphFluid& fluid,
+        const std::vector<const GpuSphFluid*>& fluids,
         const Camera& camera,
         D3D12_GPU_DESCRIPTOR_HANDLE sceneColorHandle);
     void Render(
@@ -112,6 +113,8 @@ private:
     };
 
     struct CompositeParameter {
+        static constexpr uint32_t kMaxExtraEyes = 15;
+
         Vector2 texelSize;
         float refractionStrength;
         float translucency;
@@ -135,6 +138,10 @@ private:
         float idleFaceAmount;
         float idleFaceTime;
         Vector2 paddingIdleFace;
+        // HLSL constant-buffer arrays have a 16-byte stride.
+        Vector4 extraEyeCenterUvs[kMaxExtraEyes];
+        uint32_t extraEyeCount;
+        Vector3 paddingExtraEyes;
     };
 
     static constexpr uint32_t kDefaultFirstRtvIndex = 8;

@@ -61,7 +61,6 @@ private:
         GamePlay,
         Test,
     };
-
     struct StageData {
         std::string name;
         std::string description;

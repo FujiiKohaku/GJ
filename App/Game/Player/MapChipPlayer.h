@@ -31,6 +31,7 @@ public:
     bool IsColliding() const;
     bool IsCrushed() const;
     bool IsShapingSelfDestruct() const { return isShapingSelfDestruct_; }
+    void BeginSelfDestructShape();
     bool ConsumeHardenedBody(AABB& outBody);
     void LaunchUpward(float speed);
     void SetMapChipField(const MapChipField* mapChipField);

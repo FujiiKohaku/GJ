@@ -16,8 +16,17 @@
 #include "Engine/3D/SkyBox/SkyBox.h"
 #include "Engine/Camera/Camera.h"
 #include "Engine/debugcamera/DebugCameraController.h"
+#include "Engine/PostEffect/PostEffectType.h"
 #include "PageTransition.h"
+#include <cstddef>
 #include <memory>
+#include <string>
+#include <vector>
+
+struct GamePlaySavePoint {
+    Vector3 playerStartPosition;
+    StageSnapshot stageSnapshot;
+};
 
 class GamePlayScene : public BaseScene {
 public:
@@ -45,7 +54,12 @@ private:
      */
     Vector3 ClampCameraTarget(const Vector3& targetPosition) const;
 
-    void UpdateCollisionText();
+    void PushSavePoint();
+    void PopSavePoint();
+    void RestoreSavePoint();
+
+    std::vector<GamePlaySavePoint> savePointHistory_;
+
     void UpdateLivesText();
     void LoseLife();
     void StartDeathTransition();
@@ -61,13 +75,16 @@ private:
     void StartStageSelectTransition();
     void UpdateStageSelectTransition(float deltaTime);
     void UpdateFantasyMenuEffect(float deltaTime);
+    void UpdateStage1Tutorial();
 
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
     std::unique_ptr<SkyBox> skyBox_;
-    std::unique_ptr<Text> instructionText_;
-    std::unique_ptr<Text> collisionText_;
-    std::unique_ptr<Text> livesText_;
+    std::unique_ptr<Sprite> tutorialPanelSprite_;
+    std::unique_ptr<Text> tutorialText_;
+    std::unique_ptr<Text> livesNumberText_;
+    std::vector<std::unique_ptr<Sprite>> lifeSprites_;
+    int displayedLives_ = -1;
     static constexpr int kInitialLives = 5;
     static constexpr int kStage1Lives = 10;
     int remainingLives_ = kInitialLives;
@@ -98,9 +115,11 @@ private:
     std::unique_ptr<Sprite> menuBackgroundSprite_;
     std::unique_ptr<Sprite> menuPanelSprite_;
     std::unique_ptr<Sprite> menuResumeButtonSprite_;
+    std::unique_ptr<Sprite> menuRestartButtonSprite_;
     std::unique_ptr<Sprite> menuStageSelectButtonSprite_;
     std::unique_ptr<Text> menuTitleText_;
     std::unique_ptr<Text> menuResumeText_;
+    std::unique_ptr<Text> menuRestartText_;
     std::unique_ptr<Text> menuStageSelectText_;
     std::unique_ptr<Sprite> menuTransitionFadeSprite_;
     bool isStageSelectTransitionActive_ = false;
@@ -114,6 +133,9 @@ private:
     Vector3 playerStartPosition_ = { 0.0f, 0.0f, 0.0f };
     bool selfDestructSlowActive_ = false;
     float timeScaleBeforeSelfDestruct_ = 1.0f;
+
+    std::size_t nextStage1TutorialIndex_ = 0;
+    bool stage1ShapeTutorialShown_ = false;
 
     bool isLifeRelayActive_ = false;
     float lifeRelayTimer_ = 0.0f;
