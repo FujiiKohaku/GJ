@@ -16,10 +16,17 @@
 #include "Engine/3D/SkyBox/SkyBox.h"
 #include "Engine/Camera/Camera.h"
 #include "Engine/debugcamera/DebugCameraController.h"
+#include "Engine/PostEffect/PostEffectType.h"
 #include "PageTransition.h"
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <vector>
+
+struct GamePlaySavePoint {
+    Vector3 playerStartPosition;
+    StageSnapshot stageSnapshot;
+};
 
 class GamePlayScene : public BaseScene {
 public:
@@ -42,6 +49,14 @@ private:
      * @return 画面内にマップ外の未配置領域が映らないように補正された安全な座標
      */
     Vector3 ClampCameraTarget(const Vector3& targetPosition) const;
+
+    void PushSavePoint();
+    void PopSavePoint();
+    void RestoreSavePoint();
+
+    std::vector<GamePlaySavePoint> savePointHistory_;
+
+    void UpdateCollisionText();
 
     void UpdateLivesText();
     void LoseLife();

@@ -59,6 +59,26 @@ bool DestructibleWallGimmick::Initialize(
     return true;
 }
 
+std::shared_ptr<IGimmickState> DestructibleWallGimmick::CreateSnapshot() const
+{
+    auto state = std::make_shared<DestructibleWallState>();
+    state->isDestroyed = isDestroyed_;
+    return state;
+}
+
+void DestructibleWallGimmick::RestoreFromSnapshot(const IGimmickState* state)
+{
+    if (const auto* wallState = dynamic_cast<const DestructibleWallState*>(state)) {
+        isDestroyed_ = wallState->isDestroyed;
+        if (!isDestroyed_) {
+            object_->SetScale(size_);
+        } else {
+            object_->SetScale({0.0f, 0.0f, 0.0f});
+        }
+        object_->Update();
+    }
+}
+
 void DestructibleWallGimmick::EnableToonLighting()
 {
     if (object_) {

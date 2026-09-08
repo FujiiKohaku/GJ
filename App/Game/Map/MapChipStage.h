@@ -7,8 +7,13 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 class MapChipPlayer;
+
+struct StageSnapshot {
+    std::unordered_map<BaseMapChipGimmick*, std::shared_ptr<IGimmickState>> gimmickStates;
+};
 
 class MapChipStage {
 public:
@@ -34,6 +39,18 @@ public:
     void AddGimmick(std::unique_ptr<BaseMapChipGimmick> gimmick);
     void LimitHardenedSlimeCount(size_t maximumCount);
     bool RemoveLatestHardenedSlime();
+
+    /**
+     * @brief 現在のステージの全揮発性ギミックの状態を収集したスナップショットを作成する
+     * @return スナップショットオブジェクト
+     */
+    StageSnapshot CreateStageSnapshot() const;
+
+    /**
+     * @brief スナップショットを使ってステージの全ギミックの状態を一斉に復元する
+     * @param snapshot 復元元のスナップショット
+     */
+    void RestoreStageSnapshot(const StageSnapshot& snapshot);
 
     /**
      * @brief イベントマネージャを取得する

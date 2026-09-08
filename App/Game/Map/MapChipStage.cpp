@@ -144,6 +144,31 @@ void MapChipStage::Initialize(
     }
 }
 
+StageSnapshot MapChipStage::CreateStageSnapshot() const
+{
+    StageSnapshot snapshot;
+    for (const auto& gimmick : gimmicks_) {
+        if (gimmick) {
+            if (auto state = gimmick->CreateSnapshot()) {
+                snapshot.gimmickStates[gimmick.get()] = std::move(state);
+            }
+        }
+    }
+    return snapshot;
+}
+
+void MapChipStage::RestoreStageSnapshot(const StageSnapshot& snapshot)
+{
+    for (const auto& gimmick : gimmicks_) {
+        if (gimmick) {
+            auto it = snapshot.gimmickStates.find(gimmick.get());
+            if (it != snapshot.gimmickStates.end()) {
+                gimmick->RestoreFromSnapshot(it->second.get());
+            }
+        }
+    }
+}
+
 void MapChipStage::ApplyMaterialProperties()
 {
     // 全オブジェクトにToonLightingを適用
