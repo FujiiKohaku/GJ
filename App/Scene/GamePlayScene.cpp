@@ -40,8 +40,9 @@ constexpr Vector3 kSlimeRenderForward = {0.0f, 0.0f, 1.0f};
 constexpr float kMenuButtonX = 440.0f;
 constexpr float kMenuButtonWidth = 400.0f;
 constexpr float kMenuButtonHeight = 58.0f;
-constexpr float kMenuResumeY = 325.0f;
-constexpr float kMenuStageSelectY = 405.0f;
+constexpr float kMenuResumeY = 300.0f;
+constexpr float kMenuRestartY = 380.0f;
+constexpr float kMenuStageSelectY = 460.0f;
 constexpr float kStageSelectFadeDuration = 0.45f;
 constexpr float kFantasyMenuBlendDuration = 0.20f;
 
@@ -288,7 +289,7 @@ void GamePlayScene::Initialize() {
   instructionText_->Initialize(kDefaultFont);
   instructionText_->SetText(
       "MOVE : A/D OR LEFT/RIGHT   JUMP : SPACE/W/UP   "
-      "T : SLOW/SHAPE, T AGAIN : SELF-DESTRUCT   R : RESTART   "
+      "T : SLOW/SHAPE, T AGAIN : SELF-DESTRUCT   R : UNDO 1 STEP   "
       "F1 : FREE CAM   TAB : MENU");
   instructionText_->SetPosition({32.0f, 32.0f});
   instructionText_->SetFontSize(24.0f);
@@ -342,6 +343,7 @@ void GamePlayScene::Initialize() {
     return button;
   };
   menuResumeButtonSprite_ = createMenuButton(kMenuResumeY);
+  menuRestartButtonSprite_ = createMenuButton(kMenuRestartY);
   menuStageSelectButtonSprite_ = createMenuButton(kMenuStageSelectY);
 
   // メニュータイトル
@@ -364,6 +366,7 @@ void GamePlayScene::Initialize() {
     return text;
   };
   menuResumeText_ = createMenuText("RESUME GAME  [TAB]", kMenuResumeY);
+  menuRestartText_ = createMenuText("RETRY STAGE  [R]", kMenuRestartY);
   menuStageSelectText_ =
       createMenuText("STAGE SELECT  [BACKSPACE]", kMenuStageSelectY);
 
@@ -424,7 +427,7 @@ void GamePlayScene::Update() {
     if (!isClearCelebrationActive_) return;
   }
 
-  if (!isClearCelebrationActive_ && input->IsKeyTrigger(DIK_R)) {
+  if (!isClearCelebrationActive_ && !isMenuOpen_ && input->IsKeyTrigger(DIK_R)) {
     ResetToLastRespawnPoint();
     return;
   }
@@ -443,6 +446,7 @@ void GamePlayScene::Update() {
   if (isMenuOpen_) {
     const Vector2 mousePosition = input->GetMousePosition();
     const bool resumeHovered = IsPointInMenuButton(mousePosition, kMenuResumeY);
+    const bool restartHovered = IsPointInMenuButton(mousePosition, kMenuRestartY);
     const bool stageSelectHovered =
         IsPointInMenuButton(mousePosition, kMenuStageSelectY);
     const bool clicked = input->IsMouseTrigger(0);
@@ -450,12 +454,20 @@ void GamePlayScene::Update() {
     menuResumeButtonSprite_->SetColor(resumeHovered
                                           ? Vector4{0.25f, 0.48f, 0.34f, 1.0f}
                                           : Vector4{0.15f, 0.25f, 0.22f, 1.0f});
+    menuRestartButtonSprite_->SetColor(
+        restartHovered ? Vector4{0.30f, 0.38f, 0.54f, 1.0f}
+                       : Vector4{0.17f, 0.21f, 0.30f, 1.0f});
     menuStageSelectButtonSprite_->SetColor(
         stageSelectHovered ? Vector4{0.30f, 0.38f, 0.54f, 1.0f}
                            : Vector4{0.17f, 0.21f, 0.30f, 1.0f});
 
     if (clicked && resumeHovered) {
       isMenuOpen_ = false;
+      return;
+    }
+    if (input->IsKeyTrigger(DIK_R) || (clicked && restartHovered)) {
+      SceneManager::GetInstance()->SetNextScene(
+          std::make_unique<GamePlayScene>(levelPath_));
       return;
     }
     if (input->IsKeyTrigger(DIK_BACKSPACE) || (clicked && stageSelectHovered)) {
@@ -466,9 +478,11 @@ void GamePlayScene::Update() {
     menuBackgroundSprite_->Update();
     menuPanelSprite_->Update();
     menuResumeButtonSprite_->Update();
+    menuRestartButtonSprite_->Update();
     menuStageSelectButtonSprite_->Update();
     menuTitleText_->Update();
     menuResumeText_->Update();
+    menuRestartText_->Update();
     menuStageSelectText_->Update();
     return;
   }
@@ -715,11 +729,13 @@ void GamePlayScene::Draw2D() {
     menuBackgroundSprite_->Draw();
     menuPanelSprite_->Draw();
     menuResumeButtonSprite_->Draw();
+    menuRestartButtonSprite_->Draw();
     menuStageSelectButtonSprite_->Draw();
 
     TextRenderer::GetInstance()->PreDraw();
     menuTitleText_->Draw();
     menuResumeText_->Draw();
+    menuRestartText_->Draw();
     menuStageSelectText_->Draw();
   }
   if (isStageSelectTransitionActive_) {

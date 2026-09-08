@@ -81,9 +81,11 @@ private:
     std::unique_ptr<Sprite> menuBackgroundSprite_;
     std::unique_ptr<Sprite> menuPanelSprite_;
     std::unique_ptr<Sprite> menuResumeButtonSprite_;
+    std::unique_ptr<Sprite> menuRestartButtonSprite_;
     std::unique_ptr<Sprite> menuStageSelectButtonSprite_;
     std::unique_ptr<Text> menuTitleText_;
     std::unique_ptr<Text> menuResumeText_;
+    std::unique_ptr<Text> menuRestartText_;
     std::unique_ptr<Text> menuStageSelectText_;
     std::unique_ptr<Sprite> menuTransitionFadeSprite_;
     bool isStageSelectTransitionActive_ = false;
