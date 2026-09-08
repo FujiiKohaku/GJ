@@ -10,6 +10,8 @@
 #include "Engine/Logger/Logger.h"
 #include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include "Engine/Time/TimeManager.h"
+#include "App/Game/Player/MapChipPlayer.h"
+#include "Engine/CollisionManager/CollisionManager.h"
 
 namespace {
     const float kFillDelay = 1.0f;     // ガスが充満するまでのディレイ
@@ -109,6 +111,15 @@ void GasEmitterGimmick::Update()
     if (currentState_ != State::Idle && currentState_ != State::Finished) {
         stateTimer_ += TimeManager::GetInstance()->GetDeltaTime();
         UpdateParticles();
+
+        // 充満中(Filling)、充満完了(Active)、着火済み(Ignited)の間はプレイヤーを死亡させる
+        if (stage_ && stage_->GetPlayer()) {
+            AABB playerBox = stage_->GetPlayer()->GetAABB();
+            AABB gasBox = GetGasAABB();
+            if (CollisionManager::Intersect(playerBox, gasBox).isHit) {
+                stage_->GetPlayer()->Kill();
+            }
+        }
 
         switch (currentState_) {
         case State::Filling:

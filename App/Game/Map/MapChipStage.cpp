@@ -8,6 +8,7 @@
 #include "App/Game/Gimmick/Interaction/GasEmitterGimmick.h"
 #include "App/Game/Gimmick/Interaction/DestructibleWallGimmick.h"
 #include "App/Game/Gimmick/Trap/SpikeGimmick.h"
+#include "App/Game/Player/MapChipPlayer.h"
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3d.h"
 #include "Engine/3D/Object3dManager.h"
@@ -380,6 +381,13 @@ void MapChipStage::CreateExplosion(const Vector3& origin, float radius)
     for (auto* target : targets) {
         target->OnExplosion(origin, radius);
     }
+    
+    if (player_) {
+        Vector3 diff = player_->GetAABB().center - origin;
+        if (Vector3LengthSquared(diff) <= radius * radius) {
+            player_->Kill();
+        }
+    }
 }
 
 void MapChipStage::CreateExplosionGrid(const Vector3& origin, uint32_t left, uint32_t right, uint32_t up, uint32_t down)
@@ -419,6 +427,29 @@ void MapChipStage::CreateExplosionGrid(const Vector3& origin, uint32_t left, uin
         if ((inGasX && inGasY) || isAdjacentX || isAdjacentY) {
             float dist = Vector3Length(center - origin);
             gimmick->OnExplosion(origin, dist);
+        }
+    }
+
+    if (player_) {
+        Vector3 center = player_->GetAABB().center;
+        
+        // origin からの相対距離
+        float diffX = center.x - origin.x;
+        float diffY = center.y - origin.y;
+        
+        // Z座標が同じ平面上にあるか確認
+        if (std::abs(center.z - origin.z) <= 0.5f) {
+            int dx = static_cast<int>(std::round(diffX / blockSize));
+            int dy = static_cast<int>(std::round(diffY / blockSize));
+
+            bool inGasX = (dx >= iLeft && dx <= iRight);
+            bool inGasY = (dy >= iDown && dy <= iUp);
+            bool isAdjacentX = inGasY && (dx == iLeft - 1 || dx == iRight + 1);
+            bool isAdjacentY = inGasX && (dy == iDown - 1 || dy == iUp + 1);
+            
+            if ((inGasX && inGasY) || isAdjacentX || isAdjacentY) {
+                player_->Kill();
+            }
         }
     }
 }
