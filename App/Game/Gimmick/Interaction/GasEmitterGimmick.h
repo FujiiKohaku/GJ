@@ -6,6 +6,7 @@
 #include "App/Game/Gimmick/BaseMapChipGimmick.h"
 #include "App/Game/Gimmick/Interaction/GasEmitterParam.h"
 #include "Engine/Effect/EffectManager.h"
+#include "Engine/Audio/SoundManager.h"
 #include <vector>
 #include <memory>
 
@@ -91,4 +92,6 @@ private:
     // 煙が上に昇る性質を考慮し、発生源をブロックの中心より下（-0.5）に設定します。
     // （これまでは +0.5 だったため、上に1ブロック分ズレているように見えていました）
     Vector3 particleOffset_ = { 0.0f, -0.5f, 0.0f };
+
+    AudioHandle gasFlowAudioHandle_{};
 };

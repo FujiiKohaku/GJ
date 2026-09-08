@@ -246,6 +246,15 @@ constexpr const char *kSlowWaterSoundPath = "resources/Audio/Scene/player/水中
 constexpr const char *kSlimeMoveSoundName = "SlimeMove";
 constexpr const char *kSlimeMoveSoundPath = "resources/Audio/Scene/player/ゾンビの食事.mp3";
 
+constexpr const char *kGasExplosionSoundName = "GasExplosion";
+constexpr const char *kGasExplosionSoundPath = "resources/Audio/Gimmik/mixkit-fuel-explosion-1705.wav";
+constexpr const char *kGasFlowSoundName = "GasFlow";
+constexpr const char *kGasFlowSoundPath = "resources/Audio/Gimmik/spinopel-gas-flow-411772.mp3";
+constexpr const char *kGasIgniteSoundName = "GasIgnite";
+constexpr const char *kGasIgniteSoundPath = "resources/Audio/Gimmik/biww-fire-ignite-whoosh-sound-effect-561960.mp3";
+constexpr const char *kLaserHitSlimeSoundName = "LaserHitSlime";
+constexpr const char *kLaserHitSlimeSoundPath = "resources/Audio/Gimmik/dragon-studio-steam-hissing-386157.mp3";
+
 constexpr const char *kKeyWTexture = "resources/Textures/W.png";
 constexpr const char *kKeyATexture = "resources/Textures/A.png";
 constexpr const char *kKeySTexture = "resources/Textures/S.png";
@@ -305,6 +314,10 @@ bool GamePlayScene::InitializeNextStep() {
   SoundManager* audio = SoundManager::GetInstance();
   audio->Load(kSlowWaterSoundName, kSlowWaterSoundPath, AudioCategory::SE);
   audio->Load(kSlimeMoveSoundName, kSlimeMoveSoundPath, AudioCategory::SE);
+  audio->Load(kGasExplosionSoundName, kGasExplosionSoundPath, AudioCategory::SE);
+  audio->Load(kGasFlowSoundName, kGasFlowSoundPath, AudioCategory::SE);
+  audio->Load(kGasIgniteSoundName, kGasIgniteSoundPath, AudioCategory::SE);
+  audio->Load(kLaserHitSlimeSoundName, kLaserHitSlimeSoundPath, AudioCategory::SE);
   }
 
   if (initializationStep_ == 1) {

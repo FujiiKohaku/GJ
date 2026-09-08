@@ -153,6 +153,15 @@ bool SoundManager::Resume(AudioHandle handle)
     return true;
 }
 
+void SoundManager::SetVolume(AudioHandle handle, float volume)
+{
+    PlayingAudio* playing = FindPlaying(handle);
+    if (playing) {
+        playing->volume = ClampVolume(volume);
+        ApplyVolume(*playing);
+    }
+}
+
 void SoundManager::StopBGM() { if (currentBGM_.IsValid()) { Stop(currentBGM_); } }
 void SoundManager::PauseBGM() { Pause(currentBGM_); }
 void SoundManager::ResumeBGM() { Resume(currentBGM_); }

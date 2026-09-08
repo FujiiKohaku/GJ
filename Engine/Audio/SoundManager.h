@@ -59,6 +59,7 @@ public:
     bool Stop(AudioHandle handle);
     bool Pause(AudioHandle handle);
     bool Resume(AudioHandle handle);
+    void SetVolume(AudioHandle handle, float volume);
     void StopBGM();
     void PauseBGM();
     void ResumeBGM();
