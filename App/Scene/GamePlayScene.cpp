@@ -906,8 +906,7 @@ void GamePlayScene::UpdateClearCelebration(float unscaledDeltaTime) {
 void GamePlayScene::UpdateLivesText() {
   if (!livesText_)
     return;
-  const float width = static_cast<float>(
-      (std::max)(WinApp::GetInstance()->GetClientWidth(), 1));
+  const float width = static_cast<float>(WinApp::GetInstance()->GetRenderWidth());
   livesText_->SetPosition({width - 32.0f, 108.0f});
   livesText_->SetText("残機 × " + std::to_string(remainingLives_));
   livesText_->SetColor(remainingLives_ <= 2

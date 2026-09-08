@@ -195,7 +195,14 @@ Vector2 Input::GetMousePosition() const
     POINT pt;
     GetCursorPos(&pt);
     ScreenToClient(winApp_->GetHwnd(), &pt);
-    return { static_cast<float>(pt.x), static_cast<float>(pt.y) };
+    const float clientWidth = static_cast<float>(
+        (std::max)(winApp_->GetClientWidth(), 1));
+    const float clientHeight = static_cast<float>(
+        (std::max)(winApp_->GetClientHeight(), 1));
+    return {
+        static_cast<float>(pt.x) * winApp_->GetRenderWidth() / clientWidth,
+        static_cast<float>(pt.y) * winApp_->GetRenderHeight() / clientHeight
+    };
 }
 
 bool Input::IsGamepadConnected() const

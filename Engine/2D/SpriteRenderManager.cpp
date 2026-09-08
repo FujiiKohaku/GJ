@@ -256,8 +256,8 @@ void SpriteRenderManager::CreateFrameParameterBuffer()
     frameParameterData_->elapsedTime = 0.0f;
     frameParameterData_->deltaTime = 0.0f;
     frameParameterData_->screenSize = {
-        static_cast<float>(WinApp::GetInstance()->GetClientWidth()),
-        static_cast<float>(WinApp::GetInstance()->GetClientHeight())
+        static_cast<float>(WinApp::GetInstance()->GetRenderWidth()),
+        static_cast<float>(WinApp::GetInstance()->GetRenderHeight())
     };
 }
 
@@ -269,8 +269,8 @@ void SpriteRenderManager::UpdateFrameParameters()
     frameParameterData_->deltaTime =
         std::chrono::duration<float>(currentTime - previousFrameTime_).count();
     frameParameterData_->screenSize = {
-        static_cast<float>(WinApp::GetInstance()->GetClientWidth()),
-        static_cast<float>(WinApp::GetInstance()->GetClientHeight())
+        static_cast<float>(WinApp::GetInstance()->GetRenderWidth()),
+        static_cast<float>(WinApp::GetInstance()->GetRenderHeight())
     };
     previousFrameTime_ = currentTime;
 }

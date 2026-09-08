@@ -31,6 +31,9 @@ public:
     static const int32_t kClientHeight = 720;
     int32_t GetClientWidth() const;
     int32_t GetClientHeight() const;
+    int32_t GetRenderWidth() const { return kClientWidth; }
+    int32_t GetRenderHeight() const { return kClientHeight; }
+    bool ToggleFullscreen();
 
     static LRESULT CALLBACK WindowProc(
         HWND hwnd,
@@ -49,4 +52,8 @@ private:
 private:
     HWND hwnd_ = nullptr;
     WNDCLASS wc_ {};
+    WINDOWPLACEMENT windowedPlacement_ { sizeof(WINDOWPLACEMENT) };
+    DWORD windowedStyle_ = 0;
+    DWORD windowedExStyle_ = 0;
+    bool isFullscreen_ = false;
 };
