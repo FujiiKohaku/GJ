@@ -33,6 +33,14 @@ public:
 private:
     std::string levelPath_;
     void UpdateFollowCamera();
+
+    /**
+     * @brief カメラの注視点（ターゲット）座標が、マップ境界外を映さないように制限（クランプ）する
+     * @param targetPosition 本来カメラが追従したい理想の座標
+     * @return 画面内にマップ外の未配置領域が映らないように補正された安全な座標
+     */
+    Vector3 ClampCameraTarget(const Vector3& targetPosition) const;
+
     void UpdateCollisionText();
     void UpdateLivesText();
     void LoseLife();
