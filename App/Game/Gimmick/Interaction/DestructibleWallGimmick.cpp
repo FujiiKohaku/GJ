@@ -9,6 +9,10 @@
 #include "App/Game/Map/MapChipStage.h"
 #include "Engine/LevelEditor/GimmickMetaDataManager.h"
 
+namespace {
+constexpr int32_t kDestructibleWallMaterialMode = 16;
+}
+
 DestructibleWallGimmick::DestructibleWallGimmick()
     : stage_(nullptr)
     , position_({0, 0, 0})
@@ -48,6 +52,8 @@ bool DestructibleWallGimmick::Initialize(
     object_->SetTranslate(position_);
     object_->SetScale(size_);
     object_->SetEnableLighting(true);
+    object_->GetMaterial()->enableLighting = kDestructibleWallMaterialMode;
+    object_->GetMaterial()->enableEnvironmentMap = 0;
     object_->Update();
 
     return true;
@@ -56,7 +62,7 @@ bool DestructibleWallGimmick::Initialize(
 void DestructibleWallGimmick::EnableToonLighting()
 {
     if (object_) {
-        object_->EnableToonLighting();
+        object_->GetMaterial()->enableLighting = kDestructibleWallMaterialMode;
     }
 }
 
