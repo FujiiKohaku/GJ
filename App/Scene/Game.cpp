@@ -169,6 +169,12 @@ void Game::Initialize()
 
     TimeManager::GetInstance()->Initialize();
 
+    TextureManager::GetInstance()->LoadTexture("resources/Textures/UI/cursor.png");
+    customCursorSprite_ = std::make_unique<Sprite>();
+    customCursorSprite_->Initialize(SpriteManager::GetInstance(), "resources/Textures/UI/cursor.png");
+    customCursorSprite_->SetSize({ 32.0f, 32.0f });
+    customCursorSprite_->SetAnchorPoint({ 0.0f, 0.0f });
+
     Logger::Log("Game Initialize End");
 }
 
@@ -234,14 +240,19 @@ void Game::Update()
         ProfilerScope scope("SceneUpdate");
         SceneManager::GetInstance()->Update();
     }
-    const bool wantsCursor = manualMouseCursorVisible_ || SceneManager::GetInstance()->WantsMouseCursor();
-    if (wantsCursor != isMouseCursorVisible_) {
-        ShowCursor(wantsCursor ? TRUE : FALSE);
-        if (wantsCursor) UnlockCursor(); else LockCursorToWindow();
-        isMouseCursorVisible_ = wantsCursor;
+    // OSカーソルは手動デバッグ時(F2)のみ表示・ロック解除する
+    if (manualMouseCursorVisible_ != isMouseCursorVisible_) {
+        ShowCursor(manualMouseCursorVisible_ ? TRUE : FALSE);
+        if (manualMouseCursorVisible_) UnlockCursor(); else LockCursorToWindow();
+        isMouseCursorVisible_ = manualMouseCursorVisible_;
     }
     
     DebugRenderer::GetInstance()->Update();
+    
+    if (customCursorSprite_) {
+        customCursorSprite_->SetPosition(Input::GetInstance()->GetMousePosition());
+        customCursorSprite_->Update();
+    }
     
 #ifdef USE_IMGUI
     if (showDebugUI_ || SceneManager::GetInstance()->WantsImGuiAlways()) {
@@ -271,7 +282,9 @@ void Game::Update()
 
 void Game::Draw()
 {
-    renderer_->Draw(SceneManager::GetInstance());
+    // カスタムカーソルはシーンが要求しており、かつOSカーソル（デバッグ用）が非表示の時だけ描画する
+    bool wantsCustomCursor = SceneManager::GetInstance()->WantsMouseCursor() && !manualMouseCursorVisible_;
+    renderer_->Draw(SceneManager::GetInstance(), wantsCustomCursor ? customCursorSprite_.get() : nullptr);
 }
 
 void Game::Finalize()
