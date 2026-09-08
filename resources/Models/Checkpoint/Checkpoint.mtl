@@ -1,0 +1,8 @@
+newmtl CheckpointWhite
+Ns 80.0
+Ka 0.2 0.2 0.2
+Kd 1.0 1.0 1.0
+Ks 0.25 0.25 0.25
+d 1.0
+illum 2
+map_Kd ../../Textures/white.png

@@ -66,13 +66,11 @@ class HardenedSlimeBody final : public BaseMapChipGimmick {
 public:
   explicit HardenedSlimeBody(const AABB &bounds) : bounds_(bounds) {}
 
-  bool Initialize(const Vector3 &, const std::string &,
-                  const BaseGimmickParam *) override {
+  bool Initialize(const Vector3 &, const std::string &,const BaseGimmickParam *) override {
     // 外部モデル(slime_mesh.obj)は一切使わず、変形した自爆形状(bounds_)に100%一致するCubeモデルで生成する。
     object_ = std::make_unique<Object3d>();
     object_->Initialize(Object3dManager::GetInstance());
-    Model *cubeModel =
-        ModelManager::GetInstance()->CreateCube("resources/Textures/white.png");
+    Model *cubeModel =ModelManager::GetInstance()->CreateCube("resources/Textures/white.png");
     object_->SetModel(cubeModel);
     object_->SetTranslate({bounds_.center.x, bounds_.center.y, kFluidRenderZ});
     object_->SetScale(bounds_.size);
@@ -487,7 +485,6 @@ void GamePlayScene::Update() {
   ruinsBackground_.Update();
   bool hardenedThisFrame = false;
   // 形状調整用のスロー中は、トラップ接触や落下などによる死亡を無効にする。
-  // 死亡リクエストは消費しておかないと通常速度へ戻った瞬間に死亡してしまう。
   const bool isSlowMotion = TimeManager::GetInstance()->GetTimeScale() < 0.999f;
   // Trap gimmicks continue updating while the life relay is playing. Consume
   // their requests so a laser touching the departed player cannot spend more
@@ -564,8 +561,9 @@ void GamePlayScene::Update() {
       return;
     hardenedThisFrame = true;
   }
-    if (!isClearCelebrationActive_ && !isSlowMotion && !hardenedThisFrame &&
-      (player_->IsCrushed() || player_->GetPosition().y < -10.0f)) {
+  
+    // トラップや圧死などによる死亡通知の受け取り
+    if (!isClearCelebrationActive_ && !hardenedThisFrame && player_->ConsumeJustDied()) {
     LoseLife();
     if (isDeathTransitionActive_)
       return;
@@ -919,7 +917,7 @@ void GamePlayScene::UpdateLivesText() {
 }
 
 void GamePlayScene::LoseLife() {
-  if (isDeathTransitionActive_ || remainingLives_ <= 0)
+  if (isDeathTransitionActive_ || isLifeRelayActive_ || remainingLives_ <= 0)
     return;
   --remainingLives_;
   UpdateLivesText();
@@ -1006,6 +1004,37 @@ void GamePlayScene::UpdateDeathTransition(float deltaTime) {
   }
 }
 
+/**
+ * @brief カメラの注視点（ターゲット）座標が、マップ境界外を映さないように制限（クランプ）する
+ * @param targetPosition 本来カメラが追従したい理想の座標
+ * @return 画面内にマップ外の未配置領域が映らないように補正された安全な座標
+ */
+Vector3 GamePlayScene::ClampCameraTarget(const Vector3& targetPosition) const {
+  if (!camera_) return targetPosition;
+
+  // カメラの視錐台から、現在の距離（kCameraDistance）における画面半分のサイズを算出
+  float fovY = camera_->GetFovY();
+  float aspectRatio = camera_->GetAspectRatio();
+  float halfHeight = std::tan(fovY * 0.5f) * kCameraDistance;
+  float halfWidth = halfHeight * aspectRatio;
+
+  // マップの物理的な境界（ブロック数 × ブロックサイズ）を取得
+  float mapWidth = static_cast<float>(mapChipStage_.GetField().GetBlockWidth());
+  float mapHeight = static_cast<float>(mapChipStage_.GetField().GetBlockHeight());
+
+  // 万が一マップが1画面に収まりきらないほど小さい場合のフェールセーフ（中央固定）
+  float minX = (std::min)(halfWidth, mapWidth * 0.5f);
+  float maxX = (std::max)(halfWidth, mapWidth - halfWidth);
+  float minY = (std::min)(halfHeight, mapHeight * 0.5f);
+  float maxY = (std::max)(halfHeight, mapHeight - halfHeight);
+
+  Vector3 clampedPosition = targetPosition;
+  clampedPosition.x = std::clamp(clampedPosition.x, minX, maxX);
+  clampedPosition.y = std::clamp(clampedPosition.y, minY, maxY);
+
+  return clampedPosition;
+}
+
 void GamePlayScene::UpdateFollowCamera() {
   if (!player_) {
     return;
@@ -1014,6 +1043,9 @@ void GamePlayScene::UpdateFollowCamera() {
   if (isLifeRelayActive_) {
     targetPosition = lifeRelayOrbCurrentPosition_;
   }
+
+  // マップ境界はみ出し防止のクランプ処理を適用
+  targetPosition = ClampCameraTarget(targetPosition);
 
   camera_->LookAt({targetPosition.x, targetPosition.y, -kCameraDistance},
                   {targetPosition.x, targetPosition.y, 0.0f});

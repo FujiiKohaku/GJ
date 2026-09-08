@@ -6,6 +6,11 @@
 
 class MapChipField;
 class BaseMapChipGimmick;
+enum class PlayerState {
+    Alive,
+    Dead
+};
+
 class MapChipPlayer {
 public:
     ~MapChipPlayer();
@@ -27,8 +32,11 @@ public:
     bool IsCrushed() const;
     bool IsShapingSelfDestruct() const { return isShapingSelfDestruct_; }
     bool ConsumeHardenedBody(AABB& outBody);
-    void RequestDeath() { deathRequested_ = true; }
-    bool ConsumeDeathRequest();
+    
+    void Kill();
+    void SetInvincible(bool isInvincible) { isInvincible_ = isInvincible; }
+    bool ConsumeJustDied();
+    
     bool ConsumeGoalReached();
     
     AABB GetAABB() const;
@@ -63,7 +71,9 @@ private:
     bool wasGrounded_ = false;  // 前フレームの接地状態（着地の瞬間を検知）
     bool isShapingSelfDestruct_ = false;
     bool hardenedBodyReady_ = false;
-    bool deathRequested_ = false;
+    PlayerState state_ = PlayerState::Alive;
+    bool isInvincible_ = false;
+    bool justDied_ = false;
     bool goalReached_ = false;
     Vector2 selfDestructRawPull_ = { 0.0f, 0.0f };
     Vector2 selfDestructPull_ = { 0.0f, 0.0f };

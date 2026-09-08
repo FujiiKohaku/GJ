@@ -33,6 +33,7 @@ private:
         float halfHeight = 0.0f;
         Vector3 halfExtent {};
         bool settled = false;
+        bool hasPlayedImpact = false;
     };
 
     std::unique_ptr<Camera> camera_;

@@ -81,7 +81,8 @@ void MapChipPlayer::Initialize(const MapChipField* mapChipField, const Vector3& 
     velocity_ = { 0.0f, 0.0f, 0.0f };
     isShapingSelfDestruct_ = false;
     hardenedBodyReady_ = false;
-    deathRequested_ = false;
+    state_ = PlayerState::Alive;
+    justDied_ = false;
     goalReached_ = false;
     baseGimmick_ = nullptr;
     isCrushed_ = false;
@@ -177,6 +178,10 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
     }
 
     UpdateVisualShape(deltaTime);
+    // 自己死の判定（圧死または落下死）
+    if (isCrushed_ || position_.y < -10.0f) {
+        Kill();
+    }
 }
 
 const Vector3& MapChipPlayer::GetPosition() const
@@ -237,13 +242,22 @@ bool MapChipPlayer::ConsumeHardenedBody(AABB& outBody)
     return true;
 }
 
-bool MapChipPlayer::ConsumeDeathRequest()
+bool MapChipPlayer::ConsumeJustDied()
 {
-    if (!deathRequested_) {
-        return false;
+    if (justDied_) {
+        justDied_ = false;
+        return true;
     }
-    deathRequested_ = false;
-    return true;
+    return false;
+}
+
+void MapChipPlayer::Kill()
+{
+    if (state_ == PlayerState::Dead || isInvincible_) {
+        return;
+    }
+    state_ = PlayerState::Dead;
+    justDied_ = true;
 }
 
 void MapChipPlayer::UpdateSelfDestructShape(float unscaledDeltaTime)
