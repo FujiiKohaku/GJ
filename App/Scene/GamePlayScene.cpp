@@ -32,6 +32,12 @@ constexpr const char *kWhiteTexture = "resources/Textures/white.png";
 constexpr const char *kFantasyMenuMaterial =
     "resources/Shaders/Sprite/FantasyMenu";
 constexpr float kCameraDistance = 12.0f;
+constexpr float kBackMapDepth = 4.0f;
+constexpr float kCannonTravelDuration = 0.9f;
+constexpr float kCannonTravelArcHeight = 4.5f;
+constexpr float kCannonLandingOffsetX = 8.0f;
+constexpr float kFrontCameraTargetYOffset = 0.0f;
+constexpr float kBackCameraTargetYOffset = 0.75f;
 constexpr const char *kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
 constexpr float kFluidRenderZ = 0.0f;
@@ -58,7 +64,6 @@ Vector3 MakeFluidCorePosition(const MapChipPlayer &player) {
   // neo_Engineの形状比率を保ち、GJのワールド寸法へ一律縮小する。
   // 最下部の休止粒子が床の衝突面へ届き、接地時に底が平らになる高さ。
   corePosition.y += 0.086f * kNeoWorldScale;
-  corePosition.z = kFluidRenderZ;
   return corePosition;
 }
 
@@ -115,7 +120,7 @@ GpuSphFluid::CollisionObstacle MakeFluidObstacle(const Vector3 &center,
                                                  const Vector3 &size,
                                                  const Vector3 &velocity) {
   GpuSphFluid::CollisionObstacle obstacle{};
-  obstacle.center = {center.x, center.y, kFluidRenderZ};
+  obstacle.center = center;
   obstacle.halfSize = {size.x * 0.5f, size.y * 0.5f, 0.65f};
   obstacle.velocity = {velocity.x, velocity.y, 0.0f};
   return obstacle;
@@ -138,8 +143,10 @@ BuildFluidObstacles(const MapChipStage &stage,
         continue;
       }
 
+      const Vector3 blockPosition =
+          field.GetMapChipPositionByIndex(x, y) + stage.GetWorldOffset();
       obstacles.push_back(
-          MakeFluidObstacle(field.GetMapChipPositionByIndex(x, y),
+          MakeFluidObstacle(blockPosition,
                             {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}));
     }
   }
@@ -194,9 +201,35 @@ void GamePlayScene::Initialize() {
   mapChipStage_.Initialize(levelData);
   mapChipStage_.ApplyMaterialProperties();
 
+  hasBackMap_ = levelPath_.find("stage_test.json") != std::string::npos;
+  activeMapIndex_ = 0;
+  isCannonTravelActive_ = false;
+  cameraLaneDepth_ = 0.0f;
+  cameraTravelStartDepth_ = 0.0f;
+  cameraTravelEndDepth_ = 0.0f;
+  cameraTargetYOffset_ = kFrontCameraTargetYOffset;
+  cameraTravelStartYOffset_ = kFrontCameraTargetYOffset;
+  cameraTravelEndYOffset_ = kFrontCameraTargetYOffset;
+  backMapChipStage_.reset();
+  if (hasBackMap_) {
+    LevelData backLevelData = loader.Load("resources/Maps/stage_test_back.json");
+    backMapChipStage_ = std::make_unique<MapChipStage>();
+    backMapChipStage_->Initialize(
+        backLevelData,
+        kMapChipTexture,
+        {0.0f, 0.0f, kBackMapDepth});
+    backMapChipStage_->ApplyMaterialProperties();
+  }
+
   RuinsBackground::Settings backgroundSettings;
   backgroundSettings.mapLength =
       static_cast<float>(mapChipStage_.GetField().GetBlockWidth());
+  if (backMapChipStage_ &&
+      backMapChipStage_->GetField().GetBlockWidth() >
+          mapChipStage_.GetField().GetBlockWidth()) {
+    backgroundSettings.mapLength =
+        static_cast<float>(backMapChipStage_->GetField().GetBlockWidth());
+  }
   ruinsBackground_.Initialize(backgroundSettings);
 
   Vector3 playerStartPos = {0.0f, 0.0f, 0.0f};
@@ -208,6 +241,9 @@ void GamePlayScene::Initialize() {
   player_->Initialize(&mapChipStage_.GetField(), playerStartPos);
   playerStartPosition_ = playerStartPos;
   mapChipStage_.SetPlayer(player_.get());
+  if (backMapChipStage_) {
+    backMapChipStage_->SetPlayer(player_.get());
+  }
 
   gpuSphFluid_ = std::make_unique<GpuSphFluid>();
   GpuSphFluid::Settings fluidSettings;
@@ -249,7 +285,7 @@ void GamePlayScene::Initialize() {
   fluidSettings.boundsMax = {
       static_cast<float>(mapChipStage_.GetField().GetBlockWidth()) + 4.0f,
       static_cast<float>(mapChipStage_.GetField().GetBlockHeight()) + 8.0f,
-      kFluidRenderZ + 2.0f};
+      kBackMapDepth + 2.0f};
   gpuSphFluid_->Initialize(DirectXCommon::GetInstance(),
                            SrvManager::GetInstance(), fluidSettings);
   gpuSphFluid_->SetLiquidated(
@@ -482,6 +518,13 @@ void GamePlayScene::Update() {
 
   mapChipStage_
       .Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
+  if (backMapChipStage_) {
+    backMapChipStage_->Update();
+  }
+  if (isCannonTravelActive_) {
+    UpdateCannonTravel(TimeManager::GetInstance()->GetDeltaTime());
+  }
+  MapChipStage& activeStage = GetActiveMapChipStage();
   ruinsBackground_.Update();
   bool hardenedThisFrame = false;
   // 形状調整用のスロー中は、トラップ接触や落下などによる死亡を無効にする。
@@ -502,20 +545,28 @@ void GamePlayScene::Update() {
   // player_->Update(mapChipStage_.GetGimmicks());
     if (!isClearCelebrationActive_ && !hardenedThisFrame &&
       (!isFreeCameraMode || player_->IsShapingSelfDestruct()) &&
-      !isLifeRelayActive_) {
-        player_->Update(mapChipStage_.GetGimmicks());
+      !isLifeRelayActive_ && !isCannonTravelActive_) {
+        player_->Update(activeStage.GetGimmicks());
 
         if (player_->ConsumeGoalReached()) {
           StartClearCelebration();
         }
 
     // 中間地点を通過したら、以降の命のリレー先をここへ更新する。
-    for (BaseMapChipGimmick *gimmick : mapChipStage_.GetGimmicks()) {
+    for (BaseMapChipGimmick *gimmick : activeStage.GetGimmicks()) {
       if (gimmick && gimmick->IsCheckpoint() &&
           gimmick->TryActivateCheckpoint(player_->GetAABB())) {
         playerStartPosition_ = gimmick->GetAABB().center;
         EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks",
                                                  playerStartPosition_);
+      }
+    }
+
+    Vector3 cannonPosition;
+    for (BaseMapChipGimmick* gimmick : activeStage.GetGimmicks()) {
+      if (gimmick && gimmick->ConsumeCannonLaunchRequest(cannonPosition)) {
+        StartCannonTravel(cannonPosition);
+        break;
       }
     }
   }
@@ -573,7 +624,7 @@ void GamePlayScene::Update() {
   if (gpuSphFluid_) {
     const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
     const std::vector<BaseMapChipGimmick *> gimmicks =
-        mapChipStage_.GetGimmicks();
+        activeStage.GetGimmicks();
 
     SceneManager *sceneManager = SceneManager::GetInstance();
     sceneManager->ClearExtraScreenSpaceFluids();
@@ -588,7 +639,7 @@ void GamePlayScene::Update() {
 
     if (!isLifeRelayActive_) {
       gpuSphFluid_->SetObstacles(
-          BuildFluidObstacles(mapChipStage_, gimmicks, deltaTime));
+          BuildFluidObstacles(activeStage, gimmicks, deltaTime));
       gpuSphFluid_->SetFloorHeight(player_->GetFluidFloorHeight());
       gpuSphFluid_->SetGrounded(player_->IsGrounded());
       const Vector3 playerScale = player_->GetVisualScale();
@@ -734,7 +785,12 @@ void GamePlayScene::Draw3D() {
 
   Object3dManager::GetInstance()->PreDraw();
   ruinsBackground_.Draw(true);
-  mapChipStage_.Draw();
+  if (activeMapIndex_ == 0 || isCannonTravelActive_) {
+    mapChipStage_.Draw();
+  }
+  if (backMapChipStage_) {
+    backMapChipStage_->Draw();
+  }
 }
 
 void GamePlayScene::DrawParticle() {
@@ -806,8 +862,8 @@ void GamePlayScene::StartLifeRelay() {
   if (corpse->InitializeFromParticles(DirectXCommon::GetInstance(),
                                       SrvManager::GetInstance(), particles,
                                       currentSettings)) {
-    mapChipStage_.AddGimmick(std::move(corpse));
-    mapChipStage_.LimitHardenedSlimeCount(10);
+    GetActiveMapChipStage().AddGimmick(std::move(corpse));
+    GetActiveMapChipStage().LimitHardenedSlimeCount(10);
   }
 
   GpuSphFluid::Settings hiddenSettings = gpuSphFluid_->GetSettings();
@@ -835,6 +891,14 @@ void GamePlayScene::FinishLifeRelay() {
   EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks",
                                            playerStartPosition_);
 
+  activeMapIndex_ = 0;
+  isCannonTravelActive_ = false;
+  cameraLaneDepth_ = 0.0f;
+  cameraTravelStartDepth_ = 0.0f;
+  cameraTravelEndDepth_ = 0.0f;
+  cameraTargetYOffset_ = kFrontCameraTargetYOffset;
+  cameraTravelStartYOffset_ = kFrontCameraTargetYOffset;
+  cameraTravelEndYOffset_ = kFrontCameraTargetYOffset;
   player_->Initialize(&mapChipStage_.GetField(), playerStartPosition_);
   eyeOffsetX_ = 0.0f;
 
@@ -860,7 +924,7 @@ void GamePlayScene::ResetToLastRespawnPoint() {
     selfDestructSlowActive_ = false;
   }
   // 直近の死亡で置いた死体も取り消し、詰まりから脱出できるようにする。
-  if (mapChipStage_.RemoveLatestHardenedSlime()) {
+  if (GetActiveMapChipStage().RemoveLatestHardenedSlime()) {
     remainingLives_ = (std::min)(remainingLives_ + 1, maximumLives_);
     UpdateLivesText();
   }
@@ -1003,6 +1067,84 @@ void GamePlayScene::UpdateDeathTransition(float deltaTime) {
   }
 }
 
+MapChipStage& GamePlayScene::GetActiveMapChipStage() {
+  if (activeMapIndex_ == 1 && backMapChipStage_) {
+    return *backMapChipStage_;
+  }
+  return mapChipStage_;
+}
+
+const MapChipStage& GamePlayScene::GetActiveMapChipStage() const {
+  if (activeMapIndex_ == 1 && backMapChipStage_) {
+    return *backMapChipStage_;
+  }
+  return mapChipStage_;
+}
+
+void GamePlayScene::StartCannonTravel(const Vector3& cannonPosition) {
+  if (!hasBackMap_ || !backMapChipStage_ || isCannonTravelActive_) {
+    return;
+  }
+
+  cannonTravelStart_ = player_->GetPosition();
+  cannonTravelEnd_.x = cannonPosition.x + kCannonLandingOffsetX;
+  cannonTravelEnd_.y = 1.15f;
+  cannonTravelEnd_.z = 0.0f;
+  if (activeMapIndex_ == 0) {
+    cannonTravelEnd_.z = kBackMapDepth;
+    cannonTravelEnd_.y = 6.15f;
+  }
+
+  isCannonTravelActive_ = true;
+  cannonTravelTime_ = 0.0f;
+  cameraTravelStartDepth_ = cameraLaneDepth_;
+  cameraTravelEndDepth_ = 0.0f;
+  cameraTravelStartYOffset_ = cameraTargetYOffset_;
+  cameraTravelEndYOffset_ = kFrontCameraTargetYOffset;
+  if (activeMapIndex_ == 0) {
+    cameraTravelEndDepth_ = kBackMapDepth;
+    cameraTravelEndYOffset_ = kBackCameraTargetYOffset;
+  }
+  player_->SetTransitionPosition(cannonTravelStart_);
+  EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks", cannonPosition);
+}
+
+void GamePlayScene::UpdateCannonTravel(float deltaTime) {
+  if (!isCannonTravelActive_) {
+    return;
+  }
+
+  cannonTravelTime_ += deltaTime;
+  float progress = cannonTravelTime_ / kCannonTravelDuration;
+  progress = std::clamp(progress, 0.0f, 1.0f);
+  const float smoothProgress = progress * progress * (3.0f - 2.0f * progress);
+  cameraLaneDepth_ =
+      cameraTravelStartDepth_ +
+      (cameraTravelEndDepth_ - cameraTravelStartDepth_) * smoothProgress;
+  cameraTargetYOffset_ =
+      cameraTravelStartYOffset_ +
+      (cameraTravelEndYOffset_ - cameraTravelStartYOffset_) * smoothProgress;
+  Vector3 position = Lerp(cannonTravelStart_, cannonTravelEnd_, smoothProgress);
+  position.y += std::sin(progress * 3.14159265f) * kCannonTravelArcHeight;
+  player_->SetTransitionPosition(position);
+
+  if (progress < 1.0f) {
+    return;
+  }
+
+  if (activeMapIndex_ == 0) {
+    activeMapIndex_ = 1;
+    player_->SetMapChipField(&backMapChipStage_->GetField());
+  } else {
+    activeMapIndex_ = 0;
+    player_->SetMapChipField(&mapChipStage_.GetField());
+  }
+  player_->SetTransitionPosition(cannonTravelEnd_);
+  cameraLaneDepth_ = cameraTravelEndDepth_;
+  cameraTargetYOffset_ = cameraTravelEndYOffset_;
+  isCannonTravelActive_ = false;
+}
+
 /**
  * @brief カメラの注視点（ターゲット）座標が、マップ境界外を映さないように制限（クランプ）する
  * @param targetPosition 本来カメラが追従したい理想の座標
@@ -1018,8 +1160,9 @@ Vector3 GamePlayScene::ClampCameraTarget(const Vector3& targetPosition) const {
   float halfWidth = halfHeight * aspectRatio;
 
   // マップの物理的な境界（ブロック数 × ブロックサイズ）を取得
-  float mapWidth = static_cast<float>(mapChipStage_.GetField().GetBlockWidth());
-  float mapHeight = static_cast<float>(mapChipStage_.GetField().GetBlockHeight());
+  const MapChipStage& activeStage = GetActiveMapChipStage();
+  float mapWidth = static_cast<float>(activeStage.GetField().GetBlockWidth());
+  float mapHeight = static_cast<float>(activeStage.GetField().GetBlockHeight());
 
   // 万が一マップが1画面に収まりきらないほど小さい場合のフェールセーフ（中央固定）
   float minX = (std::min)(halfWidth, mapWidth * 0.5f);
@@ -1029,7 +1172,9 @@ Vector3 GamePlayScene::ClampCameraTarget(const Vector3& targetPosition) const {
 
   Vector3 clampedPosition = targetPosition;
   clampedPosition.x = std::clamp(clampedPosition.x, minX, maxX);
-  clampedPosition.y = std::clamp(clampedPosition.y, minY, maxY);
+  if (activeMapIndex_ == 0) {
+    clampedPosition.y = std::clamp(clampedPosition.y, minY, maxY);
+  }
 
   return clampedPosition;
 }
@@ -1042,12 +1187,18 @@ void GamePlayScene::UpdateFollowCamera() {
   if (isLifeRelayActive_) {
     targetPosition = lifeRelayOrbCurrentPosition_;
   }
+  targetPosition.y += cameraTargetYOffset_;
+  targetPosition.z = cameraLaneDepth_;
 
-  // マップ境界はみ出し防止のクランプ処理を適用
-  targetPosition = ClampCameraTarget(targetPosition);
+  // 大砲の飛行中は放物線と奥行きをそのまま追い、着地後に通常の
+  // マップ境界クランプへ戻す。
+  if (!isCannonTravelActive_) {
+    targetPosition = ClampCameraTarget(targetPosition);
+  }
 
-  camera_->LookAt({targetPosition.x, targetPosition.y, -kCameraDistance},
-                  {targetPosition.x, targetPosition.y, 0.0f});
+  camera_->LookAt(
+      {targetPosition.x, targetPosition.y, targetPosition.z - kCameraDistance},
+      targetPosition);
 }
 
 void GamePlayScene::UpdateCollisionText() {
@@ -1064,7 +1215,5 @@ void GamePlayScene::UpdateCollisionText() {
     state = "WALL/CEILING COLLISION";
   }
   const Vector3 position = player_->GetPosition();
-  collisionText_->SetText("COLLISION : " + state +
-                          "   PLAYER X=" + std::to_string(position.x) +
-                          " Y=" + std::to_string(position.y));
+  collisionText_->SetText("COLLISION : " + state +"   PLAYER X=" + std::to_string(position.x) +" Y=" + std::to_string(position.y));
 }

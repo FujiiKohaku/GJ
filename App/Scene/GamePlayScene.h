@@ -33,6 +33,10 @@ public:
 private:
     std::string levelPath_;
     void UpdateFollowCamera();
+    MapChipStage& GetActiveMapChipStage();
+    const MapChipStage& GetActiveMapChipStage() const;
+    void StartCannonTravel(const Vector3& cannonPosition);
+    void UpdateCannonTravel(float deltaTime);
 
     /**
      * @brief カメラの注視点（ターゲット）座標が、マップ境界外を映さないように制限（クランプ）する
@@ -69,6 +73,19 @@ private:
     int remainingLives_ = kInitialLives;
     int maximumLives_ = kInitialLives;
     MapChipStage mapChipStage_;
+    std::unique_ptr<MapChipStage> backMapChipStage_;
+    bool hasBackMap_ = false;
+    int activeMapIndex_ = 0;
+    bool isCannonTravelActive_ = false;
+    float cannonTravelTime_ = 0.0f;
+    Vector3 cannonTravelStart_ = {0.0f, 0.0f, 0.0f};
+    Vector3 cannonTravelEnd_ = {0.0f, 0.0f, 0.0f};
+    float cameraLaneDepth_ = 0.0f;
+    float cameraTravelStartDepth_ = 0.0f;
+    float cameraTravelEndDepth_ = 0.0f;
+    float cameraTargetYOffset_ = 0.0f;
+    float cameraTravelStartYOffset_ = 0.0f;
+    float cameraTravelEndYOffset_ = 0.0f;
     RuinsBackground ruinsBackground_;
     std::unique_ptr<MapChipPlayer> player_;
     std::unique_ptr<GpuSphFluid> gpuSphFluid_;

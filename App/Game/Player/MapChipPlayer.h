@@ -33,6 +33,8 @@ public:
     bool IsShapingSelfDestruct() const { return isShapingSelfDestruct_; }
     bool ConsumeHardenedBody(AABB& outBody);
     void LaunchUpward(float speed);
+    void SetMapChipField(const MapChipField* mapChipField);
+    void SetTransitionPosition(const Vector3& position);
     
     void Kill();
     void SetInvincible(bool isInvincible) { isInvincible_ = isInvincible; }
@@ -53,6 +55,7 @@ private:
     bool ResolveDynamicCollision(Vector3& nextPosition, const std::vector<BaseMapChipGimmick*>& dynamicGimmicks, bool isHorizontal);
 
     const MapChipField* mapChipField_ = nullptr;
+    float mapChipDepth_ = 0.0f;
     Vector3 position_ = { 0.0f, 0.0f, 0.0f };
     Vector3 velocity_ = { 0.0f, 0.0f, 0.0f };
     Vector3 forward_ = { 0.0f, 0.0f, 1.0f };

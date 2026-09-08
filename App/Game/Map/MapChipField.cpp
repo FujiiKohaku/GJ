@@ -146,6 +146,7 @@ void MapChipRegistry::Initialize()
 
     // 着地したスライムを高く打ち上げるばね床。
     Register(MapChipType::Spring, "Spring", false, true, "Spring/Spring.obj");
+    Register(MapChipType::Cannon, "Cannon", false, true, "Cannon/Cannon.obj");
 }
 
 const MapChipConfig& MapChipRegistry::GetConfig(MapChipType type)

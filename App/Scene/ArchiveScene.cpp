@@ -141,8 +141,8 @@ void ArchiveScene::InitializeStageData()
     stages_.push_back(stage2);
 
     StageData crumblingFloorTestStage;
-    crumblingFloorTestStage.name = "STAGE 03  CRUMBLING TEST";
-    crumblingFloorTestStage.description = "CRUMBLING FLOOR TEST";
+    crumblingFloorTestStage.name = "STAGE 03  DEPTH CANNON";
+    crumblingFloorTestStage.description = "CANNON RELAY BETWEEN FRONT AND BACK MAPS";
     crumblingFloorTestStage.levelPath = "resources/Maps/stage_test.json";
     crumblingFloorTestStage.destination = StageDestination::GamePlay;
     stages_.push_back(crumblingFloorTestStage);

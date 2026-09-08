@@ -17,13 +17,15 @@ public:
     void Initialize(
         const LevelData& levelData,
         const std::string& texturePath =
-            "resources/Textures/checkerboard.png");
+            "resources/Textures/checkerboard.png",
+        const Vector3& worldOffset = {0.0f, 0.0f, 0.0f});
     void Update();
     void Draw();
     void ApplyMaterialProperties();
 
     const MapChipField& GetField() const;
     MapChipField& GetField();
+    const Vector3& GetWorldOffset() const { return worldOffset_; }
     
     void SetEditorMode(bool isEditor) { isEditorMode_ = isEditor; }
     
@@ -80,4 +82,5 @@ private:
     IrufemiEngine::EventManager eventManager_;
     bool isEditorMode_ = false;
     MapChipPlayer* player_ = nullptr;
+    Vector3 worldOffset_ = {0.0f, 0.0f, 0.0f};
 };
