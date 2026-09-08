@@ -185,7 +185,10 @@ void GamePlayScene::Initialize() {
   LevelDataLoader loader;
   LevelData levelData = loader.Load(levelPath_);
   maximumLives_ = levelPath_.find("stage2.json") != std::string::npos
-      ? 20 : kInitialLives;
+      ? 20
+      : (levelPath_.find("stage1.json") != std::string::npos
+          ? kStage1Lives
+          : kInitialLives);
   remainingLives_ = maximumLives_;
 
   mapChipStage_.Initialize(levelData);
@@ -483,7 +486,18 @@ void GamePlayScene::Update() {
   bool hardenedThisFrame = false;
   // 形状調整用のスロー中は、トラップ接触や落下などによる死亡を無効にする。
   const bool isSlowMotion = TimeManager::GetInstance()->GetTimeScale() < 0.999f;
-  player_->SetInvincible(isSlowMotion);
+  // Trap gimmicks continue updating while the life relay is playing. Consume
+  // their requests so a laser touching the departed player cannot spend more
+  // lives during the respawn animation.
+  const bool deathRequested = player_->ConsumeDeathRequest();
+  if (!isClearCelebrationActive_ && !isLifeRelayActive_ && deathRequested) {
+    if (!isSlowMotion) {
+      LoseLife();
+      if (isDeathTransitionActive_)
+        return;
+      hardenedThisFrame = true;
+    }
+  }
 
   // player_->Update(mapChipStage_.GetGimmicks());
     if (!isClearCelebrationActive_ && !hardenedThisFrame &&
