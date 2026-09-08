@@ -131,6 +131,7 @@ private:
     std::unique_ptr<Text> menuResumeText_;
     std::unique_ptr<Text> menuRestartText_;
     std::unique_ptr<Text> menuStageSelectText_;
+    std::unique_ptr<Sprite> loopArrowSprite_;
     std::unique_ptr<Sprite> menuTransitionFadeSprite_;
     bool isStageSelectTransitionActive_ = false;
     float stageSelectTransitionTime_ = 0.0f;
