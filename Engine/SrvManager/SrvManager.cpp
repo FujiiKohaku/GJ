@@ -1,7 +1,7 @@
 #include "SrvManager.h"
 std::unique_ptr<SrvManager> SrvManager::instance = nullptr;
-// 最大SRV数(最大テクスチャ枚数)//kMaxSRVCountは512です
-const uint32_t SrvManager::kMaxSRVCount = 512;
+// 最大SRV数(最大テクスチャ枚数)//kMaxSRVCountは2048です
+const uint32_t SrvManager::kMaxSRVCount = 2048;
 SrvManager* SrvManager::GetInstance()
 {
     if (!instance) {
