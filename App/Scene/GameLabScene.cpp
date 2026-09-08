@@ -21,6 +21,9 @@ constexpr const char* kDefaultFont =
 constexpr int32_t kGridHalfExtent = 10;
 constexpr float kGridSpacing = 1.0f;
 constexpr Vector3 kSmokePreviewPosition = { 3.0f, 0.05f, 2.0f };
+constexpr uint32_t kCrumblingFloorPreviewRow = 18;
+constexpr uint32_t kCrumblingFloorPreviewFirstColumn = 1;
+constexpr uint32_t kCrumblingFloorPreviewCount = 5;
 constexpr const char* kFlameEffects[] = {
     "FlameSmoke", "Flame", "FlameCore", "FlameSparks"
 };
@@ -110,7 +113,7 @@ void GameLabScene::Initialize()
 
     InitializePostEffectList();
 
-    // Reuse Stage1's terrain and materials without activating gameplay gimmicks.
+    // Reuse Stage1's terrain and materials, then add a small gimmick showcase.
     LevelDataLoader stageLoader;
     LevelData stageData = stageLoader.Load("resources/Maps/stage1.json");
     stageData.objects.clear();
@@ -122,7 +125,18 @@ void GameLabScene::Initialize()
             }
         }
     }
-    stagePreview_.SetEditorMode(true);
+    if (!stageData.tileMaps.empty()) {
+        LevelData::TileMapData& tileMap = stageData.tileMaps[0];
+        for (uint32_t offset = 0; offset < kCrumblingFloorPreviewCount; ++offset) {
+            const uint32_t x = kCrumblingFloorPreviewFirstColumn + offset;
+            const size_t index =
+                static_cast<size_t>(kCrumblingFloorPreviewRow) * tileMap.width + x;
+            if (x < tileMap.width && index < tileMap.data.size()) {
+                tileMap.data[index] = static_cast<int32_t>(MapChipType::CrumblingFloor);
+            }
+        }
+    }
+    stagePreview_.SetEditorMode(false);
     stagePreview_.Initialize(stageData);
     stagePreview_.ApplyMaterialProperties();
     showStageBlocks_ = true;
@@ -252,6 +266,15 @@ void GameLabScene::DrawImGui()
     ImGui::Begin("GAMELAB - Engine Post Effects");
     ImGui::Checkbox("Show Stage1 Blocks", &showStageBlocks_);
     ImGui::Checkbox("Show Lab Floor", &showLabFloor_);
+
+    if (ImGui::Button("Trigger Crumbling Floors")) {
+        const std::vector<BaseMapChipGimmick*> gimmicks = stagePreview_.GetGimmicks();
+        for (BaseMapChipGimmick* gimmick : gimmicks) {
+            gimmick->OnPlayerStepped();
+        }
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("Re-enter GameLab to reset");
 
     if (ImGui::Button("Reset Stage1 Camera")) {
         camera_->LookAt({ 1.0f, 1.0f, -12.0f }, { 1.0f, 1.0f, 0.0f });

@@ -465,6 +465,7 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
                 if (hit.normal.y < 0.0f && velocity_.y <= 0.0f) {
                     isGrounded_ = true;
                     baseGimmick_ = gimmick;
+                    gimmick->OnPlayerStepped();
                 } else if (hit.normal.y > 0.0f) {
                     ceilingSquash_ = (std::max)(ceilingSquash_, 0.35f);
                 }

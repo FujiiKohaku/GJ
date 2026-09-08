@@ -140,6 +140,9 @@ void MapChipRegistry::Initialize()
 
     // 歯車障害物（Gear）の登録: モデルはGear/Gear.obj、地形ではなくギミックとして処理(isSolid = false)
     Register(MapChipType::Gear, "Gear", false, true, "Gear/Gear.obj");
+
+    // 一度踏むと振動して崩落する岩床。
+    Register(MapChipType::CrumblingFloor, "CrumblingFloor", false, true, "");
 }
 
 const MapChipConfig& MapChipRegistry::GetConfig(MapChipType type)

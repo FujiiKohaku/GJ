@@ -130,12 +130,14 @@ void ArchiveScene::InitializeStageData()
     StageData gamePlayStage;
     gamePlayStage.name = "STAGE 01  GAME PLAY";
     gamePlayStage.description = "MAP CHIP COLLISION TEST";
+    gamePlayStage.levelPath = "resources/Maps/stage1.json";
     gamePlayStage.destination = StageDestination::GamePlay;
     stages_.push_back(gamePlayStage);
 
     StageData stage2;
     stage2.name = "STAGE 02  SKY RELAY";
     stage2.description = "ASCEND THE RUINS AND CROSS THE HIGH PATH";
+    stage2.levelPath = "resources/Maps/stage2.json";
     stage2.destination = StageDestination::GamePlay;
     stages_.push_back(stage2);
 
@@ -144,6 +146,13 @@ void ArchiveScene::InitializeStageData()
     gameLabStage.description = "FREE CAMERA ENGINE LAB";
     gameLabStage.destination = StageDestination::GameLab;
     stages_.push_back(gameLabStage);
+
+    StageData crumblingFloorTestStage;
+    crumblingFloorTestStage.name = "STAGE 04  CRUMBLING TEST";
+    crumblingFloorTestStage.description = "CRUMBLING FLOOR TEST";
+    crumblingFloorTestStage.levelPath = "resources/Maps/stage_test.json";
+    crumblingFloorTestStage.destination = StageDestination::GamePlay;
+    stages_.push_back(crumblingFloorTestStage);
 }
 
 void ArchiveScene::LoadPrintedPagePaths()
@@ -1149,9 +1158,7 @@ void ArchiveScene::UpdateStageConfirmed(float deltaTime)
     case StageDestination::GamePlay:
             SceneManager::GetInstance()->SetNextScene(
                 std::make_unique<GamePlayScene>(
-                    currentStageIndex_ == 1
-                        ? "resources/Maps/stage2.json"
-                        : "resources/Maps/stage1.json"));
+                    stages_[currentStageIndex_].levelPath));
             break;
         case StageDestination::Test:
             SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());
