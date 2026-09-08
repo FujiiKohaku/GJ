@@ -20,6 +20,9 @@ enum class MapChipType {
     LaserEmitter = 9,
     SwingingBridge = 10,
     Wall = 11,
+    Door = 12,
+    Foundation = 13,
+    Gear = 14,
 };
 
 struct MapChipConfig {
@@ -28,6 +31,8 @@ struct MapChipConfig {
     bool isSolid;            // 当たり判定を持つ固定地形か
     bool isGimmick;          // ギミック（動的オブジェクト）として処理するか
     std::string modelPath;   // 3Dモデルパス（空の場合は基本キューブを使用）
+    std::string materialType; // マテリアルの種類(例:"Moss")
+    std::string texturePath;  // 適用するテクスチャ
 };
 
 class MapChipRegistry {
