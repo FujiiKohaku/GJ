@@ -1,0 +1,15 @@
+{
+    "BlendMode": "Alpha",
+    "EffectParameters": {
+        "Amplitude": 1.0,
+        "Frequency": 1.0,
+        "Speed": 1.0,
+        "Phase": 0.0,
+        "Direction": [
+            0.0,
+            0.0
+        ],
+        "Strength": 1.0,
+        "Threshold": 0.5
+    }
+}

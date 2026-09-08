@@ -25,6 +25,7 @@ enum class MapChipType {
     Gear = 14,
     CrumblingFloor = 16,
     Spring = 17,
+    Cannon = 18,
 };
 
 struct MapChipConfig {

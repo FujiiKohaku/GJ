@@ -22,13 +22,15 @@ public:
     void Initialize(
         const LevelData& levelData,
         const std::string& texturePath =
-            "resources/Textures/checkerboard.png");
+            "resources/Textures/checkerboard.png",
+        const Vector3& worldOffset = {0.0f, 0.0f, 0.0f});
     void Update();
     void Draw();
     void ApplyMaterialProperties();
 
     const MapChipField& GetField() const;
     MapChipField& GetField();
+    const Vector3& GetWorldOffset() const { return worldOffset_; }
     
     void SetEditorMode(bool isEditor) { isEditorMode_ = isEditor; }
     
@@ -41,6 +43,12 @@ public:
     void AddGimmick(std::unique_ptr<BaseMapChipGimmick> gimmick);
     void LimitHardenedSlimeCount(size_t maximumCount);
     bool RemoveLatestHardenedSlime();
+
+    /**
+     * @brief ステージ内に配置された硬化スライム（死体）をすべて削除する
+     * @details リトライ時（完全リセット）に、動的追加された障害物を初期状態に戻すために使用
+     */
+    void RemoveAllHardenedSlimes();
 
     /**
      * @brief 現在のステージの全揮発性ギミックの状態を収集したスナップショットを作成する
@@ -100,4 +108,5 @@ private:
     bool isEditorMode_ = false;
     MapChipPlayer* player_ = nullptr;
     std::vector<MapChipPlayer*> players_;
+    Vector3 worldOffset_ = {0.0f, 0.0f, 0.0f};
 };

@@ -48,6 +48,9 @@ public:
     // プレイヤーが上面へ着地した際の通知。
     virtual void OnPlayerStepped() {}
 
+    // 大砲など、別レーンへの移動開始を要求するギミック。
+    virtual bool ConsumeCannonLaunchRequest(Vector3&) { return false; }
+
     // 自爆で残った硬化スライム。感圧板などが死体を識別するために使う。
     virtual bool IsHardenedSlime() const { return false; }
 

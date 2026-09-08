@@ -29,6 +29,13 @@ public:
     void SetNextScene(std::unique_ptr<BaseScene> nextScene)
     {
         nextScene_ = std::move(nextScene);
+        nextSceneIsPrepared_ = false;
+    }
+
+    void SetNextPreparedScene(std::unique_ptr<BaseScene> nextScene)
+    {
+        nextScene_ = std::move(nextScene);
+        nextSceneIsPrepared_ = true;
     }
 
     // ロード画面を挟んでシーン遷移するテンプレート関数
@@ -151,4 +158,5 @@ private:
     std::unique_ptr<BaseScene> scene_;
     std::unique_ptr<BaseScene> nextScene_;
     std::unique_ptr<BaseScene> retiredScene_;
+    bool nextSceneIsPrepared_ = false;
 };

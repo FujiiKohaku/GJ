@@ -287,14 +287,17 @@ void ClearScene::Update()
     }
     if (!meadowRevealed_ && sceneTime_ >= 3.70f) {
         meadowRevealed_ = true;
-        fireworkTimer_ = 0.3f;
+        fireworkTimer_ = 0.0f;
     }
     flashSprite_->SetColor({ 1.0f, 0.94f, 0.70f, lightAlpha });
 
-    if (meadowRevealed_) {
-        fireworkTimer_ += dt;
-        if (fireworkTimer_ >= 0.30f && fireworkIndex_ < 18) {
-            fireworkTimer_ = 0.0f;
+    // Let the reveal flash recede before starting the celebration.
+    if (meadowRevealed_ && sceneTime_ >= 4.35f && !archiveTransitionActive_) {
+        fireworkTimer_ += (std::min)(dt, 0.1f);
+        const float interval = fireworkIndex_ < 8 ? 0.48f :
+            fireworkIndex_ < 20 ? 0.32f : fireworkIndex_ < 26 ? 0.45f : 1.25f;
+        if (fireworkIndex_ == 0 || fireworkTimer_ >= interval) {
+            fireworkTimer_ = fireworkIndex_ == 0 ? 0.0f : fireworkTimer_ - interval;
             LaunchFirework();
         }
     }
@@ -573,26 +576,41 @@ void ClearScene::LaunchFirework()
         "CrownFirework",
     };
     static constexpr float kX[] = {
-        -10.0f, 7.0f, -4.0f, 11.0f, 1.0f, -8.0f,
-        5.0f, -12.0f, 9.0f, -1.0f, 13.0f, -6.0f
+        -10.0f, 10.0f, -6.5f, 6.5f, -12.0f, 12.0f,
+        -4.0f, 4.0f, -9.0f, 9.0f, -2.0f, 2.0f
     };
     static constexpr float kY[] = {
-        1.0f, 4.0f, 7.0f, 2.5f, 5.5f, 8.0f,
-        1.5f, 5.0f, 7.5f, 3.5f, 6.0f, 2.0f
+        2.0f, 3.0f, 4.5f, 2.5f, 1.5f, 4.0f,
+        3.5f, 5.0f, 2.0f, 4.5f, 3.0f, 5.0f
     };
     const int i = fireworkIndex_ % 12;
     const Vector3 position = {
-        kX[i], kY[i], 13.0f + static_cast<float>(fireworkIndex_ % 3) * 4.0f
+        kX[i], kY[i], 22.0f + static_cast<float>(fireworkIndex_ % 3) * 3.5f
     };
-    const int typeIndex = (fireworkIndex_ * 3 + fireworkIndex_ / 2) % 5;
-    EffectManager::GetInstance()->PlayEffect(kFireworkTypes[typeIndex], position);
-    if (fireworkIndex_ % 2 == 0) {
-        SoundManager::GetInstance()->PlaySE(kFireworkSoundName, 0.20f);
+    const bool finale = fireworkIndex_ >= 20 && fireworkIndex_ < 26;
+    const bool sustained = fireworkIndex_ >= 26;
+    const int typeIndex = fireworkIndex_ % std::size(kFireworkTypes);
+    EffectManager* effects = EffectManager::GetInstance();
+    const auto burst = [effects](const char* name, const Vector3& center, float scale) {
+        const EffectHandle handle = effects->PlayEffect(name, center);
+        if (handle != kInvalidEffectHandle) {
+            effects->SetEffectScale(handle, scale);
+        }
+    };
+    burst(kFireworkTypes[typeIndex], position, finale ? 1.65f : 1.3f);
+
+    // Alternate paired shells, then finish with a gold-and-rainbow triple volley.
+    if (finale || (fireworkIndex_ >= 8 && !sustained && fireworkIndex_ % 3 == 2)) {
+        burst(kFireworkTypes[(typeIndex + 2) % std::size(kFireworkTypes)],
+            { -position.x, position.y - 0.75f, position.z + 2.0f }, 1.4f);
     }
-    if (fireworkIndex_ % 5 == 4) {
-        EffectManager::GetInstance()->PlayEffect(
-            kFireworkTypes[(typeIndex + 2) % 5],
-            { position.x + 0.35f, position.y + 0.2f, position.z });
+    if (finale) {
+        burst(fireworkIndex_ % 2 == 0 ? "GoldenWillowFirework" : "RainbowRingFirework",
+            { 0.0f, 4.5f, 30.0f }, 1.8f);
     }
+    SoundManager::GetInstance()->PlaySE(kFireworkSoundName,
+        finale ? 0.32f : sustained ? 0.20f : 0.25f);
     ++fireworkIndex_;
+    // Keep the waiting screen alive with a bounded, slower repeating sequence.
+    if (fireworkIndex_ >= 38) fireworkIndex_ = 26;
 }

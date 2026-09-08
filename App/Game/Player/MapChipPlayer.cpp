@@ -83,6 +83,7 @@ void MapChipPlayer::Initialize(const MapChipField* mapChipField, const Vector3& 
 {
     position_ = startPosition;
     mapChipField_ = mapChipField;
+    mapChipDepth_ = startPosition.z;
     baseScale_ = kSlimeBaseRadii;
     visualScale_ = kSlimeBaseRadii;
     fluidFloorHeight_ = position_.y - kPlayerHalfHeight + kSlimeFluidGroundClearance;
@@ -264,6 +265,22 @@ void MapChipPlayer::LaunchUpward(float speed)
     landSquash_ = (std::max)(landSquash_, 0.55f);
 }
 
+void MapChipPlayer::SetMapChipField(const MapChipField* mapChipField)
+{
+    mapChipField_ = mapChipField;
+    mapChipDepth_ = position_.z;
+}
+
+void MapChipPlayer::SetTransitionPosition(const Vector3& position)
+{
+    position_ = position;
+    velocity_ = {0.0f, 0.0f, 0.0f};
+    isGrounded_ = false;
+    wasGrounded_ = false;
+    baseGimmick_ = nullptr;
+    fluidFloorHeight_ = position_.y - baseScale_.y;
+}
+
 bool MapChipPlayer::ConsumeJustDied()
 {
     if (justDied_) {
@@ -422,8 +439,9 @@ bool MapChipPlayer::ResolveHorizontalCollision(Vector3& nextPosition)
                 continue;
             }
 
-            const Vector3 blockPosition =
+            Vector3 blockPosition =
                 mapChipField_->GetMapChipPositionByIndex(xIndex, yIndex);
+            blockPosition.z += mapChipDepth_;
             AABB playerBox = {
                 nextPosition,
                 { kPlayerSize, kPlayerSize, 0.2f }
@@ -464,8 +482,9 @@ bool MapChipPlayer::ResolveVerticalCollision(Vector3& nextPosition)
                 continue;
             }
 
-            const Vector3 blockPosition =
+            Vector3 blockPosition =
                 mapChipField_->GetMapChipPositionByIndex(xIndex, yIndex);
+            blockPosition.z += mapChipDepth_;
             AABB playerBox = {
                 nextPosition,
                 { kPlayerSize, kPlayerSize, 0.2f }

@@ -37,6 +37,12 @@ constexpr const char *kLifeSlimeMaterial =
 constexpr const char *kFantasyMenuMaterial =
     "resources/Shaders/Sprite/FantasyMenu";
 constexpr float kCameraDistance = 12.0f;
+constexpr float kBackMapDepth = 4.0f;
+constexpr float kCannonTravelDuration = 0.9f;
+constexpr float kCannonTravelArcHeight = 4.5f;
+constexpr float kCannonLandingOffsetX = 8.0f;
+constexpr float kFrontCameraTargetYOffset = 0.0f;
+constexpr float kBackCameraTargetYOffset = 0.75f;
 constexpr const char *kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
 constexpr float kFluidRenderZ = 0.0f;
@@ -111,7 +117,6 @@ Vector3 MakeFluidCorePosition(const MapChipPlayer &player) {
   // neo_Engineの形状比率を保ち、GJのワールド寸法へ一律縮小する。
   // 最下部の休止粒子が床の衝突面へ届き、接地時に底が平らになる高さ。
   corePosition.y += 0.086f * kNeoWorldScale;
-  corePosition.z = kFluidRenderZ;
   return corePosition;
 }
 
@@ -168,7 +173,7 @@ GpuSphFluid::CollisionObstacle MakeFluidObstacle(const Vector3 &center,
                                                  const Vector3 &size,
                                                  const Vector3 &velocity) {
   GpuSphFluid::CollisionObstacle obstacle{};
-  obstacle.center = {center.x, center.y, kFluidRenderZ};
+  obstacle.center = center;
   obstacle.halfSize = {size.x * 0.5f, size.y * 0.5f, 0.65f};
   obstacle.velocity = {velocity.x, velocity.y, 0.0f};
   return obstacle;
@@ -191,8 +196,10 @@ BuildFluidObstacles(const MapChipStage &stage,
         continue;
       }
 
+      const Vector3 blockPosition =
+          field.GetMapChipPositionByIndex(x, y) + stage.GetWorldOffset();
       obstacles.push_back(
-          MakeFluidObstacle(field.GetMapChipPositionByIndex(x, y),
+          MakeFluidObstacle(blockPosition,
                             {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}));
     }
   }
@@ -212,12 +219,50 @@ BuildFluidObstacles(const MapChipStage &stage,
 
   return obstacles;
 }
+
+std::unique_ptr<Sprite> CreateMenuButtonSprite(float y) {
+  std::unique_ptr<Sprite> button = std::make_unique<Sprite>();
+  button->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+  button->SetMaterial(kFantasyMenuMaterial);
+  button->SetSize({kMenuButtonWidth, kMenuButtonHeight});
+  button->SetPosition({kMenuButtonX, y});
+  button->SetColor({0.15f, 0.25f, 0.22f, 1.0f});
+  return button;
+}
+
+std::unique_ptr<Text> CreateMenuLabelText(const char *label, float y) {
+  std::unique_ptr<Text> text = std::make_unique<Text>();
+  text->Initialize(kDefaultFont);
+  text->SetText(label);
+  text->SetPosition({640.0f, y + kMenuButtonHeight * 0.5f});
+  text->SetAnchorPoint({0.5f, 0.5f});
+  text->SetFontSize(25.0f);
+  text->SetColor({0.90f, 0.96f, 0.93f, 1.0f});
+  return text;
+}
 } // namespace
 
 GamePlayScene::GamePlayScene(std::string levelPath)
     : levelPath_(std::move(levelPath)) {}
 
 void GamePlayScene::Initialize() {
+  BeginIncrementalInitialize();
+  while (!InitializeNextStep()) {
+  }
+  InitializeRevealOverlay();
+}
+
+void GamePlayScene::BeginIncrementalInitialize() {
+  initializationStep_ = 0;
+  initializationLevelData_ = LevelData{};
+}
+
+bool GamePlayScene::InitializeNextStep() {
+  if (initializationStep_ >= kInitializationStepCount) {
+    return true;
+  }
+
+  if (initializationStep_ == 0) {
   SceneManager::GetInstance()->SetPostEffectType(
       PostEffectType::ArchiveAtmosphere);
   SceneManager::GetInstance()->SetArchiveApproach(0.0f);
@@ -236,32 +281,59 @@ void GamePlayScene::Initialize() {
   debugCameraController_.SetDebugMode(false);
 
   LevelDataLoader loader;
-  LevelData levelData = loader.Load(levelPath_);
-  maximumLives_ = levelPath_.find("stage2.json") != std::string::npos
-      ? 20
-      : (levelPath_.find("stage1.json") != std::string::npos
-          ? kStage1Lives
-          : kInitialLives);
+  initializationLevelData_ = loader.Load(levelPath_);
+  maximumLives_ = kInitialLives;
+  if (levelPath_.find("stage2.json") != std::string::npos) {
+    maximumLives_ = 20;
+  } else if (levelPath_.find("stage1.json") != std::string::npos) {
+    maximumLives_ = kStage1Lives;
+  }
   remainingLives_ = maximumLives_;
+  }
 
-  mapChipStage_.Initialize(levelData);
+  if (initializationStep_ == 1) {
+  mapChipStage_.Initialize(initializationLevelData_);
   mapChipStage_.ApplyMaterialProperties();
+
+  hasBackMap_ = false;
+  activeMapIndex_ = 0;
+  isCannonTravelActive_ = false;
+  cameraLaneDepth_ = 0.0f;
+  cameraTravelStartDepth_ = 0.0f;
+  cameraTravelEndDepth_ = 0.0f;
+  cameraTargetYOffset_ = kFrontCameraTargetYOffset;
+  cameraTravelStartYOffset_ = kFrontCameraTargetYOffset;
+  cameraTravelEndYOffset_ = kFrontCameraTargetYOffset;
+  backMapChipStage_.reset();
 
   RuinsBackground::Settings backgroundSettings;
   backgroundSettings.mapLength =
       static_cast<float>(mapChipStage_.GetField().GetBlockWidth());
+  if (backMapChipStage_ &&
+      backMapChipStage_->GetField().GetBlockWidth() >
+          mapChipStage_.GetField().GetBlockWidth()) {
+    backgroundSettings.mapLength =
+        static_cast<float>(backMapChipStage_->GetField().GetBlockWidth());
+  }
   ruinsBackground_.Initialize(backgroundSettings);
+  }
 
+  if (initializationStep_ == 2) {
   Vector3 playerStartPos = {0.0f, 0.0f, 0.0f};
-  if (!levelData.playerSpawns.empty()) {
-    playerStartPos = levelData.playerSpawns[0].translation;
+  if (!initializationLevelData_.playerSpawns.empty()) {
+    playerStartPos = initializationLevelData_.playerSpawns[0].translation;
   }
 
   player_ = std::make_unique<MapChipPlayer>();
   player_->Initialize(&mapChipStage_.GetField(), playerStartPos);
   playerStartPosition_ = playerStartPos;
   mapChipStage_.SetPlayer(player_.get());
+  if (backMapChipStage_) {
+    backMapChipStage_->SetPlayer(player_.get());
+  }
+  }
 
+  if (initializationStep_ == 3) {
   gpuSphFluid_ = std::make_unique<GpuSphFluid>();
   GpuSphFluid::Settings fluidSettings;
   fluidSettings.particleCount = 2048;
@@ -302,7 +374,7 @@ void GamePlayScene::Initialize() {
   fluidSettings.boundsMax = {
       static_cast<float>(mapChipStage_.GetField().GetBlockWidth()) + 4.0f,
       static_cast<float>(mapChipStage_.GetField().GetBlockHeight()) + 8.0f,
-      kFluidRenderZ + 2.0f};
+      kBackMapDepth + 2.0f};
   gpuSphFluid_->Initialize(DirectXCommon::GetInstance(),
                            SrvManager::GetInstance(), fluidSettings);
   gpuSphFluid_->SetLiquidated(
@@ -327,7 +399,9 @@ void GamePlayScene::Initialize() {
       fluidSettings.boundsMin.y, fluidSettings.boundsMin.z,
       fluidSettings.boundsMax.x, fluidSettings.boundsMax.y,
       fluidSettings.boundsMax.z));
+  }
 
+  if (initializationStep_ == 4) {
   UpdateFollowCamera();
   camera_->Update();
 
@@ -336,7 +410,9 @@ void GamePlayScene::Initialize() {
   skyBox_->Initialize(DirectXCommon::GetInstance());
   skyBox_->SetTexture(kSkyBoxTexture);
   skyBox_->Update(camera_.get());
+  }
 
+  if (initializationStep_ == 5) {
   TextureManager::GetInstance()->LoadTexture(kWhiteTexture);
   tutorialPanelSprite_ = std::make_unique<Sprite>();
   tutorialPanelSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
@@ -380,7 +456,9 @@ void GamePlayScene::Initialize() {
   livesNumberText_->SetOutlineWidth(2.0f);
   livesNumberText_->SetShadowColor({0.0f, 0.0f, 0.0f, 0.0f});
   UpdateLivesText();
+  }
 
+  if (initializationStep_ == 6) {
   // メニューUIの初期化
   TextureManager::GetInstance()->LoadTexture(kWhiteTexture);
 
@@ -400,18 +478,20 @@ void GamePlayScene::Initialize() {
   menuPanelSprite_->SetPosition({320.0f, 170.0f});
   menuPanelSprite_->SetColor({0.10f, 0.20f, 0.15f, 0.97f});
 
-  const auto createMenuButton = [](float y) {
-    auto button = std::make_unique<Sprite>();
-    button->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
-    button->SetMaterial(kFantasyMenuMaterial);
-    button->SetSize({kMenuButtonWidth, kMenuButtonHeight});
-    button->SetPosition({kMenuButtonX, y});
-    button->SetColor({0.15f, 0.25f, 0.22f, 1.0f});
-    return button;
-  };
-  menuResumeButtonSprite_ = createMenuButton(kMenuResumeY);
-  menuRestartButtonSprite_ = createMenuButton(kMenuRestartY);
-  menuStageSelectButtonSprite_ = createMenuButton(kMenuStageSelectY);
+  TextureManager::GetInstance()->LoadTexture("resources/Textures/UI/ResetArrow.png");
+  loopArrowSprite_ = std::make_unique<Sprite>();
+  loopArrowSprite_->Initialize(SpriteManager::GetInstance(), "resources/Textures/UI/ResetArrow.png");
+  loopArrowSprite_->SetGridMesh(800, 1);
+  loopArrowSprite_->SetShaderPaths("resources/Shaders/Sprite/LoopArrow/Render.VS.hlsl", "resources/Shaders/Sprite/LoopArrow/Render.PS.hlsl");
+  // 円のサイズを小さくするため、それに合わせて矢印の太さも120pxに細くする
+  loopArrowSprite_->SetSize({2000.0f, 120.0f});
+  loopArrowSprite_->SetPosition({640.0f, 360.0f});
+  loopArrowSprite_->SetAnchorPoint({0.5f, 0.5f});
+  loopArrowSprite_->SetColor({1.0f, 1.0f, 1.0f, 0.0f});
+
+  menuResumeButtonSprite_ = CreateMenuButtonSprite(kMenuResumeY);
+  menuRestartButtonSprite_ = CreateMenuButtonSprite(kMenuRestartY);
+  menuStageSelectButtonSprite_ = CreateMenuButtonSprite(kMenuStageSelectY);
 
   // メニュータイトル
   menuTitleText_ = std::make_unique<Text>();
@@ -422,20 +502,10 @@ void GamePlayScene::Initialize() {
   menuTitleText_->SetFontSize(44.0f);
   menuTitleText_->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
 
-  const auto createMenuText = [](const char *label, float y) {
-    auto text = std::make_unique<Text>();
-    text->Initialize(kDefaultFont);
-    text->SetText(label);
-    text->SetPosition({640.0f, y + kMenuButtonHeight * 0.5f});
-    text->SetAnchorPoint({0.5f, 0.5f});
-    text->SetFontSize(25.0f);
-    text->SetColor({0.90f, 0.96f, 0.93f, 1.0f});
-    return text;
-  };
-  menuResumeText_ = createMenuText("RESUME GAME  [TAB]", kMenuResumeY);
-  menuRestartText_ = createMenuText("RETRY STAGE  [R]", kMenuRestartY);
+  menuResumeText_ = CreateMenuLabelText("RESUME GAME  [TAB]", kMenuResumeY);
+  menuRestartText_ = CreateMenuLabelText("RETRY STAGE  [R]", kMenuRestartY);
   menuStageSelectText_ =
-      createMenuText("STAGE SELECT  [BACKSPACE]", kMenuStageSelectY);
+      CreateMenuLabelText("STAGE SELECT  [BACKSPACE]", kMenuStageSelectY);
 
   menuTransitionFadeSprite_ = std::make_unique<Sprite>();
   menuTransitionFadeSprite_->Initialize(SpriteManager::GetInstance(),
@@ -444,11 +514,22 @@ void GamePlayScene::Initialize() {
   menuTransitionFadeSprite_->SetPosition({0.0f, 0.0f});
   menuTransitionFadeSprite_->SetColor({0.0f, 0.0f, 0.0f, 0.0f});
   menuTransitionFadeSprite_->Update();
-
-  pageReveal_.InitializeIfRequested();
   
   savePointHistory_.clear();
   PushSavePoint();
+  }
+
+  ++initializationStep_;
+  return initializationStep_ >= kInitializationStepCount;
+}
+
+float GamePlayScene::GetInitializationProgress() const {
+  return static_cast<float>(initializationStep_) /
+         static_cast<float>(kInitializationStepCount);
+}
+
+void GamePlayScene::InitializeRevealOverlay() {
+  pageReveal_.InitializeIfRequested();
 }
 
 void GamePlayScene::Finalize() {
@@ -482,6 +563,10 @@ void GamePlayScene::Update() {
   UpdateFantasyMenuEffect(unscaledDeltaTime);
 
   UpdateLivesText();
+  if (isHardResetTransitionActive_) {
+    UpdateHardResetTransition(unscaledDeltaTime);
+    return;
+  }
   if (isStageSelectTransitionActive_) {
     UpdateStageSelectTransition(
         TimeManager::GetInstance()->GetUnscaledDeltaTime());
@@ -536,8 +621,7 @@ void GamePlayScene::Update() {
       return;
     }
     if (input->IsKeyTrigger(DIK_R) || (clicked && restartHovered)) {
-      SceneManager::GetInstance()->SetNextScene(
-          std::make_unique<GamePlayScene>(levelPath_));
+      StartHardResetTransition();
       return;
     }
     if (input->IsKeyTrigger(DIK_BACKSPACE) || (clicked && stageSelectHovered)) {
@@ -572,27 +656,42 @@ void GamePlayScene::Update() {
 
   mapChipStage_
       .Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
+  if (backMapChipStage_) {
+    backMapChipStage_->Update();
+  }
+  if (isCannonTravelActive_) {
+    UpdateCannonTravel(TimeManager::GetInstance()->GetDeltaTime());
+  }
+  MapChipStage& activeStage = GetActiveMapChipStage();
   ruinsBackground_.Update();
   bool hardenedThisFrame = false;
 
   // player_->Update(mapChipStage_.GetGimmicks());
     if (!isClearCelebrationActive_ && !hardenedThisFrame &&
       (!isFreeCameraMode || player_->IsShapingSelfDestruct()) &&
-      !isLifeRelayActive_) {
-        player_->Update(mapChipStage_.GetGimmicks());
+      !isLifeRelayActive_ && !isCannonTravelActive_) {
+        player_->Update(activeStage.GetGimmicks());
 
         if (player_->ConsumeGoalReached()) {
           StartClearCelebration();
         }
 
     // 中間地点を通過したら、以降の命のリレー先をここへ更新する。
-    for (BaseMapChipGimmick *gimmick : mapChipStage_.GetGimmicks()) {
+    for (BaseMapChipGimmick *gimmick : activeStage.GetGimmicks()) {
       if (gimmick && gimmick->IsCheckpoint() &&
           gimmick->TryActivateCheckpoint(player_->GetAABB())) {
         playerStartPosition_ = gimmick->GetAABB().center;
         PushSavePoint();
         EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks",
                                                  playerStartPosition_);
+      }
+    }
+
+    Vector3 cannonPosition;
+    for (BaseMapChipGimmick* gimmick : activeStage.GetGimmicks()) {
+      if (gimmick && gimmick->ConsumeCannonLaunchRequest(cannonPosition)) {
+        StartCannonTravel(cannonPosition);
+        break;
       }
     }
   }
@@ -632,7 +731,8 @@ void GamePlayScene::Update() {
     hardenedThisFrame = true;
   }
 
-    if (!isClearCelebrationActive_ && player_->IsShapingSelfDestruct() && !selfDestructSlowActive_) {
+    if (!isClearCelebrationActive_ && !isLifeRelayActive_ && !isDeathTransitionActive_ &&
+        player_->IsShapingSelfDestruct() && !selfDestructSlowActive_) {
     TimeManager *timeManager = TimeManager::GetInstance();
     timeScaleBeforeSelfDestruct_ = timeManager->GetTimeScale();
     timeManager->SetTimeScale(0.08f);
@@ -651,7 +751,7 @@ void GamePlayScene::Update() {
   if (gpuSphFluid_) {
     const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
     const std::vector<BaseMapChipGimmick *> gimmicks =
-        mapChipStage_.GetGimmicks();
+        activeStage.GetGimmicks();
 
     SceneManager *sceneManager = SceneManager::GetInstance();
     sceneManager->ClearExtraScreenSpaceFluids();
@@ -666,7 +766,7 @@ void GamePlayScene::Update() {
 
     if (!isLifeRelayActive_) {
       gpuSphFluid_->SetObstacles(
-          BuildFluidObstacles(mapChipStage_, gimmicks, deltaTime));
+          BuildFluidObstacles(activeStage, gimmicks, deltaTime));
       gpuSphFluid_->SetFloorHeight(player_->GetFluidFloorHeight());
       gpuSphFluid_->SetGrounded(player_->IsGrounded());
       const Vector3 playerScale = player_->GetVisualScale();
@@ -846,9 +946,13 @@ void GamePlayScene::Draw2D() {
     menuRestartText_->Draw();
     menuStageSelectText_->Draw();
   }
-  if (isStageSelectTransitionActive_) {
+  if (isStageSelectTransitionActive_ || isHardResetTransitionActive_) {
     SpriteManager::GetInstance()->PreDraw();
     menuTransitionFadeSprite_->Draw();
+  }
+  if (isHardResetTransitionActive_ && loopArrowSprite_) {
+    SpriteManager::GetInstance()->PreDraw();
+    loopArrowSprite_->Draw();
   }
 }
 
@@ -857,8 +961,13 @@ void GamePlayScene::Draw3D() {
   skyBox_->Draw(DirectXCommon::GetInstance()->GetCommandList());
 
   Object3dManager::GetInstance()->PreDraw();
-  ruinsBackground_.Draw(false);
-  mapChipStage_.Draw();
+  ruinsBackground_.Draw(true);
+  if (activeMapIndex_ == 0 || isCannonTravelActive_) {
+    mapChipStage_.Draw();
+  }
+  if (backMapChipStage_) {
+    backMapChipStage_->Draw();
+  }
 }
 
 void GamePlayScene::PushSavePoint() {
@@ -982,6 +1091,14 @@ void GamePlayScene::FinishLifeRelay() {
   EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks",
                                            playerStartPosition_);
 
+  activeMapIndex_ = 0;
+  isCannonTravelActive_ = false;
+  cameraLaneDepth_ = 0.0f;
+  cameraTravelStartDepth_ = 0.0f;
+  cameraTravelEndDepth_ = 0.0f;
+  cameraTargetYOffset_ = kFrontCameraTargetYOffset;
+  cameraTravelStartYOffset_ = kFrontCameraTargetYOffset;
+  cameraTravelEndYOffset_ = kFrontCameraTargetYOffset;
   player_->Initialize(&mapChipStage_.GetField(), playerStartPosition_);
   eyeOffsetX_ = 0.0f;
 
@@ -1007,7 +1124,7 @@ void GamePlayScene::ResetToLastRespawnPoint() {
     selfDestructSlowActive_ = false;
   }
   // 直近の死亡で置いた死体も取り消し、詰まりから脱出できるようにする。
-  if (mapChipStage_.RemoveLatestHardenedSlime()) {
+  if (GetActiveMapChipStage().RemoveLatestHardenedSlime()) {
     remainingLives_ = (std::min)(remainingLives_ + 1, maximumLives_);
     UpdateLivesText();
     PopSavePoint();
@@ -1019,6 +1136,87 @@ void GamePlayScene::ResetToLastRespawnPoint() {
   lifeRelayTimer_ = 0.0f;
   FinishLifeRelay();
 }
+
+void GamePlayScene::StartHardResetTransition() {
+  if (isHardResetTransitionActive_) return;
+  
+  isMenuOpen_ = false; // メニューを閉じる
+  isHardResetTransitionActive_ = true;
+  hardResetTransitionTime_ = 0.0f;
+  
+  if (loopArrowSprite_) {
+      loopArrowSprite_->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
+      loopArrowSprite_->SetEffectPhase(0.0f);
+  }
+  SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
+}
+
+void GamePlayScene::UpdateHardResetTransition(float deltaTime) {
+  hardResetTransitionTime_ += deltaTime;
+  
+  constexpr float kTransitionDuration = 2.4f;
+  float progress = std::clamp(hardResetTransitionTime_ / kTransitionDuration, 0.0f, 1.0f);
+  
+  if (loopArrowSprite_) {
+      loopArrowSprite_->SetEffectPhase(progress);
+      loopArrowSprite_->Update();
+  }
+  
+  // 白フェード（後半にかけて徐々に画面を白く飛ばす）
+  float fadeAlpha = std::clamp((progress - 0.5f) * 2.0f, 0.0f, 1.0f);
+  menuTransitionFadeSprite_->SetColor({1.0f, 1.0f, 1.0f, fadeAlpha});
+  menuTransitionFadeSprite_->Update();
+  
+  // 矢印が中央で交差するタイミング付近でショックウェーブを有効化
+  // Shader側のwaveRadius=progress*1.1 に合わせて、0.0〜1.0へ直線的に増加させる
+  if (progress > 0.45f && progress < 0.95f) {
+      SceneManager::GetInstance()->AddPostEffect(PostEffectType::Shockwave, PostEffectStage::AfterParticle);
+      float waveProgress = (progress - 0.45f) / 0.50f;
+      SceneManager::GetInstance()->SetVignetteStrength(waveProgress);
+  } else if (progress >= 0.95f) {
+      SceneManager::GetInstance()->RemovePostEffect(PostEffectType::Shockwave);
+  }
+  
+  if (hardResetTransitionTime_ >= kTransitionDuration) {
+      ExecuteHardReset();
+      isHardResetTransitionActive_ = false;
+      
+      if (loopArrowSprite_) {
+          loopArrowSprite_->SetColor({1.0f, 1.0f, 1.0f, 0.0f});
+      }
+      menuTransitionFadeSprite_->SetColor({0.0f, 0.0f, 0.0f, 0.0f}); // 黒透明に戻す
+      SceneManager::GetInstance()->RemovePostEffect(PostEffectType::Shockwave);
+      PageTransition::RequestReveal({0.0f, 0.0f, 0.0f, 1.0f}, 0.5f);
+  }
+}
+
+void GamePlayScene::ExecuteHardReset() {
+  if (selfDestructSlowActive_) {
+    TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
+    selfDestructSlowActive_ = false;
+  }
+  
+  // セーブポイント履歴を最初の状態（インデックス0: 突入時のスナップショット）のみ残して切り詰める
+  if (savePointHistory_.size() > 1) {
+    savePointHistory_.erase(savePointHistory_.begin() + 1, savePointHistory_.end());
+  }
+
+  // 動的に置かれたすべての死体を削除する
+  mapChipStage_.RemoveAllHardenedSlimes();
+
+  // ライフを最大まで回復する
+  remainingLives_ = maximumLives_;
+  UpdateLivesText();
+
+  // インデックス0（初期状態）のスナップショットからギミックの状態などを復元
+  RestoreSavePoint();
+  
+  // リスポーン演出・プレイヤー初期化フラグなどをリセット
+  isLifeRelayActive_ = false;
+  lifeRelayTimer_ = 0.0f;
+  FinishLifeRelay(); // FluidとPlayerの座標をリセットし、初期位置へ復帰
+}
+
 
 void GamePlayScene::StartClearCelebration() {
   if (isClearCelebrationActive_) return;
@@ -1189,6 +1387,84 @@ void GamePlayScene::UpdateDeathTransition(float deltaTime) {
   }
 }
 
+MapChipStage& GamePlayScene::GetActiveMapChipStage() {
+  if (activeMapIndex_ == 1 && backMapChipStage_) {
+    return *backMapChipStage_;
+  }
+  return mapChipStage_;
+}
+
+const MapChipStage& GamePlayScene::GetActiveMapChipStage() const {
+  if (activeMapIndex_ == 1 && backMapChipStage_) {
+    return *backMapChipStage_;
+  }
+  return mapChipStage_;
+}
+
+void GamePlayScene::StartCannonTravel(const Vector3& cannonPosition) {
+  if (!hasBackMap_ || !backMapChipStage_ || isCannonTravelActive_) {
+    return;
+  }
+
+  cannonTravelStart_ = player_->GetPosition();
+  cannonTravelEnd_.x = cannonPosition.x + kCannonLandingOffsetX;
+  cannonTravelEnd_.y = 1.15f;
+  cannonTravelEnd_.z = 0.0f;
+  if (activeMapIndex_ == 0) {
+    cannonTravelEnd_.z = kBackMapDepth;
+    cannonTravelEnd_.y = 6.15f;
+  }
+
+  isCannonTravelActive_ = true;
+  cannonTravelTime_ = 0.0f;
+  cameraTravelStartDepth_ = cameraLaneDepth_;
+  cameraTravelEndDepth_ = 0.0f;
+  cameraTravelStartYOffset_ = cameraTargetYOffset_;
+  cameraTravelEndYOffset_ = kFrontCameraTargetYOffset;
+  if (activeMapIndex_ == 0) {
+    cameraTravelEndDepth_ = kBackMapDepth;
+    cameraTravelEndYOffset_ = kBackCameraTargetYOffset;
+  }
+  player_->SetTransitionPosition(cannonTravelStart_);
+  EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks", cannonPosition);
+}
+
+void GamePlayScene::UpdateCannonTravel(float deltaTime) {
+  if (!isCannonTravelActive_) {
+    return;
+  }
+
+  cannonTravelTime_ += deltaTime;
+  float progress = cannonTravelTime_ / kCannonTravelDuration;
+  progress = std::clamp(progress, 0.0f, 1.0f);
+  const float smoothProgress = progress * progress * (3.0f - 2.0f * progress);
+  cameraLaneDepth_ =
+      cameraTravelStartDepth_ +
+      (cameraTravelEndDepth_ - cameraTravelStartDepth_) * smoothProgress;
+  cameraTargetYOffset_ =
+      cameraTravelStartYOffset_ +
+      (cameraTravelEndYOffset_ - cameraTravelStartYOffset_) * smoothProgress;
+  Vector3 position = Lerp(cannonTravelStart_, cannonTravelEnd_, smoothProgress);
+  position.y += std::sin(progress * 3.14159265f) * kCannonTravelArcHeight;
+  player_->SetTransitionPosition(position);
+
+  if (progress < 1.0f) {
+    return;
+  }
+
+  if (activeMapIndex_ == 0) {
+    activeMapIndex_ = 1;
+    player_->SetMapChipField(&backMapChipStage_->GetField());
+  } else {
+    activeMapIndex_ = 0;
+    player_->SetMapChipField(&mapChipStage_.GetField());
+  }
+  player_->SetTransitionPosition(cannonTravelEnd_);
+  cameraLaneDepth_ = cameraTravelEndDepth_;
+  cameraTargetYOffset_ = cameraTravelEndYOffset_;
+  isCannonTravelActive_ = false;
+}
+
 /**
  * @brief カメラの注視点（ターゲット）座標が、マップ境界外を映さないように制限（クランプ）する
  * @param targetPosition 本来カメラが追従したい理想の座標
@@ -1204,8 +1480,9 @@ Vector3 GamePlayScene::ClampCameraTarget(const Vector3& targetPosition) const {
   float halfWidth = halfHeight * aspectRatio;
 
   // マップの物理的な境界（ブロック数 × ブロックサイズ）を取得
-  float mapWidth = static_cast<float>(mapChipStage_.GetField().GetBlockWidth());
-  float mapHeight = static_cast<float>(mapChipStage_.GetField().GetBlockHeight());
+  const MapChipStage& activeStage = GetActiveMapChipStage();
+  float mapWidth = static_cast<float>(activeStage.GetField().GetBlockWidth());
+  float mapHeight = static_cast<float>(activeStage.GetField().GetBlockHeight());
 
   // 万が一マップが1画面に収まりきらないほど小さい場合のフェールセーフ（中央固定）
   float minX = (std::min)(halfWidth, mapWidth * 0.5f);
@@ -1215,7 +1492,9 @@ Vector3 GamePlayScene::ClampCameraTarget(const Vector3& targetPosition) const {
 
   Vector3 clampedPosition = targetPosition;
   clampedPosition.x = std::clamp(clampedPosition.x, minX, maxX);
-  clampedPosition.y = std::clamp(clampedPosition.y, minY, maxY);
+  if (activeMapIndex_ == 0) {
+    clampedPosition.y = std::clamp(clampedPosition.y, minY, maxY);
+  }
 
   return clampedPosition;
 }
@@ -1228,10 +1507,16 @@ void GamePlayScene::UpdateFollowCamera() {
   if (isLifeRelayActive_) {
     targetPosition = lifeRelayOrbCurrentPosition_;
   }
+  targetPosition.y += cameraTargetYOffset_;
+  targetPosition.z = cameraLaneDepth_;
 
-  // マップ境界はみ出し防止のクランプ処理を適用
-  targetPosition = ClampCameraTarget(targetPosition);
+  // 大砲の飛行中は放物線と奥行きをそのまま追い、着地後に通常の
+  // マップ境界クランプへ戻す。
+  if (!isCannonTravelActive_) {
+    targetPosition = ClampCameraTarget(targetPosition);
+  }
 
-  camera_->LookAt({targetPosition.x, targetPosition.y, -kCameraDistance},
-                  {targetPosition.x, targetPosition.y, 0.0f});
+  camera_->LookAt(
+      {targetPosition.x, targetPosition.y, targetPosition.z - kCameraDistance},
+      targetPosition);
 }

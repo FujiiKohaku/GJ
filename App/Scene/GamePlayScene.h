@@ -32,6 +32,10 @@ class GamePlayScene : public BaseScene {
 public:
     explicit GamePlayScene(std::string levelPath = "resources/Maps/stage1.json");
     void Initialize() override;
+    void BeginIncrementalInitialize();
+    bool InitializeNextStep();
+    float GetInitializationProgress() const;
+    void InitializeRevealOverlay();
     void Finalize() override;
     void Update() override;
     void Draw2D() override;
@@ -42,7 +46,14 @@ public:
 
 private:
     std::string levelPath_;
+    static constexpr int kInitializationStepCount = 7;
+    int initializationStep_ = 0;
+    LevelData initializationLevelData_;
     void UpdateFollowCamera();
+    MapChipStage& GetActiveMapChipStage();
+    const MapChipStage& GetActiveMapChipStage() const;
+    void StartCannonTravel(const Vector3& cannonPosition);
+    void UpdateCannonTravel(float deltaTime);
 
     /**
      * @brief カメラの注視点（ターゲット）座標が、マップ境界外を映さないように制限（クランプ）する
@@ -57,8 +68,6 @@ private:
 
     std::vector<GamePlaySavePoint> savePointHistory_;
 
-    void UpdateCollisionText();
-
     void UpdateLivesText();
     void LoseLife(bool leaveCorpse = true);
     void StartDeathTransition();
@@ -68,6 +77,9 @@ private:
     void StartLifeRelay(bool leaveCorpse = true);
     void FinishLifeRelay();
     void ResetToLastRespawnPoint();
+    void StartHardResetTransition();
+    void UpdateHardResetTransition(float deltaTime);
+    void ExecuteHardReset();
     void StartClearCelebration();
     void UpdateClearCelebration(float unscaledDeltaTime);
 
@@ -89,6 +101,19 @@ private:
     int remainingLives_ = kInitialLives;
     int maximumLives_ = kInitialLives;
     MapChipStage mapChipStage_;
+    std::unique_ptr<MapChipStage> backMapChipStage_;
+    bool hasBackMap_ = false;
+    int activeMapIndex_ = 0;
+    bool isCannonTravelActive_ = false;
+    float cannonTravelTime_ = 0.0f;
+    Vector3 cannonTravelStart_ = {0.0f, 0.0f, 0.0f};
+    Vector3 cannonTravelEnd_ = {0.0f, 0.0f, 0.0f};
+    float cameraLaneDepth_ = 0.0f;
+    float cameraTravelStartDepth_ = 0.0f;
+    float cameraTravelEndDepth_ = 0.0f;
+    float cameraTargetYOffset_ = 0.0f;
+    float cameraTravelStartYOffset_ = 0.0f;
+    float cameraTravelEndYOffset_ = 0.0f;
     RuinsBackground ruinsBackground_;
     std::unique_ptr<MapChipPlayer> player_;
     std::unique_ptr<GpuSphFluid> gpuSphFluid_;
@@ -107,10 +132,13 @@ private:
     std::unique_ptr<Text> menuResumeText_;
     std::unique_ptr<Text> menuRestartText_;
     std::unique_ptr<Text> menuStageSelectText_;
+    std::unique_ptr<Sprite> loopArrowSprite_;
     std::unique_ptr<Sprite> menuTransitionFadeSprite_;
     bool isStageSelectTransitionActive_ = false;
     float stageSelectTransitionTime_ = 0.0f;
     float fantasyMenuEffectStrength_ = 0.0f;
+    bool isHardResetTransitionActive_ = false;
+    float hardResetTransitionTime_ = 0.0f;
     bool isDeathTransitionActive_ = false;
     float deathTransitionTime_ = 0.0f;
     bool showForces_ = false;

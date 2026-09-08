@@ -32,6 +32,9 @@
   "Spring": {
     "file_name": "Spring/Spring.obj"
   },
+  "Cannon": {
+    "file_name": "Cannon/Cannon.obj"
+  },
   "Floor": {
     "file_name": "",
     "material_type": "Moss",

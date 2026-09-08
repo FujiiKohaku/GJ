@@ -18,11 +18,13 @@ MapChipStage::~MapChipStage() = default;
 
 void MapChipStage::Initialize(
     const LevelData& levelData,
-    const std::string& texturePath)
+    const std::string& texturePath,
+    const Vector3& worldOffset)
 {
     // ギミックは数が少ないので毎回作り直す
     gimmicks_.clear();
     eventManager_.Clear();
+    worldOffset_ = worldOffset;
     
     if (levelData.tileMaps.empty()) return;
     field_.Initialize(levelData.tileMaps[0]);
@@ -42,15 +44,16 @@ void MapChipStage::Initialize(
                 continue;
             }
 
-            const Vector3 position =
+            const Vector3 localPosition =
                 field_.GetMapChipPositionByIndex(xIndex, yIndex);
+            const Vector3 position = localPosition + worldOffset_;
 
             if (!MapChipRegistry::IsSolidBlock(type) || MapChipRegistry::GetConfig(type).isGimmick) {
                 // 同じ座標の ObjectData を探す
                 const BaseGimmickParam* gimmickParam = nullptr;
                 for (const auto& obj : levelData.objects) {
-                    if (std::abs(obj.translation.x - position.x) < 0.1f &&
-                        std::abs(obj.translation.y - position.y) < 0.1f) {
+                    if (std::abs(obj.translation.x - localPosition.x) < 0.1f &&
+                        std::abs(obj.translation.y - localPosition.y) < 0.1f) {
                         gimmickParam = obj.gimmickParam.get();
                         break;
                     }
@@ -137,7 +140,8 @@ void MapChipStage::Initialize(
         }
 
         if (gimmick) {
-            if (gimmick->Initialize(obj.translation, modelFile, obj.gimmickParam.get())) {
+            Vector3 objectPosition = obj.translation + worldOffset_;
+            if (gimmick->Initialize(objectPosition, modelFile, obj.gimmickParam.get())) {
                 gimmick->SetStage(this);
                 gimmicks_.push_back(std::move(gimmick));
             }
@@ -300,6 +304,16 @@ bool MapChipStage::RemoveLatestHardenedSlime()
         }
     }
     return false;
+}
+
+void MapChipStage::RemoveAllHardenedSlimes()
+{
+    gimmicks_.erase(
+        std::remove_if(gimmicks_.begin(), gimmicks_.end(),
+            [](const std::unique_ptr<BaseMapChipGimmick>& gimmick) {
+                return gimmick && gimmick->IsHardenedSlime();
+            }),
+        gimmicks_.end());
 }
 
 void MapChipStage::ResolveHardenedSlimeAdhesion(
