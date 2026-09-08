@@ -135,10 +135,7 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
             return;
         }
 
-        isShapingSelfDestruct_ = true;
-        selfDestructRawPull_ = { 0.0f, 0.0f };
-        selfDestructPull_ = { 0.0f, 0.0f };
-        velocity_ = { 0.0f, 0.0f, 0.0f };
+        BeginSelfDestructShape();
     }
 
     if (isShapingSelfDestruct_) {
@@ -264,11 +261,29 @@ bool MapChipPlayer::ConsumeJustDied()
 
 void MapChipPlayer::Kill()
 {
-    if (state_ == PlayerState::Dead || isInvincible_) {
+    if (isInvincible_ || isShapingSelfDestruct_) {
         return;
     }
-    state_ = PlayerState::Dead;
-    justDied_ = true;
+
+    // Traps no longer kill immediately. Contact puts the player into the same
+    // slow-motion shaping state as the first right click; only the user's
+    // following right click confirms self-destruction and spends a life.
+    BeginSelfDestructShape();
+}
+
+void MapChipPlayer::BeginSelfDestructShape()
+{
+    if (isShapingSelfDestruct_) {
+        return;
+    }
+
+    state_ = PlayerState::Alive;
+    justDied_ = false;
+    isShapingSelfDestruct_ = true;
+    hardenedBodyReady_ = false;
+    selfDestructRawPull_ = { 0.0f, 0.0f };
+    selfDestructPull_ = { 0.0f, 0.0f };
+    velocity_ = { 0.0f, 0.0f, 0.0f };
 }
 
 void MapChipPlayer::UpdateSelfDestructShape(float unscaledDeltaTime)

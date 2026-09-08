@@ -19,6 +19,7 @@
 #include "PageTransition.h"
 #include <cstddef>
 #include <memory>
+#include <vector>
 
 class GamePlayScene : public BaseScene {
 public:
@@ -42,7 +43,6 @@ private:
      */
     Vector3 ClampCameraTarget(const Vector3& targetPosition) const;
 
-    void UpdateCollisionText();
     void UpdateLivesText();
     void LoseLife();
     void StartDeathTransition();
@@ -63,11 +63,11 @@ private:
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
     std::unique_ptr<SkyBox> skyBox_;
-    std::unique_ptr<Text> instructionText_;
     std::unique_ptr<Sprite> tutorialPanelSprite_;
     std::unique_ptr<Text> tutorialText_;
-    std::unique_ptr<Text> collisionText_;
-    std::unique_ptr<Text> livesText_;
+    std::unique_ptr<Text> livesNumberText_;
+    std::vector<std::unique_ptr<Sprite>> lifeSprites_;
+    int displayedLives_ = -1;
     static constexpr int kInitialLives = 5;
     static constexpr int kStage1Lives = 10;
     int remainingLives_ = kInitialLives;
