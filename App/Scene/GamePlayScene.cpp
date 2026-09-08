@@ -219,12 +219,50 @@ BuildFluidObstacles(const MapChipStage &stage,
 
   return obstacles;
 }
+
+std::unique_ptr<Sprite> CreateMenuButtonSprite(float y) {
+  std::unique_ptr<Sprite> button = std::make_unique<Sprite>();
+  button->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+  button->SetMaterial(kFantasyMenuMaterial);
+  button->SetSize({kMenuButtonWidth, kMenuButtonHeight});
+  button->SetPosition({kMenuButtonX, y});
+  button->SetColor({0.15f, 0.25f, 0.22f, 1.0f});
+  return button;
+}
+
+std::unique_ptr<Text> CreateMenuLabelText(const char *label, float y) {
+  std::unique_ptr<Text> text = std::make_unique<Text>();
+  text->Initialize(kDefaultFont);
+  text->SetText(label);
+  text->SetPosition({640.0f, y + kMenuButtonHeight * 0.5f});
+  text->SetAnchorPoint({0.5f, 0.5f});
+  text->SetFontSize(25.0f);
+  text->SetColor({0.90f, 0.96f, 0.93f, 1.0f});
+  return text;
+}
 } // namespace
 
 GamePlayScene::GamePlayScene(std::string levelPath)
     : levelPath_(std::move(levelPath)) {}
 
 void GamePlayScene::Initialize() {
+  BeginIncrementalInitialize();
+  while (!InitializeNextStep()) {
+  }
+  InitializeRevealOverlay();
+}
+
+void GamePlayScene::BeginIncrementalInitialize() {
+  initializationStep_ = 0;
+  initializationLevelData_ = LevelData{};
+}
+
+bool GamePlayScene::InitializeNextStep() {
+  if (initializationStep_ >= kInitializationStepCount) {
+    return true;
+  }
+
+  if (initializationStep_ == 0) {
   SceneManager::GetInstance()->SetPostEffectType(
       PostEffectType::ArchiveAtmosphere);
   SceneManager::GetInstance()->SetArchiveApproach(0.0f);
@@ -243,15 +281,19 @@ void GamePlayScene::Initialize() {
   debugCameraController_.SetDebugMode(false);
 
   LevelDataLoader loader;
-  LevelData levelData = loader.Load(levelPath_);
-  maximumLives_ = levelPath_.find("stage2.json") != std::string::npos
-      ? 20
-      : (levelPath_.find("stage1.json") != std::string::npos
-          ? kStage1Lives
-          : kInitialLives);
+  initializationLevelData_ = loader.Load(levelPath_);
+  maximumLives_ = kInitialLives;
+  if (levelPath_.find("stage2.json") != std::string::npos) {
+    maximumLives_ = 20;
+  } else if (levelPath_.find("stage1.json") != std::string::npos) {
+    maximumLives_ = kStage1Lives;
+  }
   remainingLives_ = maximumLives_;
+  }
 
-  mapChipStage_.Initialize(levelData);
+  if (initializationStep_ == 1) {
+  LevelDataLoader loader;
+  mapChipStage_.Initialize(initializationLevelData_);
   mapChipStage_.ApplyMaterialProperties();
 
   hasBackMap_ = levelPath_.find("stage_test.json") != std::string::npos;
@@ -284,10 +326,12 @@ void GamePlayScene::Initialize() {
         static_cast<float>(backMapChipStage_->GetField().GetBlockWidth());
   }
   ruinsBackground_.Initialize(backgroundSettings);
+  }
 
+  if (initializationStep_ == 2) {
   Vector3 playerStartPos = {0.0f, 0.0f, 0.0f};
-  if (!levelData.playerSpawns.empty()) {
-    playerStartPos = levelData.playerSpawns[0].translation;
+  if (!initializationLevelData_.playerSpawns.empty()) {
+    playerStartPos = initializationLevelData_.playerSpawns[0].translation;
   }
 
   player_ = std::make_unique<MapChipPlayer>();
@@ -297,7 +341,9 @@ void GamePlayScene::Initialize() {
   if (backMapChipStage_) {
     backMapChipStage_->SetPlayer(player_.get());
   }
+  }
 
+  if (initializationStep_ == 3) {
   gpuSphFluid_ = std::make_unique<GpuSphFluid>();
   GpuSphFluid::Settings fluidSettings;
   fluidSettings.particleCount = 2048;
@@ -363,7 +409,9 @@ void GamePlayScene::Initialize() {
       fluidSettings.boundsMin.y, fluidSettings.boundsMin.z,
       fluidSettings.boundsMax.x, fluidSettings.boundsMax.y,
       fluidSettings.boundsMax.z));
+  }
 
+  if (initializationStep_ == 4) {
   UpdateFollowCamera();
   camera_->Update();
 
@@ -372,7 +420,9 @@ void GamePlayScene::Initialize() {
   skyBox_->Initialize(DirectXCommon::GetInstance());
   skyBox_->SetTexture(kSkyBoxTexture);
   skyBox_->Update(camera_.get());
+  }
 
+  if (initializationStep_ == 5) {
   TextureManager::GetInstance()->LoadTexture(kWhiteTexture);
   tutorialPanelSprite_ = std::make_unique<Sprite>();
   tutorialPanelSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
@@ -416,7 +466,9 @@ void GamePlayScene::Initialize() {
   livesNumberText_->SetOutlineWidth(2.0f);
   livesNumberText_->SetShadowColor({0.0f, 0.0f, 0.0f, 0.0f});
   UpdateLivesText();
+  }
 
+  if (initializationStep_ == 6) {
   // メニューUIの初期化
   TextureManager::GetInstance()->LoadTexture(kWhiteTexture);
 
@@ -436,18 +488,9 @@ void GamePlayScene::Initialize() {
   menuPanelSprite_->SetPosition({320.0f, 170.0f});
   menuPanelSprite_->SetColor({0.10f, 0.20f, 0.15f, 0.97f});
 
-  const auto createMenuButton = [](float y) {
-    auto button = std::make_unique<Sprite>();
-    button->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
-    button->SetMaterial(kFantasyMenuMaterial);
-    button->SetSize({kMenuButtonWidth, kMenuButtonHeight});
-    button->SetPosition({kMenuButtonX, y});
-    button->SetColor({0.15f, 0.25f, 0.22f, 1.0f});
-    return button;
-  };
-  menuResumeButtonSprite_ = createMenuButton(kMenuResumeY);
-  menuRestartButtonSprite_ = createMenuButton(kMenuRestartY);
-  menuStageSelectButtonSprite_ = createMenuButton(kMenuStageSelectY);
+  menuResumeButtonSprite_ = CreateMenuButtonSprite(kMenuResumeY);
+  menuRestartButtonSprite_ = CreateMenuButtonSprite(kMenuRestartY);
+  menuStageSelectButtonSprite_ = CreateMenuButtonSprite(kMenuStageSelectY);
 
   // メニュータイトル
   menuTitleText_ = std::make_unique<Text>();
@@ -458,20 +501,10 @@ void GamePlayScene::Initialize() {
   menuTitleText_->SetFontSize(44.0f);
   menuTitleText_->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
 
-  const auto createMenuText = [](const char *label, float y) {
-    auto text = std::make_unique<Text>();
-    text->Initialize(kDefaultFont);
-    text->SetText(label);
-    text->SetPosition({640.0f, y + kMenuButtonHeight * 0.5f});
-    text->SetAnchorPoint({0.5f, 0.5f});
-    text->SetFontSize(25.0f);
-    text->SetColor({0.90f, 0.96f, 0.93f, 1.0f});
-    return text;
-  };
-  menuResumeText_ = createMenuText("RESUME GAME  [TAB]", kMenuResumeY);
-  menuRestartText_ = createMenuText("RETRY STAGE  [R]", kMenuRestartY);
+  menuResumeText_ = CreateMenuLabelText("RESUME GAME  [TAB]", kMenuResumeY);
+  menuRestartText_ = CreateMenuLabelText("RETRY STAGE  [R]", kMenuRestartY);
   menuStageSelectText_ =
-      createMenuText("STAGE SELECT  [BACKSPACE]", kMenuStageSelectY);
+      CreateMenuLabelText("STAGE SELECT  [BACKSPACE]", kMenuStageSelectY);
 
   menuTransitionFadeSprite_ = std::make_unique<Sprite>();
   menuTransitionFadeSprite_->Initialize(SpriteManager::GetInstance(),
@@ -480,11 +513,22 @@ void GamePlayScene::Initialize() {
   menuTransitionFadeSprite_->SetPosition({0.0f, 0.0f});
   menuTransitionFadeSprite_->SetColor({0.0f, 0.0f, 0.0f, 0.0f});
   menuTransitionFadeSprite_->Update();
-
-  pageReveal_.InitializeIfRequested();
   
   savePointHistory_.clear();
   PushSavePoint();
+  }
+
+  ++initializationStep_;
+  return initializationStep_ >= kInitializationStepCount;
+}
+
+float GamePlayScene::GetInitializationProgress() const {
+  return static_cast<float>(initializationStep_) /
+         static_cast<float>(kInitializationStepCount);
+}
+
+void GamePlayScene::InitializeRevealOverlay() {
+  pageReveal_.InitializeIfRequested();
 }
 
 void GamePlayScene::Finalize() {

@@ -5,7 +5,8 @@ namespace {
 bool ChangeScene(
     std::unique_ptr<BaseScene>& scene,
     std::unique_ptr<BaseScene>& nextScene,
-    std::unique_ptr<BaseScene>& retiredScene)
+    std::unique_ptr<BaseScene>& retiredScene,
+    bool initializeScene)
 {
     if (!nextScene) {
         return false;
@@ -19,7 +20,9 @@ bool ChangeScene(
     retiredScene.reset();
 
     scene = std::move(nextScene);
-    scene->Initialize();
+    if (initializeScene) {
+        scene->Initialize();
+    }
     return true;
 }
 }
@@ -32,13 +35,17 @@ void SceneManager::Update()
         retiredScene_.reset();
     }
 
-    if (nextScene_) {
+    if (nextScene_ && !nextSceneIsPrepared_) {
         screenSpaceFluid_ = nullptr;
         RemovePostEffect(PostEffectType::ArchiveAtmosphere);
         archiveApproach_ = 0.0f;
     }
 
-    ChangeScene(scene_, nextScene_, retiredScene_);
+    const bool sceneChanged = ChangeScene(
+        scene_, nextScene_, retiredScene_, !nextSceneIsPrepared_);
+    if (sceneChanged) {
+        nextSceneIsPrepared_ = false;
+    }
 
     if (scene_) {
         scene_->Update();

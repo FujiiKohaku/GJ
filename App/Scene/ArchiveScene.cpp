@@ -9,7 +9,7 @@
 #include "Engine/PostEffect/PostEffectType.h"
 #include "Engine/Time/TimeManager.h"
 #include "Engine/math/MatrixMath.h"
-#include "GamePlayScene.h"
+#include "LoadingScene.h"
 #include "SceneManager.h"
 #include "PageTransition.h"
 #include "TestScene.h"
@@ -1168,13 +1168,13 @@ void ArchiveScene::UpdateStageConfirmed(float deltaTime)
     transitionPage_->Update();
 
     if (animationTime_ >= kConfirmSceneChangeTime) {
-        PageTransition::RequestReveal();
-    switch (confirmedDestination_) {
-    case StageDestination::GamePlay:
+        switch (confirmedDestination_) {
+        case StageDestination::GamePlay:
             SceneManager::GetInstance()->SetNextScene(
-                std::make_unique<GamePlayScene>(stages_[currentStageIndex_].levelPath));
+                std::make_unique<LoadingScene>(stages_[currentStageIndex_].levelPath));
             break;
         case StageDestination::Test:
+            PageTransition::RequestReveal();
             SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());
             break;
         }

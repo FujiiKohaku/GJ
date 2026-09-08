@@ -32,6 +32,10 @@ class GamePlayScene : public BaseScene {
 public:
     explicit GamePlayScene(std::string levelPath = "resources/Maps/stage1.json");
     void Initialize() override;
+    void BeginIncrementalInitialize();
+    bool InitializeNextStep();
+    float GetInitializationProgress() const;
+    void InitializeRevealOverlay();
     void Finalize() override;
     void Update() override;
     void Draw2D() override;
@@ -41,6 +45,9 @@ public:
 
 private:
     std::string levelPath_;
+    static constexpr int kInitializationStepCount = 7;
+    int initializationStep_ = 0;
+    LevelData initializationLevelData_;
     void UpdateFollowCamera();
     MapChipStage& GetActiveMapChipStage();
     const MapChipStage& GetActiveMapChipStage() const;
