@@ -8,11 +8,43 @@
 #include <cstring>
 
 #ifdef GJ_WITH_EOS
+#include <Windows.h>
 #include <eos_sdk.h>
 #include <eos_connect.h>
 #include <eos_lobby.h>
 #include <eos_p2p.h>
 #endif
+
+namespace {
+#ifdef GJ_WITH_EOS
+std::filesystem::path FindEosConfig() {
+    std::vector<std::filesystem::path> roots;
+    std::error_code error;
+    roots.push_back(std::filesystem::current_path(error));
+
+    std::wstring executablePath(32768, L'\0');
+    const DWORD length = GetModuleFileNameW(nullptr, executablePath.data(), static_cast<DWORD>(executablePath.size()));
+    if (length > 0 && length < executablePath.size()) {
+        executablePath.resize(length);
+        roots.push_back(std::filesystem::path(executablePath).parent_path());
+    }
+
+    constexpr std::array<const char*, 2> filenames{"eos.local.json", "eos.json"};
+    for (auto root : roots) {
+        for (int depth = 0; depth < 8 && !root.empty(); ++depth) {
+            for (const auto* filename : filenames) {
+                const auto candidate = root / "resources" / "Config" / filename;
+                if (std::filesystem::is_regular_file(candidate, error)) return candidate;
+            }
+            const auto parent = root.parent_path();
+            if (parent == root) break;
+            root = parent;
+        }
+    }
+    return {};
+}
+#endif
+}
 
 struct EosMultiplayer::Impl {
     bool connected = false, busy = false, playing = false;
@@ -232,12 +264,12 @@ void EosMultiplayer::Connect() {
 #ifdef GJ_WITH_EOS
     if (!s.platform) {
         try {
-            std::ifstream file("resources/Config/eos.local.json");
-            if (!file) { s.status = "EOS 接続設定がありません (eos.local.json)"; return; }
+            std::ifstream file(FindEosConfig());
+            if (!file) { s.status = "EOS 接続設定がありません (eos.local.json / eos.json)"; return; }
             file >> s.config;
             for (auto key : {"productId", "sandboxId", "deploymentId", "clientId", "clientSecret"})
                 if (s.config.at(key).get<std::string>().empty()) throw std::runtime_error("Missing config");
-        } catch (...) { s.status = "EOS 接続設定を確認してください (eos.local.json)"; return; }
+        } catch (...) { s.status = "EOS 接続設定を確認してください (eos.local.json / eos.json)"; return; }
         EOS_InitializeOptions init{};
         init.ApiVersion = EOS_INITIALIZE_API_LATEST;
         init.ProductName = "GJ"; init.ProductVersion = "1.0";

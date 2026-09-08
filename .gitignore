@@ -396,8 +396,12 @@ Tools/UIAnimationEditor/ai_settings.json
 # ImGui local layout configuration
 imgui.ini
 
-# EOS SDK distribution and per-product credentials are installed locally.
+# The full multi-platform SDK and per-machine credential overrides stay local.
 /externals/EOS/
 /resources/Config/eos.local.json
 /generated/eos-build/
 /generated/eos-tests/
+
+# Required EOS Win64 runtime is intentionally versioned for reproducible builds.
+!/externals/EOS-Win64/Bin/
+!/externals/EOS-Win64/Bin/EOSSDK-Win64-Shipping.dll

@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <EosSdkDir Condition="'$(EosSdkDir)' == ''">$(ProjectDir)externals\EOS\SDK</EosSdkDir>
+    <EosSdkDir Condition="'$(EosSdkDir)' == ''">$(ProjectDir)externals\EOS-Win64</EosSdkDir>
+    <RequireEOS Condition="'$(RequireEOS)' == '' and '$(Configuration)' == 'Release'">true</RequireEOS>
+    <RequireEOS Condition="'$(RequireEOS)' == ''">false</RequireEOS>
     <EnableEOS Condition="'$(EnableEOS)' == '' and Exists('$(EosSdkDir)\Include\eos_sdk.h')">true</EnableEOS>
+    <EnableEOS Condition="'$(EnableEOS)' == '' and '$(RequireEOS)' == 'true'">true</EnableEOS>
     <EnableEOS Condition="'$(EnableEOS)' == ''">false</EnableEOS>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(EnableEOS)' == 'true'">
