@@ -7,6 +7,7 @@
 #include "App/Game/Map/MapChipStage.h"
 #include "Engine/3D/Object3d.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/Audio/SoundManager.h"
 #include <cmath>
 #include <numbers>
 
@@ -91,7 +92,14 @@ void DoorGimmick::Update()
                 }
             }
         }
-        isOpen_ = shouldOpen;
+        float previousProgress = openProgress_;
+
+        if (isOpen_ != shouldOpen) {
+            if (shouldOpen) {
+                SoundManager::GetInstance()->PlaySE("DoorOpen", 0.3f);
+            }
+            isOpen_ = shouldOpen;
+        }
 
         float dt = TimeManager::GetInstance()->GetDeltaTime();
         float speed = 3.0f; // 開閉スピード
@@ -102,6 +110,11 @@ void DoorGimmick::Update()
         } else {
             openProgress_ -= speed * dt;
             if (openProgress_ < 0.0f) openProgress_ = 0.0f;
+        }
+
+        // ドアが閉まりきった瞬間に音を鳴らす
+        if (!isOpen_ && previousProgress > 0.0f && openProgress_ == 0.0f) {
+            SoundManager::GetInstance()->PlaySE("DoorClose", 0.3f);
         }
     } // !isEditorMode_ && stage_ の終了
 

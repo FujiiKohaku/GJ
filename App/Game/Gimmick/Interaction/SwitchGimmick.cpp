@@ -11,6 +11,7 @@
 #include "App/Game/Player/MapChipPlayer.h"
 #include "Engine/CollisionManager/CollisionManager.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/Audio/SoundManager.h"
 
 Vector3 SwitchGimmick::s_pressurePlateAABBOffset = { 0.0f, -0.4f, 0.0f };
 Vector3 SwitchGimmick::s_pressurePlateAABBSize = { 0.8f, 0.2f, 0.8f };
@@ -124,10 +125,12 @@ void SwitchGimmick::Update()
             if (!isActive_) {
                 Logger::Log("SwitchGimmick(PressurePlate): Event Fired -> " + param_->fireEventName_ + "\n");
                 stage_->GetEventManager().Publish(param_->fireEventName_);
+                SoundManager::GetInstance()->PlaySE("SwitchPress", 0.3f);
                 isActive_ = true;
             }
         } else {
             if (isActive_) {
+                SoundManager::GetInstance()->PlaySE("SwitchRelease", 0.3f);
                 isActive_ = false;
             }
         }

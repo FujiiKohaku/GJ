@@ -255,6 +255,16 @@ constexpr const char *kGasIgniteSoundPath = "resources/Audio/Gimmik/biww-fire-ig
 constexpr const char *kLaserHitSlimeSoundName = "LaserHitSlime";
 constexpr const char *kLaserHitSlimeSoundPath = "resources/Audio/Gimmik/dragon-studio-steam-hissing-386157.mp3";
 
+constexpr const char *kSwitchPressSoundName = "SwitchPress";
+constexpr const char *kSwitchPressSoundPath = "resources/Audio/Gimmik/soundreality-switch-150130.mp3";
+constexpr const char *kSwitchReleaseSoundName = "SwitchRelease";
+constexpr const char *kSwitchReleaseSoundPath = "resources/Audio/Gimmik/freesounds-4u-light-switch-1-401152.mp3";
+
+constexpr const char *kDoorOpenSoundName = "DoorOpen";
+constexpr const char *kDoorOpenSoundPath = "resources/Audio/Gimmik/590949__rudmer_rotteveel__creaky-door-fast-01.wav";
+constexpr const char *kDoorCloseSoundName = "DoorClose";
+constexpr const char *kDoorCloseSoundPath = "resources/Audio/Gimmik/DOORWood_Door slamming 3 (ID 1339)_BigSoundBank.com.wav";
+
 constexpr const char *kKeyWTexture = "resources/Textures/W.png";
 constexpr const char *kKeyATexture = "resources/Textures/A.png";
 constexpr const char *kKeySTexture = "resources/Textures/S.png";
@@ -318,6 +328,10 @@ bool GamePlayScene::InitializeNextStep() {
   audio->Load(kGasFlowSoundName, kGasFlowSoundPath, AudioCategory::SE);
   audio->Load(kGasIgniteSoundName, kGasIgniteSoundPath, AudioCategory::SE);
   audio->Load(kLaserHitSlimeSoundName, kLaserHitSlimeSoundPath, AudioCategory::SE);
+  audio->Load(kSwitchPressSoundName, kSwitchPressSoundPath, AudioCategory::SE);
+  audio->Load(kSwitchReleaseSoundName, kSwitchReleaseSoundPath, AudioCategory::SE);
+  audio->Load(kDoorOpenSoundName, kDoorOpenSoundPath, AudioCategory::SE);
+  audio->Load(kDoorCloseSoundName, kDoorCloseSoundPath, AudioCategory::SE);
   }
 
   if (initializationStep_ == 1) {
