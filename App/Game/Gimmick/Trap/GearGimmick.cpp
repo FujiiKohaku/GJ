@@ -120,7 +120,7 @@ void GearGimmick::Update()
         if (!wasPlayerColliding_) {
             Logger::Log(std::format("[GearGimmick] Player touched the gear at ({:.2f}, {:.2f}, {:.2f})\n",
                                     position_.x, position_.y, position_.z));
-            player->RequestDeath();
+            player->Kill();
         }
         wasPlayerColliding_ = true;
     } else {

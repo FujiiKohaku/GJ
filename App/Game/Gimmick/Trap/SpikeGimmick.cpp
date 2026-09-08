@@ -81,7 +81,7 @@ void SpikeGimmick::Update()
         if (!wasPlayerColliding_) {
             Logger::Log(std::format("[SpikeGimmick] Player touched the spike at ({:.2f}, {:.2f}, {:.2f})\n",
                                     position_.x, position_.y, position_.z));
-            player->RequestDeath();
+            player->Kill();
         }
         wasPlayerColliding_ = true;
     } else {

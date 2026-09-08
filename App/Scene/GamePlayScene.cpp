@@ -484,16 +484,8 @@ void GamePlayScene::Update() {
   ruinsBackground_.Update();
   bool hardenedThisFrame = false;
   // 形状調整用のスロー中は、トラップ接触や落下などによる死亡を無効にする。
-  // 死亡リクエストは消費しておかないと通常速度へ戻った瞬間に死亡してしまう。
   const bool isSlowMotion = TimeManager::GetInstance()->GetTimeScale() < 0.999f;
-    if (!isClearCelebrationActive_ && player_->ConsumeDeathRequest()) {
-    if (!isSlowMotion) {
-      LoseLife();
-      if (isDeathTransitionActive_)
-        return;
-      hardenedThisFrame = true;
-    }
-  }
+  player_->SetInvincible(isSlowMotion);
 
   // player_->Update(mapChipStage_.GetGimmicks());
     if (!isClearCelebrationActive_ && !hardenedThisFrame &&
@@ -557,8 +549,9 @@ void GamePlayScene::Update() {
       return;
     hardenedThisFrame = true;
   }
-    if (!isClearCelebrationActive_ && !isSlowMotion && !hardenedThisFrame &&
-      (player_->IsCrushed() || player_->GetPosition().y < -10.0f)) {
+  
+    // トラップや圧死などによる死亡通知の受け取り
+    if (!isClearCelebrationActive_ && !hardenedThisFrame && player_->ConsumeJustDied()) {
     LoseLife();
     if (isDeathTransitionActive_)
       return;

@@ -282,7 +282,7 @@ void LaserGimmick::Update()
         }
         playerHitTime_ += TimeManager::GetInstance()->GetUnscaledDeltaTime();
         if (playerHitTime_ >= kPlayerDeathDelay) {
-            player->RequestDeath();
+            player->Kill();
             playerHitTime_ = 0.0f;
         }
         wasPlayerColliding_ = true;
