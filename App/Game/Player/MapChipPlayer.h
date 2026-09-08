@@ -32,6 +32,7 @@ public:
     bool IsCrushed() const;
     bool IsShapingSelfDestruct() const { return isShapingSelfDestruct_; }
     bool ConsumeHardenedBody(AABB& outBody);
+    void LaunchUpward(float speed);
     
     void Kill();
     void SetInvincible(bool isInvincible) { isInvincible_ = isInvincible; }

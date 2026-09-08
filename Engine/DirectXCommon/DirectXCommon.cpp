@@ -299,8 +299,8 @@ void DirectXCommon::InitializeDepthBuffer()
 
     // === 生成するResourceの設定 ===
     D3D12_RESOURCE_DESC resourceDesc {};
-    resourceDesc.Width = WinApp::kClientWidth;
-    resourceDesc.Height = WinApp::kClientHeight;
+    resourceDesc.Width = swapChainDesc.Width;
+    resourceDesc.Height = swapChainDesc.Height;
     resourceDesc.MipLevels = 1;
     resourceDesc.DepthOrArraySize = 1;
     resourceDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -552,6 +552,41 @@ void DirectXCommon::PostDraw()
     // コマンドリストのリセット
     hr = commandList->Reset(commandAllocator.Get(), nullptr);
     assert(SUCCEEDED(hr));
+}
+
+bool DirectXCommon::ResizeSwapChain(uint32_t width, uint32_t height)
+{
+    if (!swapChain || width == 0 || height == 0) {
+        return false;
+    }
+
+    WaitForGPU();
+    for (Microsoft::WRL::ComPtr<ID3D12Resource>& resource : swapChainResources) {
+        resource.Reset();
+    }
+    depthStencilResource.Reset();
+
+    HRESULT hr = swapChain->ResizeBuffers(
+        kSwapChainBufferCount,
+        width,
+        height,
+        swapChainDesc.Format,
+        swapChainDesc.Flags);
+    if (FAILED(hr)) {
+        Logger::Error("Failed to resize swap chain.");
+        return false;
+    }
+
+    swapChainDesc.Width = width;
+    swapChainDesc.Height = height;
+    InitializeRenderTargetView();
+    InitializeDepthBuffer();
+    InitializeDepthStencilView();
+    viewport.Width = static_cast<float>(width);
+    viewport.Height = static_cast<float>(height);
+    scissorRect.right = static_cast<LONG>(width);
+    scissorRect.bottom = static_cast<LONG>(height);
+    return true;
 }
 
 void DirectXCommon::SetBackBufferRenderTarget(D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle)

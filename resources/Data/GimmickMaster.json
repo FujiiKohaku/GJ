@@ -29,6 +29,9 @@
   "SwingingBridge": {
     "file_name": "SwingingBridge/SwingingBridgePlatform.obj"
   },
+  "Spring": {
+    "file_name": "Spring/Spring.obj"
+  },
   "Floor": {
     "file_name": "",
     "material_type": "Moss",

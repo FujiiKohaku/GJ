@@ -222,7 +222,7 @@ void ClearScene::Initialize()
     titleText_->SetAnchorPoint({ 0.5f, 0.5f });
     titleText_->SetFontSize(64.0f);
     titleText_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
-    titleText_->SetOutlineColor({ 0.10f, 0.20f, 0.04f, 1.0f });
+    titleText_->SetOutlineColor({ 0.0f, 0.0f, 0.0f, 1.0f });
     titleText_->SetOutlineWidth(3.0f);
 
     instructionText_ = std::make_unique<Text>();

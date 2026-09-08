@@ -164,8 +164,8 @@ void Sprite::AdjustTextureSize()
 
 void Sprite::UpdateTransform()
 {
-    float clientWidth = static_cast<float>(WinApp::GetInstance()->GetClientWidth());
-    float clientHeight = static_cast<float>(WinApp::GetInstance()->GetClientHeight());
+    float clientWidth = static_cast<float>(WinApp::GetInstance()->GetRenderWidth());
+    float clientHeight = static_cast<float>(WinApp::GetInstance()->GetRenderHeight());
     if (clientWidth <= 0.0f) {
         clientWidth = static_cast<float>(WinApp::kClientWidth);
     }

@@ -13,7 +13,6 @@
 #include "SceneManager.h"
 #include "PageTransition.h"
 #include "TestScene.h"
-#include "GameLabScene.h"
 #include "EditorScene.h"
 #include <cmath>
 #include <algorithm>
@@ -158,16 +157,17 @@ void ArchiveScene::InitializeStageData()
                                 (displayIndex == 2) ? "ASCEND THE RUINS AND CROSS THE HIGH PATH" :
                                 "USER CREATED STAGE";
         stageData.destination = StageDestination::GamePlay;
-        stageData.jsonPath = path;
+        stageData.levelPath = path;
         stages_.push_back(stageData);
         displayIndex++;
     }
 
-    StageData gameLabStage;
-    gameLabStage.name = "STAGE EX  GAMELAB";
-    gameLabStage.description = "FREE CAMERA ENGINE LAB";
-    gameLabStage.destination = StageDestination::GameLab;
-    stages_.push_back(gameLabStage);
+    StageData crumblingFloorTestStage;
+    crumblingFloorTestStage.name = std::format("STAGE {:02}  CRUMBLING TEST", displayIndex);
+    crumblingFloorTestStage.description = "CRUMBLING FLOOR TEST";
+    crumblingFloorTestStage.levelPath = "resources/Maps/stage_test.json";
+    crumblingFloorTestStage.destination = StageDestination::GamePlay;
+    stages_.push_back(crumblingFloorTestStage);
 }
 
 void ArchiveScene::LoadPrintedPagePaths()
@@ -1172,13 +1172,10 @@ void ArchiveScene::UpdateStageConfirmed(float deltaTime)
     switch (confirmedDestination_) {
     case StageDestination::GamePlay:
             SceneManager::GetInstance()->SetNextScene(
-                std::make_unique<GamePlayScene>(stages_[currentStageIndex_].jsonPath));
+                std::make_unique<GamePlayScene>(stages_[currentStageIndex_].levelPath));
             break;
         case StageDestination::Test:
             SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());
-            break;
-        case StageDestination::GameLab:
-            SceneManager::GetInstance()->SetNextScene(std::make_unique<GameLabScene>());
             break;
         }
     }
