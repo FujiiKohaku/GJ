@@ -6,6 +6,7 @@
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/3D/SkyBox/SkyBoxManager.h"
+#include "Engine/Audio/SoundManager.h"
 #include "Engine/DirectXCommon/DirectXCommon.h"
 #include "Engine/Effect/EffectManager.h"
 #include "Engine/Input/Input.h"
@@ -32,6 +33,12 @@ constexpr const char* kPrintedPage = "resources/Models/StageSelectBook/Pages/pag
 constexpr const char* kPrintedPageDirectory = "resources/Models/StageSelectBook/Pages";
 constexpr const char* kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
+constexpr const char* kClearSoundName = "Scene.Clear.Victory";
+constexpr const char* kClearSoundPath = "resources/Audio/Scene/clear_victory.wav";
+constexpr const char* kFireworkSoundName = "Scene.Clear.Firework";
+constexpr const char* kFireworkSoundPath = "resources/Audio/Scene/clear_firework.ogg";
+constexpr const char* kSceneConfirmSoundName = "Scene.Confirm";
+constexpr const char* kSceneConfirmSoundPath = "resources/Audio/Scene/scene_confirm.wav";
 constexpr uint32_t kOpeningPageCount = 24;
 constexpr uint32_t kOpeningPageStripCount = 16;
 constexpr float kBookPageWidth = 4.45f;
@@ -61,6 +68,12 @@ float SmoothStep(float value)
 
 void ClearScene::Initialize()
 {
+    SoundManager* audio = SoundManager::GetInstance();
+    audio->Load(kClearSoundName, kClearSoundPath, AudioCategory::SE);
+    audio->Load(kFireworkSoundName, kFireworkSoundPath, AudioCategory::SE);
+    audio->Load(kSceneConfirmSoundName, kSceneConfirmSoundPath, AudioCategory::SE);
+    audio->PlaySE(kClearSoundName, 0.72f);
+
     SceneManager* sceneManager = SceneManager::GetInstance();
     sceneManager->SetPostEffectType(PostEffectType::Copy);
     sceneManager->SetSlimeScreenProgress(1.0f);
@@ -368,6 +381,7 @@ void ClearScene::DrawImGui()
 
 void ClearScene::StartArchiveTransition()
 {
+    SoundManager::GetInstance()->PlaySE(kSceneConfirmSoundName, 0.52f);
     archiveTransitionActive_ = true;
     archiveTransitionTime_ = 0.0f;
 }
@@ -572,6 +586,9 @@ void ClearScene::LaunchFirework()
     };
     const int typeIndex = (fireworkIndex_ * 3 + fireworkIndex_ / 2) % 5;
     EffectManager::GetInstance()->PlayEffect(kFireworkTypes[typeIndex], position);
+    if (fireworkIndex_ % 2 == 0) {
+        SoundManager::GetInstance()->PlaySE(kFireworkSoundName, 0.20f);
+    }
     if (fireworkIndex_ % 5 == 4) {
         EffectManager::GetInstance()->PlayEffect(
             kFireworkTypes[(typeIndex + 2) % 5],

@@ -312,6 +312,53 @@ float3 WoodPlatformColor(float3 localPosition, float3 normal)
     return wood * faceLight;
 }
 
+float DistanceToCrackSegment(float2 position, float2 start, float2 end)
+{
+    float2 segment = end - start;
+    float segmentLengthSquared = max(dot(segment, segment), 0.0001f);
+    float positionOnSegment = saturate(dot(position - start, segment) / segmentLengthSquared);
+    return length(position - (start + segment * positionOnSegment));
+}
+
+float DestructibleWallCrack(float3 localPosition, float3 normal)
+{
+    float3 faceNormal = abs(normal);
+    float2 facePosition = localPosition.xy;
+    if (faceNormal.y >= faceNormal.x && faceNormal.y >= faceNormal.z) {
+        facePosition = localPosition.xz;
+    } else if (faceNormal.x > faceNormal.z) {
+        facePosition = localPosition.zy;
+    }
+
+    float2 uv = facePosition + 0.5f;
+    float distanceToCrack = 1.0f;
+    distanceToCrack = min(distanceToCrack,
+        DistanceToCrackSegment(uv, float2(0.49f, 0.48f), float2(0.58f, 0.59f)));
+    distanceToCrack = min(distanceToCrack,
+        DistanceToCrackSegment(uv, float2(0.58f, 0.59f), float2(0.70f, 0.65f)));
+    distanceToCrack = min(distanceToCrack,
+        DistanceToCrackSegment(uv, float2(0.70f, 0.65f), float2(0.76f, 0.79f)));
+    distanceToCrack = min(distanceToCrack,
+        DistanceToCrackSegment(uv, float2(0.49f, 0.48f), float2(0.40f, 0.58f)));
+    distanceToCrack = min(distanceToCrack,
+        DistanceToCrackSegment(uv, float2(0.40f, 0.58f), float2(0.29f, 0.63f)));
+    distanceToCrack = min(distanceToCrack,
+        DistanceToCrackSegment(uv, float2(0.49f, 0.48f), float2(0.54f, 0.37f)));
+    distanceToCrack = min(distanceToCrack,
+        DistanceToCrackSegment(uv, float2(0.54f, 0.37f), float2(0.46f, 0.27f)));
+
+    float smallCrackDistance = DistanceToCrackSegment(
+        uv, float2(0.20f, 0.26f), float2(0.27f, 0.34f));
+    smallCrackDistance = min(smallCrackDistance,
+        DistanceToCrackSegment(uv, float2(0.27f, 0.34f), float2(0.34f, 0.36f)));
+    distanceToCrack = min(distanceToCrack, smallCrackDistance);
+
+    float irregularity = TerrainNoise(floor(uv * 96.0f) + 71.3f) - 0.5f;
+    distanceToCrack += irregularity * 0.0035f;
+    float antialiasWidth = max(fwidth(distanceToCrack), 0.0015f);
+    return 1.0f - smoothstep(0.003f, 0.007f + antialiasWidth, distanceToCrack);
+}
+
 float3 ApplyRuinsFog(float3 color, float3 worldPosition)
 {
     // Background-only depth fog: foreground grass remains clear while distant
@@ -418,6 +465,17 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color = float4(
             gMaterial.color.rgb * WoodPlatformColor(
                 bridgeLocalPosition, input.normal),
+            gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 16)
+    {
+        float3 normal = normalize(input.normal);
+        float crack = DestructibleWallCrack(input.localPosition, normal);
+        float3 crackedTexture = lerp(textureColor.rgb,
+            textureColor.rgb * float3(0.30f, 0.32f, 0.34f), crack * 0.72f);
+        output.color = float4(
+            gMaterial.color.rgb * crackedTexture *
+                ToonIllumination(normal, input.worldPosition),
             gMaterial.color.a * textureColor.a);
     }
     else if (gMaterial.enableLighting == 8)
@@ -541,7 +599,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         gMaterial.enableLighting != 9 && gMaterial.enableLighting != 10 &&
         gMaterial.enableLighting != 11 && gMaterial.enableLighting != 12 &&
         gMaterial.enableLighting != 13 && gMaterial.enableLighting != 14 &&
-        gMaterial.enableLighting != 15)
+        gMaterial.enableLighting != 15 && gMaterial.enableLighting != 16)
     {
         float3 N = normalize(input.normal);
         float3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);

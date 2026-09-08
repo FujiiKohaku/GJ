@@ -66,13 +66,11 @@ class HardenedSlimeBody final : public BaseMapChipGimmick {
 public:
   explicit HardenedSlimeBody(const AABB &bounds) : bounds_(bounds) {}
 
-  bool Initialize(const Vector3 &, const std::string &,
-                  const BaseGimmickParam *) override {
+  bool Initialize(const Vector3 &, const std::string &,const BaseGimmickParam *) override {
     // 外部モデル(slime_mesh.obj)は一切使わず、変形した自爆形状(bounds_)に100%一致するCubeモデルで生成する。
     object_ = std::make_unique<Object3d>();
     object_->Initialize(Object3dManager::GetInstance());
-    Model *cubeModel =
-        ModelManager::GetInstance()->CreateCube("resources/Textures/white.png");
+    Model *cubeModel =ModelManager::GetInstance()->CreateCube("resources/Textures/white.png");
     object_->SetModel(cubeModel);
     object_->SetTranslate({bounds_.center.x, bounds_.center.y, kFluidRenderZ});
     object_->SetScale(bounds_.size);

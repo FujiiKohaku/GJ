@@ -5,42 +5,103 @@
 #include "Engine/Time/TimeManager.h"
 #include <cmath>
 
+namespace {
+constexpr float kFlagStartX = 0.17f;
+constexpr float kFlagCenterY = 0.18f;
+constexpr float kFlagSegmentWidth = 1.0f / 12.0f;
+constexpr float kFlagHeight = 1.0f;
+constexpr float kFlagWaveSpeed = 5.4f;
+constexpr float kFlagPhaseStep = 0.58f;
+}
+
 bool CheckpointGimmick::Initialize(const Vector3& position, const std::string&, const BaseGimmickParam*)
 {
     position_ = position;
-    object_ = std::make_unique<Object3d>();
-    object_->Initialize(Object3dManager::GetInstance());
-    object_->SetModel(ModelManager::GetInstance()->CreateCube("resources/Textures/white.png"));
-    object_->SetTranslate(position_);
-    object_->SetScale(size_);
-    object_->SetEnableLighting(true);
-    object_->EnableToonLighting();
-    object_->SetColor({ 0.15f, 0.72f, 1.0f, 1.0f });
-    object_->Update();
+    Model* standModel = ModelManager::GetInstance()->Load("Checkpoint/CheckpointStand.obj");
+    Model* segmentModel = ModelManager::GetInstance()->Load("Checkpoint/CheckpointFlagSegment.obj");
+    if (!standModel || !segmentModel) {
+        return false;
+    }
+
+    standObject_ = std::make_unique<Object3d>();
+    standObject_->Initialize(Object3dManager::GetInstance());
+    standObject_->SetModel(standModel);
+    standObject_->SetTranslate(position_);
+    standObject_->SetEnableLighting(true);
+    standObject_->EnableToonLighting();
+    standObject_->SetColor({ 0.24f, 0.30f, 0.38f, 1.0f });
+    standObject_->Update();
+
+    for (size_t index = 0; index < kFlagSegmentCount; ++index) {
+        flagObjects_[index] = std::make_unique<Object3d>();
+        flagObjects_[index]->Initialize(Object3dManager::GetInstance());
+        flagObjects_[index]->SetModel(segmentModel);
+        flagObjects_[index]->SetScale({ kFlagSegmentWidth + 0.012f, kFlagHeight, 1.0f });
+        flagObjects_[index]->SetEnableLighting(true);
+        flagObjects_[index]->EnableToonLighting();
+        flagObjects_[index]->SetColor({ 0.15f, 0.72f, 1.0f, 1.0f });
+        flagObjects_[index]->Update();
+    }
     return true;
 }
 
 void CheckpointGimmick::Update()
 {
-    if (!object_) return;
+    if (!standObject_) {
+        return;
+    }
 
     time_ += TimeManager::GetInstance()->GetDeltaTime();
-    const float pulse = 1.0f + std::sin(time_ * 3.5f) * 0.08f;
-    object_->SetScale({ size_.x * pulse, size_.y, size_.z * pulse });
-    object_->SetColor(isActivated_
-        ? Vector4{ 0.28f, 1.0f, 0.46f, 1.0f }
-        : Vector4{ 0.15f, 0.72f, 1.0f, 1.0f });
-    object_->Update();
+    Vector4 flagColor = { 0.15f, 0.72f, 1.0f, 1.0f };
+    if (isActivated_) {
+        flagColor = { 1.0f, 0.72f, 0.12f, 1.0f };
+    }
+
+    for (size_t index = 0; index < kFlagSegmentCount; ++index) {
+        const float segmentIndex = static_cast<float>(index);
+        const float distanceRatio = segmentIndex / static_cast<float>(kFlagSegmentCount - 1);
+        const float phase = time_ * kFlagWaveSpeed - segmentIndex * kFlagPhaseStep;
+        const float waveStrength = 0.025f + distanceRatio * 0.11f;
+        const float yOffset = std::sin(phase) * waveStrength;
+        const float zOffset = std::sin(phase - 0.8f) * waveStrength * 1.35f;
+        const float rotateZ = std::cos(phase) * (0.035f + distanceRatio * 0.12f);
+        const float rotateY = std::cos(phase - 0.8f) * (0.08f + distanceRatio * 0.28f);
+
+        Vector3 segmentPosition = position_;
+        segmentPosition.x += kFlagStartX + kFlagSegmentWidth * (segmentIndex + 0.5f);
+        segmentPosition.y += kFlagCenterY + yOffset;
+        segmentPosition.z += zOffset;
+        flagObjects_[index]->SetTranslate(segmentPosition);
+        flagObjects_[index]->SetRotate({ 0.0f, rotateY, rotateZ });
+        flagObjects_[index]->SetColor(flagColor);
+        flagObjects_[index]->Update();
+    }
+
+    standObject_->Update();
 }
 
 void CheckpointGimmick::Draw()
 {
-    if (object_) object_->Draw();
+    if (standObject_) {
+        standObject_->Draw();
+    }
+    for (const std::unique_ptr<Object3d>& flagObject : flagObjects_) {
+        if (flagObject) {
+            flagObject->Draw();
+        }
+    }
 }
 
 void CheckpointGimmick::EnableToonLighting()
 {
-    if (object_) object_->EnableToonLighting();
+    if (standObject_) {
+        standObject_->EnableToonLighting();
+    }
+    for (const std::unique_ptr<Object3d>& flagObject : flagObjects_) {
+        if (flagObject) {
+            flagObject->EnableToonLighting();
+        }
+    }
 }
 
 AABB CheckpointGimmick::GetAABB() const

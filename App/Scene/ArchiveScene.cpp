@@ -364,7 +364,12 @@ void ArchiveScene::InitializeInterface()
     creditsBodyText_->SetText(
         "DOWNLOADED SOUND EFFECTS\n"
         "UI Sound Effects - Robin Lamb / CC0 1.0\n"
-        "Book Flip Sounds - Voltiment555 / CC0 1.0\n\n"
+        "Book Flip Sounds - Voltiment555 / CC0 1.0\n"
+        "Victory - Umplix / CC0 1.0\n"
+        "Game Over Trumpet SFX - 0new4y / CC0 1.0\n"
+        "25 CC0 Bang / Firework SFX - rubberduck / CC0 1.0\n"
+        "Metal Impact Sounds - BMacZero / CC0 1.0\n"
+        "8bit Menu Select - Fupi / CC0 1.0\n\n"
         "FONT\n"
         "Japanese Font - Adobe / SIL Open Font License 1.1");
     creditsBodyText_->SetPosition({ 640.0f, 175.0f });
