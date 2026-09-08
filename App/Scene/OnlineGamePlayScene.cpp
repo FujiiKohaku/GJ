@@ -56,7 +56,7 @@ private:
 OnlineGamePlayScene::OnlineGamePlayScene(std::string stageFile) : stageFile_(std::move(stageFile)) {}
 void OnlineGamePlayScene::Initialize() {
     auto& online = EosMultiplayer::Get();
-    host_ = online.IsHost(); localSlot_ = online.LocalSlot(); match_ = online.MatchId();
+    host_ = online.IsHost(); localSlot_ = online.LocalSlot(); playerCount_ = static_cast<int>(online.Members().size()); match_ = online.MatchId();
     SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
     TimeManager::GetInstance()->SetTimeScale(1);
     camera_ = std::make_unique<Camera>(); camera_->Initialize();
@@ -71,23 +71,27 @@ void OnlineGamePlayScene::Initialize() {
     leaveButton_->SetPosition({1010, 20}); leaveButton_->SetSize({240, 42});
     try {
         // Only allow bundled stage filenames; never load a path supplied by a peer.
-        if (!std::regex_match(stageFile_, std::regex("stage([0-9]+|_test)\\.json")) || localSlot_ < 0 || localSlot_ >= 3 || online.Members().size() != 3)
+        if (!std::regex_match(stageFile_, std::regex("stage([0-9]+|_test)\\.json")) ||
+            playerCount_ < EosMultiplayer::MinPlayers || playerCount_ > EosMultiplayer::MaxPlayers ||
+            localSlot_ < 0 || localSlot_ >= playerCount_)
             throw std::runtime_error("Invalid stage or roster");
         const auto path = std::filesystem::path("resources/Maps") / stageFile_;
         mapHash_ = HashFile(path);
         LevelDataLoader loader;
         const auto level = loader.Load(path.string());
         stage_.Initialize(level); stage_.ApplyMaterialProperties();
-        for (int i = 0; i < 3; ++i) {
+        std::vector<MapChipPlayer*> activePlayers;
+        for (int i = 0; i < playerCount_; ++i) {
             spawn_[i] = level.playerSpawns.empty() ? Vector3{1, 2, 0} : level.playerSpawns[static_cast<size_t>(i) < level.playerSpawns.size() ? i : 0].translation;
             players_[i].Initialize(&stage_.GetField(), spawn_[i]);
+            activePlayers.push_back(&players_[i]);
         }
-        stage_.SetPlayers({&players_[0], &players_[1], &players_[2]});
+        stage_.SetPlayers(activePlayers);
         RuinsBackground::Settings settings;
         settings.mapLength = static_cast<float>(stage_.GetField().GetBlockWidth()); background_.Initialize(settings);
         slimes_.Initialize(camera_.get());
         loaded_ = true; loadedPeers_[localSlot_] = true;
-    } catch (...) { Fail("ステージを読み込めません。同じゲームデータを3台に配置してください"); }
+    } catch (...) { Fail("ステージを読み込めません。同じゲームデータを各PCに配置してください"); }
 }
 void OnlineGamePlayScene::Finalize() {
     if (loaded_) slimes_.Finalize();
@@ -120,7 +124,7 @@ void OnlineGamePlayScene::ProcessPackets() {
             const auto message = OnlineProtocol::Decode(packet.data, match_);
             const auto type = message.at("type").get<std::string>();
             const int sender = packet.sender;
-            if (sender < 0 || sender >= 3 || sender == localSlot_) continue;
+            if (sender < 0 || sender >= playerCount_ || sender == localSlot_) continue;
             if (host_ && sender != 0 && type == "loaded") {
                 if (message.at("map").get<uint64_t>() != mapHash_) { Fail("参加者のステージデータが一致しません"); return; }
                 loadedPeers_[sender] = true; silence_[sender] = 0;
@@ -135,9 +139,9 @@ void OnlineGamePlayScene::ProcessPackets() {
             } else if (!host_ && sender == 0 && type == "frame") {
                 if (message.at("tick").get<uint64_t>() != tick_ + 1) { Fail("通信フレームの順序が一致しません"); return; }
                 const auto& values = message.at("inputs");
-                if (!values.is_array() || values.size() != 3) throw std::runtime_error("Invalid roster");
+                if (!values.is_array() || values.size() != static_cast<size_t>(playerCount_)) throw std::runtime_error("Invalid roster");
                 std::array<OnlineProtocol::Input, 3> inputs;
-                for (int i = 0; i < 3; ++i) inputs[i] = OnlineProtocol::DecodeInput(values[i]);
+                for (int i = 0; i < playerCount_; ++i) inputs[i] = OnlineProtocol::DecodeInput(values[i]);
                 const auto expectedState = message.at("state").get<uint64_t>();
                 Simulate(inputs); ++tick_; silence_[0] = 0;
                 if (expectedState != StateHash()) { Fail("ゲーム状態が一致しません。同じビルドで再接続してください"); return; }
@@ -158,7 +162,7 @@ void OnlineGamePlayScene::Simulate(const std::array<OnlineProtocol::Input, 3>& i
     const auto gimmicks = stage_.GetGimmicks();
     std::vector<AABB> bodies;
     bool goal = false;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < playerCount_; ++i) {
         auto& player = players_[i];
         // Shaping is local to each player and does not slow other participants.
         player.SetInvincible(player.IsShapingSelfDestruct());
@@ -191,7 +195,7 @@ uint64_t OnlineGamePlayScene::StateHash() const {
         const auto bits = static_cast<uint32_t>(static_cast<int32_t>(std::round(value * 1000)));
         for (int shift = 0; shift < 32; shift += 8) HashByte(hash, static_cast<uint8_t>(bits >> shift));
     };
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < playerCount_; ++i) {
         const auto& p = players_[i].GetPosition(); const auto& v = players_[i].GetVelocity();
         add(p.x); add(p.y); add(v.x); add(v.y); add(static_cast<float>(lives_[i]));
         const auto box = players_[i].GetAABB(); add(box.size.x); add(box.size.y);
@@ -213,7 +217,7 @@ void OnlineGamePlayScene::Update() {
     leaveButton_->SetColor(LeaveHovered() ? Vector4{0.3f, 0.4f, 0.35f, 1} : Vector4{0.15f, 0.23f, 0.25f, 1}); leaveButton_->Update();
     if (!failed_ && !cleared_ && !online.Playing()) Fail("ロビーとの接続が終了しました");
     if (loaded_ && !failed_ && !cleared_) {
-        for (int i = 0; i < 3; ++i) if (i != localSlot_) silence_[i] += dt;
+        for (int i = 0; i < playerCount_; ++i) if (i != localSlot_) silence_[i] += dt;
         handshakeTimer_ += dt; inputTimer_ += dt;
         auto* input = Input::GetInstance();
         localInput_.move = std::clamp(
@@ -228,29 +232,33 @@ void OnlineGamePlayScene::Update() {
         if (!failed_ && tick_ == 0 && handshakeTimer_ >= 1) {
             handshakeTimer_ = 0;
             auto hello = OnlineProtocol::Message(host_ ? "waiting" : "loaded", match_); hello["map"] = mapHash_;
-            if (host_) { for (int i = 1; i < 3; ++i) online.Send(i, OnlineProtocol::Encode(hello)); }
+            if (host_) { for (int i = 1; i < playerCount_; ++i) online.Send(i, OnlineProtocol::Encode(hello)); }
             else online.Send(0, OnlineProtocol::Encode(hello));
         }
-        if (!failed_ && host_ && std::all_of(loadedPeers_.begin(), loadedPeers_.end(), [](bool v) { return v; })) {
+        if (!failed_ && host_ && std::all_of(loadedPeers_.begin(), loadedPeers_.begin() + playerCount_, [](bool v) { return v; })) {
             accumulator_ = (std::min)(accumulator_ + dt, OnlineProtocol::Step * 2);
             // A slow client applies its reliable backlog before the host gets
             // more than two seconds ahead; this also bounds EOS send queues.
-            if (accumulator_ >= OnlineProtocol::Step && tick_ - acknowledged_[1] < 60 && tick_ - acknowledged_[2] < 60) {
+            const bool clientsCaughtUp = std::all_of(acknowledged_.begin() + 1, acknowledged_.begin() + playerCount_,
+                [this](uint64_t acknowledged) { return tick_ - acknowledged < 60; });
+            if (accumulator_ >= OnlineProtocol::Step && clientsCaughtUp) {
                 accumulator_ -= OnlineProtocol::Step;
                 auto frame = OnlineProtocol::Message("frame", match_); frame["tick"] = tick_ + 1;
                 frame["inputs"] = nlohmann::json::array();
-                for (const auto& i : pending_) frame["inputs"].push_back(OnlineProtocol::EncodeInput(i));
+                for (int i = 0; i < playerCount_; ++i) frame["inputs"].push_back(OnlineProtocol::EncodeInput(pending_[i]));
                 Simulate(pending_); ++tick_; frame["state"] = StateHash();
                 if (!failed_) {
                     const auto bytes = OnlineProtocol::Encode(frame);
-                    for (int i = 1; i < 3; ++i) if (!online.Send(i, bytes)) Fail("ゲーム状態の送信に失敗しました");
+                    for (int i = 1; i < playerCount_; ++i) if (!online.Send(i, bytes)) Fail("ゲーム状態の送信に失敗しました");
                 }
-                for (auto& i : pending_) OnlineProtocol::ConsumeTransient(i);
+                for (int i = 0; i < playerCount_; ++i) OnlineProtocol::ConsumeTransient(pending_[i]);
             }
         }
         if (!failed_ && !cleared_) {
             const float limit = tick_ == 0 ? 60.0f : 15.0f;
-            if (host_ ? (silence_[1] > limit || silence_[2] > limit) : silence_[0] > limit)
+            const bool clientTimedOut = std::any_of(silence_.begin() + 1, silence_.begin() + playerCount_,
+                [limit](float silence) { return silence > limit; });
+            if (host_ ? clientTimedOut : silence_[0] > limit)
                 Fail("通信がタイムアウトしました。接続を確認して再参加してください");
         }
     }
@@ -261,9 +269,13 @@ void OnlineGamePlayScene::Update() {
     }
     std::string text;
     if (failed_) text = error_;
-    else if (cleared_) text = "STAGE CLEAR!  3人の冒険が完了しました";
-    else if (tick_ == 0) text = "3人のステージ読み込み・接続を待っています…";
-    else text = "あなたは P" + std::to_string(localSlot_ + 1) + "    P1: " + std::to_string(lives_[0]) + "命   P2: " + std::to_string(lives_[1]) + "命   P3: " + std::to_string(lives_[2]) + "命";
+    else if (cleared_) text = "STAGE CLEAR!  " + std::to_string(playerCount_) + "人の冒険が完了しました";
+    else if (tick_ == 0) text = std::to_string(playerCount_) + "人のステージ読み込み・接続を待っています…";
+    else {
+        text = "あなたは P" + std::to_string(localSlot_ + 1);
+        for (int i = 0; i < playerCount_; ++i)
+            text += "    P" + std::to_string(i + 1) + ": " + std::to_string(lives_[i]) + "命";
+    }
     text += "\nA / D : 移動   SPACE : ジャンプ   右クリック : 形を作る / 確定   左ドラッグ : 伸ばす";
     hud_->SetText(text); hud_->Update();
 }
@@ -275,7 +287,7 @@ void OnlineGamePlayScene::Draw3D() {
     if (!loaded_) return;
     Object3dManager::GetInstance()->PreDraw(); background_.Draw(false); stage_.Draw();
     slimes_.PreDraw();
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < playerCount_; ++i) {
         const auto box = players_[i].GetAABB();
         slimes_.Draw(box.center, players_[i].GetVisualScale(), players_[i].GetForward(), std::abs(players_[i].GetVelocity().x), Colors[i]);
     }

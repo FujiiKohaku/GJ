@@ -28,7 +28,7 @@ void LobbyPanel::Initialize() {
     panel_->Initialize(SpriteManager::GetInstance(), "resources/Textures/white.png");
     panel_->SetPosition({64, 502}); panel_->SetSize({1152, 208});
     panel_->SetColor({0.025f, 0.04f, 0.06f, 0.96f}); panel_->Update();
-    title_ = Label(88, 512, 21); title_->SetText("ONLINE CO-OP  /  3人で冒険"); title_->Update();
+    title_ = Label(88, 512, 21); title_->SetText("ONLINE CO-OP  /  2～3人で冒険"); title_->Update();
     status_ = Label(88, 542, 14); status_->SetMaxWidth(1100);
     members_ = Label(355, 572, 17);
     AddButton(160, 452, 210, 38); // previous stage
@@ -61,11 +61,16 @@ LobbyPanel::Action LobbyPanel::Update(bool canSelectStage) {
     const bool ready = slot >= 0 && online.Members()[slot].ready;
     SetButton(0, "← 前のステージ", select);
     SetButton(1, "次のステージ →", select);
-    SetButton(2, lobby ? "参加中：3人そろってから開始" : "1人でプレイ", canSelectStage && !lobby && available);
+    SetButton(2, lobby ? "参加中：2人以上で開始可能" : "1人でプレイ", canSelectStage && !lobby && available);
     SetButton(3, online.Connected() ? "ロビーを作る" : "オンラインに接続", available && !lobby);
     SetButton(4, lobby ? (ready ? "準備を取り消す" : "準備完了") : "参加 / 一覧を更新", available && online.Connected());
     SetButton(5, "ロビーから退出", available && lobby, lobby);
-    SetButton(6, online.IsHost() ? "3人でこのステージを開始" : "ホストの開始を待っています", canSelectStage && online.CanStart(), lobby);
+    const std::string startLabel = online.IsHost()
+        ? (online.Members().size() < EosMultiplayer::MinPlayers
+            ? "あと1人参加すると開始できます"
+            : std::to_string(online.Members().size()) + "人でこのステージを開始")
+        : "ホストの開始を待っています";
+    SetButton(6, startLabel, canSelectStage && online.CanStart(), lobby);
     status_->SetText(online.Status()); status_->Update();
     std::string names;
     for (size_t i = 0; i < online.Members().size(); ++i) {
@@ -74,7 +79,7 @@ LobbyPanel::Action LobbyPanel::Update(bool canSelectStage) {
         names += online.Members()[i].ready ? "準備OK\n" : "準備中\n";
     }
     for (size_t i = online.Members().size(); i < 3; ++i) names += "P" + std::to_string(i + 1) + "  参加待ち…\n";
-    members_->SetText(lobby ? names : "ロビー作成 → 参加 → 全員準備完了\n3人そろうとホストが開始できます\n参加にコード入力は不要です"); members_->Update();
+    members_->SetText(lobby ? names : "ロビー作成 → 参加 → 全員準備完了\n2人以上でホストが開始できます（最大3人）\n参加にコード入力は不要です"); members_->Update();
     const size_t pageCount = (std::max)(size_t{1}, (online.Rooms().size() + 2) / 3);
     page_ = (std::min)(page_, pageCount - 1);
     for (size_t row = 0; row < 3; ++row) {
