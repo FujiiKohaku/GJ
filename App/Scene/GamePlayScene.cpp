@@ -240,6 +240,12 @@ std::unique_ptr<Text> CreateMenuLabelText(const char *label, float y) {
   text->SetColor({0.90f, 0.96f, 0.93f, 1.0f});
   return text;
 }
+
+constexpr const char *kSlowWaterSoundName = "SlowWater";
+constexpr const char *kSlowWaterSoundPath = "resources/Audio/Scene/player/水中.mp3";
+constexpr const char *kSlimeMoveSoundName = "SlimeMove";
+constexpr const char *kSlimeMoveSoundPath = "resources/Audio/Scene/player/ゾンビの食事.mp3";
+
 } // namespace
 
 GamePlayScene::GamePlayScene(std::string levelPath)
@@ -289,6 +295,10 @@ bool GamePlayScene::InitializeNextStep() {
     maximumLives_ = kStage1Lives;
   }
   remainingLives_ = maximumLives_;
+
+  SoundManager* audio = SoundManager::GetInstance();
+  audio->Load(kSlowWaterSoundName, kSlowWaterSoundPath, AudioCategory::SE);
+  audio->Load(kSlimeMoveSoundName, kSlimeMoveSoundPath, AudioCategory::SE);
   }
 
   if (initializationStep_ == 1) {
@@ -800,6 +810,7 @@ void GamePlayScene::Update() {
       float maxZ = corePos.z + zEnvelope;
       gpuSphFluid_->SetWallBoundaries(minX, maxX, minZ, maxZ, -1000.0f, maxY);
       gpuSphFluid_->SetLiquidated(false);
+      gpuSphFluid_->SetDeathEyes(isSlowMotion);
       constexpr float kEyeMaximumOffset = 0.075f;
       constexpr float kEyeFollowSpeed = 0.90f;
       const float desiredEyeOffset =
@@ -827,6 +838,29 @@ void GamePlayScene::Update() {
           -movementDirection * (0.70f + horizontalSpeed * 0.12f), 0.10f, 0.0f};
       gpuSphFluid_->SetEmitter(false, corePos, {0.0f, 0.0f, 0.0f});
       gpuSphFluid_->Update(deltaTime);
+
+      SoundManager* audio = SoundManager::GetInstance();
+      if (isSlowMotion) {
+        if (!slowWaterSoundHandle_.IsValid()) {
+          slowWaterSoundHandle_ = audio->Play(kSlowWaterSoundName, true, 0.6f);
+        }
+      } else {
+        if (slowWaterSoundHandle_.IsValid()) {
+          audio->Stop(slowWaterSoundHandle_);
+          slowWaterSoundHandle_ = {};
+        }
+      }
+
+      if (emitWalkingTrail) {
+        if (!slimeMoveSoundHandle_.IsValid()) {
+          slimeMoveSoundHandle_ = audio->Play(kSlimeMoveSoundName, true, 0.5f);
+        }
+      } else {
+        if (slimeMoveSoundHandle_.IsValid()) {
+          audio->Stop(slimeMoveSoundHandle_);
+          slimeMoveSoundHandle_ = {};
+        }
+      }
 
       // 流体とは無関係な土埃エフェクト。低い位置から後方へ短く舞い上がる。
       EffectManager *effects = EffectManager::GetInstance();
