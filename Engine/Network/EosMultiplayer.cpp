@@ -215,7 +215,8 @@ int EosMultiplayer::LocalSlot() const {
     return -1;
 }
 bool EosMultiplayer::CanStart() const {
-    return IsHost() && !Busy() && !Playing() && impl_->members.size() == MaxPlayers &&
+    return IsHost() && !Busy() && !Playing() && impl_->members.size() >= MinPlayers &&
+        impl_->members.size() <= MaxPlayers &&
         std::all_of(impl_->members.begin(), impl_->members.end(), [](const Member& m) { return m.ready; });
 }
 

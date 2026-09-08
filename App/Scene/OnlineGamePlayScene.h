@@ -30,7 +30,7 @@ private:
     uint64_t StateHash() const;
     std::string stageFile_, match_, error_;
     uint64_t mapHash_ = 0, tick_ = 0, inputSequence_ = 0;
-    int localSlot_ = 0;
+    int localSlot_ = 0, playerCount_ = 0;
     bool host_ = false, loaded_ = false, cleared_ = false, failed_ = false;
     float accumulator_ = 0, inputTimer_ = 0, handshakeTimer_ = 0;
     std::array<float, 3> silence_{};

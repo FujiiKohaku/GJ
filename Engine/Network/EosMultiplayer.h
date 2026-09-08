@@ -7,6 +7,7 @@
 // All methods, including EOS callbacks, run on the game's main thread.
 class EosMultiplayer {
 public:
+    static constexpr int MinPlayers = 2;
     static constexpr int MaxPlayers = 3;
     struct Room { std::string id; int members = 0; };
     struct Member { std::string id; bool ready = false; };
