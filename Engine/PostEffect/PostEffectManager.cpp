@@ -218,6 +218,8 @@ void PostEffectManager::UpdatePostEffectParameters(
         sceneManager->GetPaintColor();
     postEffectParameter.slimeScreenProgress =
         sceneManager->GetSlimeScreenProgress();
+    postEffectParameter.fantasyMenuStrength =
+        sceneManager->GetFantasyMenuStrength();
 }
 
 void PostEffectManager::Apply(SceneManager* sceneManager, D3D12_GPU_DESCRIPTOR_HANDLE sceneColorHandle)
@@ -393,10 +395,10 @@ void PostEffectManager::ApplyAfterParticleDraw(
         return;
     }
 
-    GpuSphFluid* screenSpaceFluid = sceneManager->GetScreenSpaceFluid();
+    std::vector<const GpuSphFluid*> screenSpaceFluids = sceneManager->GetScreenSpaceFluids();
     int diagnosticState = 3;
     const char* diagnosticText = "active.";
-    if (screenSpaceFluid == nullptr) {
+    if (screenSpaceFluids.empty()) {
         diagnosticState = 1;
         diagnosticText = "no fluid.";
     } else if (camera_ == nullptr) {
@@ -408,17 +410,17 @@ void PostEffectManager::ApplyAfterParticleDraw(
         screenSpaceFluidDiagnosticState_ = diagnosticState;
     }
 
-    if (screenSpaceFluid != nullptr && camera_ != nullptr) {
+    if (!screenSpaceFluids.empty() && camera_ != nullptr) {
         uint32_t fluidCompositionTargetIndex =
             GetNextPingPongIndex(particleCompositionTargetIndex_);
         RenderTarget& fluidCompositionTarget =
             pingPongRenderTargets_[fluidCompositionTargetIndex];
 
-        screenSpaceFluidRenderer_->RenderDepth(*screenSpaceFluid, *camera_);
+        screenSpaceFluidRenderer_->RenderDepth(screenSpaceFluids, *camera_);
         screenSpaceFluidRenderer_->SmoothDepth();
 
         fluidCompositionTarget.BeginRender();
-        screenSpaceFluidRenderer_->Composite(*screenSpaceFluid, *camera_, inputHandle);
+        screenSpaceFluidRenderer_->Composite(*screenSpaceFluids[0], *camera_, inputHandle);
         fluidCompositionTarget.EndRender();
 
         inputHandle = fluidCompositionTarget.GetSrvHandleGPU();

@@ -93,7 +93,12 @@ public:
         const Vector3& corePosition,
         const Vector3& targetVelocity,
         const Vector3& coreForward);
-    void SetEmitter(bool enabled, const Vector3& position, const Vector3& velocity);
+    void SetEmitter(
+        bool enabled,
+        const Vector3& position,
+        const Vector3& velocity,
+        float rateScale = 1.0f,
+        float lifetimeScale = 1.0f);
     void TriggerEmitBurst(uint32_t count);
     void SetObstacles(const std::vector<CollisionObstacle>& obstacles);
     void SetBlobRadii(const Vector3& blobRadii) { settings_.blobRadii = blobRadii; }
@@ -102,6 +107,14 @@ public:
     bool IsGrounded() const { return isGrounded_; }
     void SetEyeOffsetX(float offset) { eyeOffsetX_ = offset; }
     float GetEyeOffsetX() const { return eyeOffsetX_; }
+    void SetEyeOffsetY(float offset) { eyeOffsetY_ = offset; }
+    float GetEyeOffsetY() const { return eyeOffsetY_; }
+    float GetIdleDuration() const { return idleDuration_; }
+    float GetIdleExpressionBlend() const { return idleExpressionBlend_; }
+    void SetDeathEyes(bool enabled) { deathEyes_ = enabled; }
+    bool HasDeathEyes() const { return deathEyes_; }
+    void SetHideEyes(bool hidden) { hideEyes_ = hidden; }
+    bool IsEyeHidden() const { return hideEyes_; }
     void SetWallBoundaries(float wallMinX, float wallMaxX, float wallMinZ = -0.3f, float wallMaxZ = 0.3f, float wallMinY = -1000.0f, float wallMaxY = 1000.0f);
     void TriggerLiquidationBurst(float strength = 8.0f);
     void SetLiquidated(bool liquidated) { isLiquidated_ = liquidated; }
@@ -115,6 +128,9 @@ public:
     const Settings& GetSettings() const { return settings_; }
     D3D12_GPU_DESCRIPTOR_HANDLE GetParticleSrvHandleGPU() const { return particleSrvHandleGPU_; }
     D3D12_GPU_DESCRIPTOR_HANDLE GetForceSrvHandleGPU() const { return forceSrvHandleGPU_; }
+
+    std::vector<Particle> GetParticlesCPU() const;
+    void SetParticlesCPU(const std::vector<Particle>& particles);
 
 private:
     struct SimulationParameter {
@@ -221,11 +237,19 @@ private:
     Settings settings_ {};
     bool needsReset_ = true;
     bool isLiquidated_ = false;
+    bool hideEyes_ = false;
     bool isGrounded_ = false;
     bool hasPreviousCorePosition_ = false;
     bool emitterEnabled_ = false;
+    float emitterRateScale_ = 1.0f;
+    float emitterLifetimeScale_ = 1.0f;
     float liquidBlend_ = 0.0f;
     float eyeOffsetX_ = 0.0f;
+    float eyeOffsetY_ = 0.0f;
+    float idleDuration_ = 0.0f;
+    float idleStillDuration_ = 0.0f;
+    float idleExpressionBlend_ = 0.0f;
+    bool deathEyes_ = false;
     float liquidationBurstStrength_ = 0.0f;
     float emitAccumulator_ = 0.0f;
     uint32_t emitCursor_ = 0;

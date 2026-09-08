@@ -54,7 +54,7 @@ float3 ToonIllumination(float3 normal, float3 worldPosition)
     float brightness = dot(light, float3(0.2126f, 0.7152f, 0.0722f));
     // Terrain uses painted shadow colors and a stable face value so its shape
     // remains readable even under broad ambient lighting.
-    if (gMaterial.enableLighting == 7) {
+    if (gMaterial.enableLighting == 7 || gMaterial.enableLighting == 8) {
         brightness += saturate(N.y) * 0.20f;
         float3 terrainBand = float3(0.58f, 0.53f, 0.72f);
         if (brightness >= 0.95f) {
@@ -143,6 +143,193 @@ float3 MossTerrainColor(float3 worldPosition, float3 normal)
     return lerp(dirt, green, moss);
 }
 
+float3 StoneTileColor(float3 worldPosition, float3 normal)
+{
+    // Match MossSoil: 256 texels across four map units = 64 texels per unit.
+    // Dominant-axis projection keeps every cube face at the same density.
+    float2 facePosition = float2(worldPosition.x, -worldPosition.y);
+    float3 faceNormal = abs(normal);
+    if (faceNormal.y >= faceNormal.x && faceNormal.y >= faceNormal.z) {
+        facePosition = worldPosition.xz;
+    } else if (faceNormal.x > faceNormal.z) {
+        facePosition = float2(worldPosition.z, -worldPosition.y);
+    }
+    float2 texel = floor((facePosition + 0.5f) * 64.0f);
+    // Rectangular bricks use a running bond: alternate rows shift half a brick.
+    // floor/frac keep the bond continuous across blocks and negative coordinates.
+    float2 brickSize = float2(32.0f, 16.0f);
+    float row = floor(texel.y / brickSize.y);
+    float rowOffset = frac(row * 0.5f) * brickSize.x;
+    float2 brickTexel = texel + float2(rowOffset, 0.0f);
+    float2 tile = floor(brickTexel / brickSize);
+    float2 local = brickTexel - tile * brickSize;
+    float stoneTone = TerrainNoise(tile * 7.13f + 19.6f);
+    float grain = TerrainNoise(texel * 0.73f + 31.2f);
+    float mottling = TerrainNoise(texel * 0.12f + 5.8f);
+    float3 stone = lerp(float3(0.36f, 0.39f, 0.42f),
+        float3(0.58f, 0.59f, 0.57f), stoneTone);
+    stone *= 0.88f + floor(mottling * 4.0f) * 0.055f;
+    stone += (floor(grain * 4.0f) - 1.5f) * 0.014f;
+
+    float2 farEdge = brickSize - 1.0f - local;
+    float edge = min(min(local.x, local.y), min(farEdge.x, farEdge.y));
+    // A two-texel joint and small chips separate stones without thick outlines.
+    float chip = 0.0f;
+    if (grain > 0.72f) {
+        chip = 1.0f;
+    }
+    if (edge < 1.0f + chip) {
+        return float3(0.20f, 0.22f, 0.24f) * (0.92f + grain * 0.16f);
+    }
+    if (local.x < 3.0f || local.y < 3.0f) {
+        stone *= 1.16f;
+    }
+    if (farEdge.x < 3.0f || farEdge.y < 3.0f) {
+        stone *= 0.76f;
+    }
+    // Sparse mineral flecks stay on the same 64-texel grid as the soil detail.
+    if (grain > 0.82f) {
+        stone *= 1.12f;
+    } else if (grain < 0.16f) {
+        stone *= 0.86f;
+    }
+    return stone;
+}
+
+float3 GrassGroundColor(float3 worldPosition)
+{
+    // Continuous world-space layers avoid stretching across the large floor plane.
+    float2 position = worldPosition.xz;
+    float broad = TerrainNoise(position * 0.10f + 7.3f);
+    float patches = TerrainNoise(position * 0.42f + 31.9f);
+    float blades = TerrainNoise(floor(position * 11.0f) * 0.73f + 63.1f);
+
+    float3 darkGrass = float3(0.48f, 0.64f, 0.34f);
+    float3 lightGrass = float3(0.82f, 0.96f, 0.56f);
+    float3 grass = lerp(darkGrass, lightGrass, broad * 0.64f + patches * 0.36f);
+    grass *= 0.92f + (floor(blades * 4.0f) / 3.0f) * 0.14f;
+
+    // Sparse soft soil patches break up the green without reading as a tiled texture.
+    float soilMask = smoothstep(0.79f, 0.94f, TerrainNoise(position * 0.21f + 94.7f));
+    float3 soil = lerp(float3(0.37f, 0.29f, 0.17f),
+        float3(0.51f, 0.42f, 0.24f), patches);
+    grass = lerp(grass, soil, soilMask * 0.72f);
+
+    // Tiny mineral flecks are deliberately rare and remain subordinate to gameplay.
+    float fleck = TerrainNoise(floor(position * 18.0f) + 117.4f);
+    if (fleck > 0.965f) {
+        grass = lerp(grass, float3(0.44f, 0.45f, 0.40f), 0.58f);
+    }
+    return grass;
+}
+
+float3 StageCardColor(float3 localPosition, float3 worldPosition, float3 normal)
+{
+    float2 cardUv = localPosition.xy + 0.5f;
+    float edgeDistance = min(min(cardUv.x, 1.0f - cardUv.x),
+        min(cardUv.y, 1.0f - cardUv.y));
+
+    float broad = TerrainNoise(cardUv * float2(7.0f, 5.0f) + 14.2f);
+    float fibers = TerrainNoise(floor(cardUv * float2(190.0f, 130.0f)) * 0.37f + 61.8f);
+    float stains = TerrainNoise(cardUv * float2(2.8f, 2.1f) + 97.4f);
+    float3 parchment = lerp(float3(0.50f, 0.34f, 0.16f),
+        float3(0.86f, 0.73f, 0.43f), broad * 0.42f + 0.35f);
+    parchment *= 0.93f + fibers * 0.10f;
+    parchment = lerp(parchment, float3(0.37f, 0.20f, 0.08f),
+        smoothstep(0.76f, 0.96f, stains) * 0.16f);
+
+    float edgeWear = 1.0f - smoothstep(0.025f, 0.15f, edgeDistance);
+    parchment = lerp(parchment, float3(0.20f, 0.095f, 0.035f), edgeWear * 0.82f);
+
+    float borderWidth = max(fwidth(edgeDistance), 0.0015f);
+    float brassBorder = 1.0f - smoothstep(borderWidth, borderWidth * 2.8f,
+        abs(edgeDistance - 0.105f));
+    float innerBorder = 1.0f - smoothstep(borderWidth, borderWidth * 2.2f,
+        abs(edgeDistance - 0.125f));
+
+    float2 cornerCell = abs(cardUv - 0.5f) - float2(0.335f, 0.315f);
+    float cornerStud = 1.0f - smoothstep(0.018f, 0.032f, length(cornerCell));
+    float ornament = saturate(brassBorder + innerBorder * 0.36f + cornerStud);
+    float brassGrain = 0.78f + TerrainNoise(cardUv * 90.0f + 23.0f) * 0.32f;
+    float3 brass = float3(0.72f, 0.47f, 0.13f) * brassGrain;
+    parchment = lerp(parchment, brass, ornament * 0.92f);
+
+    float faceSurface = smoothstep(0.38f, 0.48f, abs(localPosition.z));
+    float leatherGrain = TerrainNoise(localPosition.xy * 24.0f + localPosition.z * 7.0f);
+    float3 leather = lerp(float3(0.10f, 0.035f, 0.018f),
+        float3(0.30f, 0.12f, 0.045f), leatherGrain);
+    float3 baseColor = lerp(leather, parchment, faceSurface);
+
+    float3 N = normalize(normal);
+    float3 V = normalize(gCamera.worldPosition - worldPosition);
+    float3 L = normalize(float3(-0.55f, 0.72f, -0.42f));
+    float light = 0.68f + saturate(dot(N, L)) * 0.30f;
+    float glint = pow(saturate(dot(N, normalize(L + V))), 52.0f) * ornament * 0.42f;
+    return baseColor * light + float3(1.0f, 0.72f, 0.28f) * glint;
+}
+
+float3 WoodPlatformColor(float3 localPosition, float3 normal)
+{
+    float3 faceNormal = abs(normal);
+    float2 facePosition = localPosition.xy;
+    if (faceNormal.y >= faceNormal.x && faceNormal.y >= faceNormal.z) {
+        facePosition = localPosition.xz;
+    } else if (faceNormal.x > faceNormal.z) {
+        facePosition = localPosition.zy;
+    }
+
+    float2 woodUv = facePosition + 0.5f;
+    float distortion = TerrainNoise(woodUv * float2(3.0f, 8.0f) + 19.7f) - 0.5f;
+    float grainWave = sin((woodUv.y + distortion * 0.055f) * 54.0f);
+    float fineGrain = TerrainNoise(
+        float2(woodUv.x * 32.0f, woodUv.y * 7.0f) + 43.1f);
+    float grain = saturate(grainWave * 0.24f + fineGrain * 0.42f + 0.45f);
+
+    float3 darkWood = float3(0.20f, 0.075f, 0.022f);
+    float3 lightWood = float3(0.66f, 0.32f, 0.085f);
+    float3 wood = lerp(darkWood, lightWood, grain);
+
+    float plankRate = frac(woodUv.y * 3.0f);
+    float plankEdge = min(plankRate, 1.0f - plankRate);
+    float plankWidth = max(fwidth(plankRate), 0.004f);
+    float seam = 1.0f - smoothstep(plankWidth * 0.8f, plankWidth * 2.8f, plankEdge);
+    wood = lerp(wood, float3(0.075f, 0.023f, 0.009f), seam * 0.88f);
+
+    float2 knotCenter = float2(0.67f, 0.54f);
+    float2 knotDelta = (woodUv - knotCenter) * float2(1.0f, 1.8f);
+    float knotRadius = length(knotDelta);
+    float knotRing = 0.5f + 0.5f * sin(knotRadius * 92.0f);
+    float knotMask = 1.0f - smoothstep(0.055f, 0.19f, knotRadius);
+    wood = lerp(wood, darkWood * (0.72f + knotRing * 0.38f), knotMask * 0.78f);
+
+    float edgeDistance = min(min(woodUv.x, 1.0f - woodUv.x),
+        min(woodUv.y, 1.0f - woodUv.y));
+    float edgeWear = 1.0f - smoothstep(0.025f, 0.105f, edgeDistance);
+    wood = lerp(wood, float3(0.11f, 0.035f, 0.012f), edgeWear * 0.66f);
+
+    float3 L = normalize(float3(-0.55f, 0.78f, -0.35f));
+    float faceLight = 0.66f + saturate(dot(normalize(normal), L)) * 0.34f;
+    return wood * faceLight;
+}
+
+float3 ApplyRuinsFog(float3 color, float3 worldPosition)
+{
+    // Background-only depth fog: foreground grass remains clear while distant
+    // ruins merge into the hazy green-gray horizon.
+    const float fogStart = 20.0f;
+    const float fogEnd = 48.0f;
+    const float3 fogColor = float3(0.67f, 0.73f, 0.66f);
+    float fogAmount = smoothstep(fogStart, fogEnd, worldPosition.z);
+    return lerp(color, fogColor, fogAmount);
+}
+
+float3 ApplyMountainFog(float3 color, float3 worldPosition)
+{
+    const float3 fogColor = float3(0.67f, 0.73f, 0.66f);
+    float fogAmount = 0.26f + smoothstep(64.0f, 125.0f, worldPosition.z) * 0.66f;
+    return lerp(color, fogColor, fogAmount);
+}
+
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
@@ -199,6 +386,48 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color = float4(base * illumination * saturate(occlusion) +
             float3(1.0f, 0.78f, 0.42f) * specular, gMaterial.color.a * textureColor.a);
     }
+    else if (gMaterial.enableLighting == 9)
+    {
+        float3 normal = normalize(input.normal);
+        float faceLight = 0.82f + saturate(dot(normal,
+            normalize(-gDirectionalLight.direction))) * 0.18f;
+        output.color = float4(
+            gMaterial.color.rgb * GrassGroundColor(input.worldPosition) * faceLight,
+            gMaterial.color.a);
+    }
+    else if (gMaterial.enableLighting == 13)
+    {
+        output.color = float4(
+            gMaterial.color.rgb * StageCardColor(
+                input.localPosition, input.worldPosition, input.normal),
+            gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 14)
+    {
+        output.color = float4(
+            gMaterial.color.rgb * WoodPlatformColor(
+                input.localPosition, input.normal),
+            gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 15)
+    {
+        const float3 bridgeLocalPosition = float3(
+            input.localPosition.x / 3.0f,
+            input.localPosition.y,
+            input.localPosition.z);
+        output.color = float4(
+            gMaterial.color.rgb * WoodPlatformColor(
+                bridgeLocalPosition, input.normal),
+            gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 8)
+    {
+        float3 normal = normalize(input.normal);
+        output.color = float4(
+            gMaterial.color.rgb * StoneTileColor(input.worldPosition, normal) *
+                ToonIllumination(normal, input.worldPosition),
+            gMaterial.color.a);
+    }
     else if (gMaterial.enableLighting == 7)
     {
         float3 normal = normalize(input.normal);
@@ -212,6 +441,10 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color = float4(
             gMaterial.color.rgb * textureColor.rgb * ToonIllumination(input.normal, input.worldPosition),
             gMaterial.color.a * textureColor.a);
+    }
+    else if (gMaterial.enableLighting == 11)
+    {
+        output.color = gMaterial.color * textureColor;
     }
     else if (gMaterial.enableLighting != 0)
     {
@@ -293,7 +526,22 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color = gMaterial.color * textureColor;
     }
 
-    if (gMaterial.enableEnvironmentMap != 0 && gMaterial.enableLighting != 6 && gMaterial.enableLighting != 7)
+    if (gMaterial.enableLighting == 9 || gMaterial.enableLighting == 10 ||
+        gMaterial.enableLighting == 11)
+    {
+        output.color.rgb = ApplyRuinsFog(output.color.rgb, input.worldPosition);
+    }
+    else if (gMaterial.enableLighting == 12)
+    {
+        output.color.rgb = ApplyMountainFog(output.color.rgb, input.worldPosition);
+    }
+
+    if (gMaterial.enableEnvironmentMap != 0 && gMaterial.enableLighting != 6 &&
+        gMaterial.enableLighting != 7 && gMaterial.enableLighting != 8 &&
+        gMaterial.enableLighting != 9 && gMaterial.enableLighting != 10 &&
+        gMaterial.enableLighting != 11 && gMaterial.enableLighting != 12 &&
+        gMaterial.enableLighting != 13 && gMaterial.enableLighting != 14 &&
+        gMaterial.enableLighting != 15)
     {
         float3 N = normalize(input.normal);
         float3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);

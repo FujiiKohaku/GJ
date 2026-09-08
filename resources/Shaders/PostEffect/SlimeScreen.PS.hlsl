@@ -20,14 +20,15 @@ float Hash(float value)
 
 float3 RandomSlimeColor(uint index)
 {
-    float hue = Hash(float(index) * 2.17f + paintSeed * 13.31f);
-    float3 rgb = saturate(abs(frac(hue + float3(0.0f, 0.6667f, 0.3333f)) * 6.0f - 3.0f) - 1.0f);
-    rgb = rgb * rgb * (3.0f - 2.0f * rgb);
-    return lerp(float3(1.0f, 1.0f, 1.0f), rgb, 0.78f) * 0.92f;
+    const float shade = Hash(float(index) * 2.17f + paintSeed * 13.31f);
+    const float3 deepSlimeBlue = float3(0.025f, 0.12f, 0.32f);
+    const float3 brightSlimeBlue = float3(0.10f, 0.62f, 0.88f);
+    return lerp(deepSlimeBlue, brightSlimeBlue, 0.38f + shade * 0.30f);
 }
 
 float SlimeSplat(float2 uv, uint index, float growth)
 {
+    if (growth <= 0.0f) return 0.0f;
     float2 delta = uv - kCenters[index];
     delta.x *= 16.0f / 9.0f;
 
@@ -61,6 +62,8 @@ float SlimeSplat(float2 uv, uint index, float growth)
 float4 main(VertexShaderOutput input) : SV_TARGET
 {
     float4 scene = gTexture.Sample(gSampler, input.texcoord);
+    // During the initial flight the lens is still clean.
+    if (slimeScreenProgress <= 0.0f) return scene;
     float3 slimeColor = RandomSlimeColor(0);
     float coverage = 0.0f;
     float highlight = 0.0f;
@@ -89,6 +92,7 @@ float4 main(VertexShaderOutput input) : SV_TARGET
         finalRadius * (0.94f + finalEdge),
         finalRadius,
         length(finalDelta));
+    finalSplat *= step(0.0001f, finalImpact);
     if (finalSplat > coverage) {
         coverage = finalSplat;
         slimeColor = RandomSlimeColor(kSplatCount);

@@ -9,13 +9,16 @@
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/LevelEditor/LevelDataLoader.h"
 #include "Engine/LevelEditor/GimmickParamFactory.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include "App/Game/Gimmick/MovingBlockParam.h"
 #include "App/Game/Gimmick/Interaction/SwitchParam.h"
 #include "App/Game/Gimmick/Interaction/SwitchGimmick.h"
 #include "App/Game/Gimmick/Trap/SpikeParam.h"
 #include "App/Game/Gimmick/Trap/SpikeGimmick.h"
 #include "App/Game/Gimmick/Interaction/GasEmitterParam.h"
-#include "Engine/Logger/Logger.h"
+#include "App/Game/Gimmick/Interaction/DoorParam.h"
+#include "App/Game/Gimmick/Trap/GearParam.h"
+#include "App/Game/Gimmick/Trap/GearGimmick.h"
 #include "Engine/ImGuiManager/ImGuiManager.h"
 #include "Engine/3D/ModelManager.h"
 #include "Engine/Debug/DebugRenderer.h"
@@ -29,6 +32,9 @@
 #include <thread>
 #include <cstdlib>
 #include <cmath>
+#include <filesystem>
+#include <format>
+#include <vector>
 #include "Engine/Debug/DebugRenderer.h"
 #include "Engine/DirectXCommon/DirectXCommon.h"
 #include <windows.h>
@@ -41,6 +47,88 @@ namespace {
     // エディタ専用の巨大キャンバスサイズ
     constexpr uint32_t kEditorCanvasWidth = 256;
     constexpr uint32_t kEditorCanvasHeight = 64;
+
+    std::string FindInstalledPythonw()
+    {
+        const auto findInDirectory = [](const std::filesystem::path& root) {
+            std::filesystem::path newestPythonw;
+            std::error_code error;
+            for (const auto& entry : std::filesystem::directory_iterator(root, error)) {
+                if (error || !entry.is_directory()) {
+                    continue;
+                }
+                const std::filesystem::path candidate = entry.path() / "pythonw.exe";
+                if (std::filesystem::is_regular_file(candidate, error) &&
+                    (newestPythonw.empty() || candidate.string() > newestPythonw.string())) {
+                    newestPythonw = candidate;
+                }
+            }
+            return newestPythonw;
+        };
+
+        char localAppData[MAX_PATH] {};
+        const DWORD length = GetEnvironmentVariableA(
+            "LOCALAPPDATA", localAppData, MAX_PATH);
+        if (length > 0 && length < MAX_PATH) {
+            const std::filesystem::path pythonRoot =
+                std::filesystem::path(localAppData) / "Programs" / "Python";
+            const std::filesystem::path candidate = findInDirectory(pythonRoot);
+            if (!candidate.empty()) {
+                return candidate.string();
+            }
+        }
+
+        // 「全ユーザー向けにインストール」を選んだPythonは Program Files 配下になる。
+        char programFiles[MAX_PATH] {};
+        const DWORD programFilesLength = GetEnvironmentVariableA(
+            "ProgramFiles", programFiles, MAX_PATH);
+        if (programFilesLength > 0 && programFilesLength < MAX_PATH) {
+            const std::filesystem::path candidate = findInDirectory(programFiles);
+            if (!candidate.empty()) {
+                return candidate.string();
+            }
+        }
+
+        // インストール先を変更した場合にも対応するため、Windowsへ登録されたPythonを最後に調べる。
+        constexpr const char* kPythonCoreKey = "SOFTWARE\\Python\\PythonCore";
+        for (HKEY registryRoot : { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE }) {
+            HKEY coreKey = nullptr;
+            if (RegOpenKeyExA(registryRoot, kPythonCoreKey, 0, KEY_READ, &coreKey) != ERROR_SUCCESS) {
+                continue;
+            }
+            for (DWORD index = 0;; ++index) {
+                char versionName[128] {};
+                DWORD versionNameLength = static_cast<DWORD>(sizeof(versionName));
+                if (RegEnumKeyExA(coreKey, index, versionName, &versionNameLength,
+                        nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS) {
+                    break;
+                }
+                const std::string installKeyPath =
+                    std::string(kPythonCoreKey) + "\\" + versionName + "\\InstallPath";
+                HKEY installKey = nullptr;
+                if (RegOpenKeyExA(registryRoot, installKeyPath.c_str(), 0, KEY_READ, &installKey) != ERROR_SUCCESS) {
+                    continue;
+                }
+                char installPath[MAX_PATH] {};
+                DWORD installPathLength = sizeof(installPath);
+                const LSTATUS queryResult = RegQueryValueExA(
+                    installKey, nullptr, nullptr, nullptr,
+                    reinterpret_cast<LPBYTE>(installPath), &installPathLength);
+                RegCloseKey(installKey);
+                if (queryResult == ERROR_SUCCESS) {
+                    const std::filesystem::path candidate =
+                        std::filesystem::path(installPath) / "pythonw.exe";
+                    std::error_code error;
+                    if (std::filesystem::is_regular_file(candidate, error)) {
+                        RegCloseKey(coreKey);
+                        return candidate.string();
+                    }
+                }
+            }
+            RegCloseKey(coreKey);
+        }
+        return {};
+    }
 
     // ロードしたマップデータを巨大キャンバスに左下基準で拡張する
     LevelData::TileMapData ExpandTileMapData(const LevelData::TileMapData& src, uint32_t targetWidth, uint32_t targetHeight) {
@@ -111,6 +199,18 @@ namespace {
 
 void EditorScene::Initialize()
 {
+    // カーソルの初期状態を保存し、非表示なら強制表示する
+    CURSORINFO cursorInfo = { sizeof(CURSORINFO) };
+    if (GetCursorInfo(&cursorInfo)) {
+        wasCursorVisible_ = (cursorInfo.flags & CURSOR_SHOWING) != 0;
+    } else {
+        wasCursorVisible_ = false;
+    }
+    
+    if (!wasCursorVisible_) {
+        ShowCursor(TRUE);
+    }
+
     // カメラ設定
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
@@ -130,6 +230,7 @@ void EditorScene::Initialize()
     }
     mapChipStage_.SetEditorMode(true);
     mapChipStage_.Initialize(currentLevelData_);
+    mapChipStage_.ApplyMaterialProperties();
 
     // プレイヤーのプレビュー用モデルの初期化
     playerModel_ = ModelManager::GetInstance()->CreatePlane("resources/Textures/checkerboard.png");
@@ -160,19 +261,37 @@ void EditorScene::Initialize()
         Logger::Log("Failed to initialize UdpServer\n");
     }
 
-    // Python ツールの自動起動 (プロセスを管理して終了時にKillするため CreateProcessA を使用)
+    // Python ツールの自動起動。IDEを再起動していなくても動くように、
+    // PATHではなくユーザーの標準Pythonインストール先のpythonw.exeを優先する。
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
+    si.wShowWindow = SW_SHOWNORMAL;
     ZeroMemory(&pi, sizeof(pi));
 
-    char cmd[] = "pythonw Tools/editor_tool.py";
-    if (CreateProcessA(nullptr, cmd, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+    const std::string pythonw = FindInstalledPythonw();
+    if (pythonw.empty()) {
+        Logger::Log("Map Editor tool: pythonw.exe was not found under LOCALAPPDATA.\n");
+    } else {
+        Logger::Log("Map Editor tool Python: " + pythonw + "\n");
+    }
+    const std::string command = pythonw.empty()
+        ? "py -3 Tools\\editor_tool.py"
+        : "\"" + pythonw + "\" Tools\\editor_tool.py";
+    std::vector<char> launcherCommand(command.begin(), command.end());
+    launcherCommand.push_back('\0');
+    if (CreateProcessA(nullptr, launcherCommand.data(), nullptr, nullptr, FALSE,
+            CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
         toolProcessHandle_ = pi.hProcess;
         CloseHandle(pi.hThread);
+        Logger::Log("Map Editor tool started.\n");
+    } else {
+        const DWORD error = GetLastError();
+        Logger::Log(std::format(
+            "Failed to start Map Editor tool. Win32 error={} command={}\n",
+            error, command));
     }
 
     // 初期状態を履歴に保存
@@ -182,6 +301,11 @@ void EditorScene::Initialize()
 
 void EditorScene::Finalize()
 {
+    // エディタに入る前にカーソルが非表示だった場合は、元に戻す
+    if (!wasCursorVisible_) {
+        ShowCursor(FALSE);
+    }
+
     Object3dManager::GetInstance()->SetDefaultCamera(nullptr);
     SkinningObject3dManager::GetInstance()->SetDefaultCamera(nullptr);
     
@@ -402,6 +526,30 @@ void EditorScene::Draw3D()
             {1,0,0}, {0,1,0}, {0,0,1},
             {1.0f, 0.0f, 0.0f, 1.0f}, 2.0f); // 赤色
     }
+
+    // Gearの当たり判定（平面円）の視覚化
+    if (selectedGimmick && selectedGimmick->type == "Gear") {
+        if (selectedGimmick->gimmickParam) {
+            if (auto* param = dynamic_cast<GearParam*>(selectedGimmick->gimmickParam.get())) {
+                Vector3 center = selectedGimmick->translation;
+                float r = param->collisionRadius_;
+                Vector4 color = { 1.0f, 0.0f, 1.0f, 1.0f }; // マゼンタ色
+                float thick = 2.0f;
+                
+                auto dr = DebugRenderer::GetInstance();
+                const int segments = 32;
+                for (int i = 0; i < segments; ++i) {
+                    float theta1 = (2.0f * 3.1415926535f * i) / segments;
+                    float theta2 = (2.0f * 3.1415926535f * (i + 1)) / segments;
+                    
+                    Vector3 p1 = { center.x + r * std::cos(theta1), center.y + r * std::sin(theta1), center.z };
+                    Vector3 p2 = { center.x + r * std::cos(theta2), center.y + r * std::sin(theta2), center.z };
+                    
+                    dr->AddLine(p1, p2, color, thick);
+                }
+            }
+        }
+    }
     
     // イベント連携の視覚化（オレンジ色の線）
     for (const auto& emitter : currentLevelData_.objects) {
@@ -417,6 +565,8 @@ void EditorScene::Draw3D()
             std::string listenName;
             if (auto* gasParam = dynamic_cast<GasEmitterParam*>(receiver.gimmickParam.get())) {
                 listenName = gasParam->listenEventName_;
+            } else if (auto* doorParam = dynamic_cast<DoorParam*>(receiver.gimmickParam.get())) {
+                listenName = doorParam->listenEventName_;
             }
             
             if (!listenName.empty() && fireName == listenName) {
@@ -448,7 +598,17 @@ void EditorScene::DrawImGui()
         ImGui::Separator();
         
         if (selectedGimmick->gimmickParam) {
+            std::string beforeState = selectedGimmick->gimmickParam->Serialize().dump();
             selectedGimmick->gimmickParam->DrawImGui();
+            std::string afterState = selectedGimmick->gimmickParam->Serialize().dump();
+
+            if (beforeState != afterState) {
+                // パラメータが変更されたのでステージを再構築して即時反映
+                DirectXCommon::GetInstance()->WaitForGPU();
+                mapChipStage_.Initialize(currentLevelData_);
+                mapChipStage_.ApplyMaterialProperties();
+                SaveSnapshot();
+            }
         } else if (selectedGimmick->type == "MovingBlock") {
             // 互換性（未移行データ用）
             ImGui::Text("Type: MovingBlock (Legacy)");
@@ -484,6 +644,7 @@ void EditorScene::ProcessUdpCommand(const std::string& command)
             LevelData::TileMapData expandedData = ExpandTileMapData(currentLevelData_.tileMaps[0], kEditorCanvasWidth, kEditorCanvasHeight);
             currentLevelData_.tileMaps[0] = expandedData;
             mapChipStage_.Initialize(currentLevelData_);
+            mapChipStage_.ApplyMaterialProperties();
             Logger::Log("Loaded map: " + filename + "\n");
         }
         
@@ -590,6 +751,7 @@ void EditorScene::UpdateRaycastEdit()
                         DirectXCommon::GetInstance()->WaitForGPU();
                         currentLevelData_.tileMaps[0] = mapChipStage_.GetField().GetTileMapData();
                         mapChipStage_.Initialize(currentLevelData_);
+                        mapChipStage_.ApplyMaterialProperties();
                         hasUnsavedChanges_ = true;
                     }
                 }
@@ -686,10 +848,12 @@ void EditorScene::UpdateRaycastEdit()
                                 LevelData::ObjectData newData;
                                 newData.name = "Goal";
                                 newData.type = "Goal";
-                                newData.fileName = "GoalPost/GoalPost.obj";
                                 newData.translation = newPos;
                                 newData.rotation = {0,0,0};
                                 newData.scale = {1,1,1};
+                                if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("Goal")) {
+                                    newData.fileName = metaData->defaultModelPath;
+                                }
                                 currentLevelData_.objects.push_back(newData);
                             } else {
                                 goalIt->translation = newPos;
@@ -703,8 +867,35 @@ void EditorScene::UpdateRaycastEdit()
                             // 座標だけ変わった場合でもInitializeでGoalのインスタンス位置を更新させるため
                             DirectXCommon::GetInstance()->WaitForGPU();
                             mapChipStage_.Initialize(currentLevelData_);
+                            mapChipStage_.ApplyMaterialProperties();
                             
                             hasUnsavedChanges_ = true;
+                        }
+                        // Checkpoint は複数配置できる独立オブジェクト。タイルは消費しない。
+                        else if (currentPalette_ == 15 && isLeftClick) {
+                            const auto checkpointIt = std::find_if(
+                                currentLevelData_.objects.begin(), currentLevelData_.objects.end(),
+                                [snapX, snapY](const LevelData::ObjectData& o) {
+                                    return o.type == "Checkpoint" &&
+                                        std::abs(o.translation.x - snapX) < 0.1f &&
+                                        std::abs(o.translation.y - snapY) < 0.1f;
+                                });
+                            if (checkpointIt == currentLevelData_.objects.end()) {
+                                LevelData::ObjectData newData;
+                                newData.name = "Checkpoint";
+                                newData.type = "Checkpoint";
+                                newData.translation = newPos;
+                                newData.rotation = { 0, 0, 0 };
+                                newData.scale = { 1, 1, 1 };
+                                if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("Checkpoint")) {
+                                    newData.fileName = metaData->defaultModelPath;
+                                }
+                                currentLevelData_.objects.push_back(std::move(newData));
+                                DirectXCommon::GetInstance()->WaitForGPU();
+                                mapChipStage_.Initialize(currentLevelData_);
+                                mapChipStage_.ApplyMaterialProperties();
+                                hasUnsavedChanges_ = true;
+                            }
                         }
                         // 通常のブロック配置・削除（ドラッグ中でない場合のみ）
                         else if (!isDraggingPlayer_ && !isDraggingGoal_) {
@@ -744,23 +935,27 @@ void EditorScene::UpdateRaycastEdit()
                                         type == MapChipType::DestructibleWall ||
                                         type == MapChipType::Spike ||
                                         type == MapChipType::LaserEmitter ||
-                                        type == MapChipType::SwingingBridge) {
+                                        type == MapChipType::SwingingBridge ||
+                                        type == MapChipType::Door ||
+                                        type == MapChipType::Gear) {
                                         
                                         LevelData::ObjectData newData;
                                         newData.translation = newPos;
                                         newData.rotation = {0,0,0};
                                         newData.scale = {1,1,1};
                                         
+                                        std::string metaKey = "";
+
                                         if (type == MapChipType::MovingBlock) {
                                             newData.name = "MovingBlock";
                                             newData.type = "MovingBlock";
-                                            newData.fileName = "cube";
+                                            metaKey = "MovingBlock";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("MovingBlock");
                                         }
                                         else if (type == MapChipType::PressurePlate) {
                                             newData.name = "Switch";
                                             newData.type = "Switch";
-                                            newData.fileName = "PressurePlate.obj";
+                                            metaKey = "Switch_PressurePlate";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Switch");
                                             if (auto* param = dynamic_cast<SwitchParam*>(newData.gimmickParam.get())) {
                                                 param->switchType_ = 0; // 感圧盤
@@ -770,7 +965,7 @@ void EditorScene::UpdateRaycastEdit()
                                         else if (type == MapChipType::Bonfire) {
                                             newData.name = "Switch";
                                             newData.type = "Switch";
-                                            newData.fileName = "Bonfire/Bonfire.obj";
+                                            metaKey = "Switch_Bonfire";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Switch");
                                             if (auto* param = dynamic_cast<SwitchParam*>(newData.gimmickParam.get())) {
                                                 param->switchType_ = 2; // 篝火
@@ -779,7 +974,7 @@ void EditorScene::UpdateRaycastEdit()
                                         else if (type == MapChipType::GasEmitter) {
                                             newData.name = "GasEmitter";
                                             newData.type = "GasEmitter";
-                                            newData.fileName = "Vent/Venct.obj";
+                                            metaKey = "GasEmitter";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("GasEmitter");
                                             if (auto* param = dynamic_cast<GasEmitterParam*>(newData.gimmickParam.get())) {
                                                 param->listenEventName_ = "Event_1"; // デフォルト
@@ -792,26 +987,44 @@ void EditorScene::UpdateRaycastEdit()
                                         else if (type == MapChipType::DestructibleWall) {
                                             newData.name = "DestructibleWall";
                                             newData.type = "DestructibleWall";
-                                            newData.fileName = "StoneBlock/StoneBlock.obj";
+                                            metaKey = "DestructibleWall";
                                             // DestructibleWallGimmick は Param を持たず、DestructibleWall 側の Factory ロジック等に任せるか Param を作る
                                         }
                                         else if (type == MapChipType::Spike) {
                                             newData.name = "Spike";
                                             newData.type = "Spike";
-                                            newData.fileName = "Thorn/Thorn.obj";
+                                            metaKey = "Spike";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Spike");
                                         }
                                         else if (type == MapChipType::LaserEmitter) {
                                             newData.name = "LaserEmitter";
                                             newData.type = "LaserEmitter";
-                                            newData.fileName = "LaserEmitter/LaserEmitter.obj";
+                                            metaKey = "LaserEmitter";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("LaserEmitter");
                                         }
                                         else if (type == MapChipType::SwingingBridge) {
                                             newData.name = "SwingingBridge";
                                             newData.type = "SwingingBridge";
-                                            newData.fileName = "SwingingBridge/SwingingBridgePlatform.obj";
+                                            metaKey = "SwingingBridge";
                                             newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("SwingingBridge");
+                                        }
+                                        else if (type == MapChipType::Door) {
+                                            newData.name = "Door";
+                                            newData.type = "Door";
+                                            metaKey = "Door";
+                                            newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Door");
+                                        }
+                                        else if (type == MapChipType::Gear) {
+                                            newData.name = "Gear";
+                                            newData.type = "Gear";
+                                            metaKey = "Gear";
+                                            newData.gimmickParam = GimmickParamFactory::GetInstance()->Create("Gear");
+                                        }
+                                        
+                                        if (!metaKey.empty()) {
+                                            if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData(metaKey)) {
+                                                newData.fileName = metaData->defaultModelPath;
+                                            }
                                         }
                                         
                                         currentLevelData_.objects.push_back(newData);
@@ -825,6 +1038,7 @@ void EditorScene::UpdateRaycastEdit()
                                     DirectXCommon::GetInstance()->WaitForGPU();
                                     currentLevelData_.tileMaps[0] = mapChipStage_.GetField().GetTileMapData();
                                     mapChipStage_.Initialize(currentLevelData_);
+                                    mapChipStage_.ApplyMaterialProperties();
                                 }
                             }
                         }
@@ -870,6 +1084,7 @@ void EditorScene::Undo()
 
     DirectXCommon::GetInstance()->WaitForGPU();
     mapChipStage_.Initialize(currentLevelData_);
+    mapChipStage_.ApplyMaterialProperties();
 
     if (playerPreview_ && !currentLevelData_.playerSpawns.empty()) {
         playerPreview_->SetTranslate(currentLevelData_.playerSpawns[0].translation);
@@ -894,6 +1109,7 @@ void EditorScene::Redo()
 
     DirectXCommon::GetInstance()->WaitForGPU();
     mapChipStage_.Initialize(currentLevelData_);
+    mapChipStage_.ApplyMaterialProperties();
 
     if (playerPreview_ && !currentLevelData_.playerSpawns.empty()) {
         playerPreview_->SetTranslate(currentLevelData_.playerSpawns[0].translation);

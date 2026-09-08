@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
 
 void MapChipField::Initialize(const LevelData::TileMapData& tileMapData)
 {
@@ -108,8 +109,16 @@ void MapChipRegistry::Initialize()
 {
     configs_.clear();
 
-    auto Register = [](MapChipType type, const std::string& name, bool isSolid, bool isGimmick, const std::string& modelPath) {
-        configs_[type] = { type, name, isSolid, isGimmick, modelPath };
+    auto Register = [](MapChipType type, const std::string& name, bool isSolid, bool isGimmick, const std::string& fallbackModelPath) {
+        std::string modelPath = fallbackModelPath;
+        std::string materialType = "";
+        std::string texturePath = "";
+        if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData(name)) {
+            modelPath = metaData->defaultModelPath;
+            materialType = metaData->materialType;
+            texturePath = metaData->defaultTexturePath;
+        }
+        configs_[type] = { type, name, isSolid, isGimmick, modelPath, materialType, texturePath };
     };
 
     // ----------------------------------------------------
@@ -119,17 +128,23 @@ void MapChipRegistry::Initialize()
     // 基本的な地形（当たり判定あり、静的描画）
     Register(MapChipType::Block, "Floor", true, false, ""); // 空パスで標準キューブを使用
     Register(MapChipType::Wall,  "Wall",  true, false, ""); // 空パスで標準キューブを使用
+    configs_[MapChipType::Foundation] = { MapChipType::Foundation, "Foundation", true, false, "" };
     
     // 【拡張例】もし氷の床を作りたくなったら、ここに1行追加するだけ！
     // Register(MapChipType::IceFloor, "Ice Floor", true, "IceBlock/IceBlock.obj");
     
     // 特殊な壁（ギミックとして処理される）
-    Register(MapChipType::DestructibleWall, "DestructibleWall", true, true, "");
+    Register(MapChipType::DestructibleWall, "DestructibleWall", false, true, ""); // ギミックで判定するため地形としては透過(false)にする
+    
+    Register(MapChipType::Door, "Door", false, true, ""); // ドア（ギミック）は自身で当たり判定を持つため地形としては透過(false)にする
+
+    // 歯車障害物（Gear）の登録: モデルはGear/Gear.obj、地形ではなくギミックとして処理(isSolid = false)
+    Register(MapChipType::Gear, "Gear", false, true, "Gear/Gear.obj");
 }
 
 const MapChipConfig& MapChipRegistry::GetConfig(MapChipType type)
 {
-    static const MapChipConfig defaultConfig = { MapChipType::Blank, "Unknown", false, false, "" };
+    static const MapChipConfig defaultConfig = { MapChipType::Blank, "Unknown", false, false, "", "", "" };
     auto it = configs_.find(type);
     if (it != configs_.end()) {
         return it->second;

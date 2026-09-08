@@ -5,6 +5,8 @@
 #pragma once
 #include "App/Game/Gimmick/BaseMapChipGimmick.h"
 #include "App/Game/Gimmick/Interaction/SwitchParam.h"
+#include "Engine/Effect/EffectManager.h"
+#include <vector>
 #include <memory>
 
 class Object3d;
@@ -30,10 +32,23 @@ public:
     AABB GetAABB() const override;
     void SetStage(MapChipStage* stage) override;
     bool IsSolid() const override { return false; }
+    
+    // 連携用の状態公開
+    bool IsActive() const override { return isActive_; }
+    std::string GetLinkName() const override;
 
     // 感圧盤用の共通AABB設定
     static Vector3 s_pressurePlateAABBOffset;
     static Vector3 s_pressurePlateAABBSize;
+
+    // 篝火エフェクト用のグローバル設定
+    static Vector3 s_bonfireEffectOffset;
+    static float s_bonfireEffectScale;
+
+private:
+    void StartFireEffects();
+    void StopFireEffects();
+    void UpdateFireEffects();
 
 private:
     std::unique_ptr<Object3d> object_;
@@ -45,4 +60,7 @@ private:
     
     bool isEditorMode_;
     bool isActive_; ///< スイッチがオン状態かどうか
+    
+    // エフェクト管理
+    std::vector<EffectHandle> fireEffects_;
 };

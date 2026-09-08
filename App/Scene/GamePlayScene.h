@@ -21,6 +21,7 @@
 
 class GamePlayScene : public BaseScene {
 public:
+    explicit GamePlayScene(std::string levelPath = "resources/Maps/stage1.json");
     void Initialize() override;
     void Finalize() override;
     void Update() override;
@@ -30,6 +31,7 @@ public:
     void DrawImGui() override;
 
 private:
+    std::string levelPath_;
     void UpdateFollowCamera();
     void UpdateCollisionText();
     void UpdateLivesText();
@@ -40,6 +42,9 @@ private:
 
     void StartLifeRelay();
     void FinishLifeRelay();
+    void ResetToLastRespawnPoint();
+    void StartClearCelebration();
+    void UpdateClearCelebration(float unscaledDeltaTime);
 
     void StartStageSelectTransition();
     void UpdateStageSelectTransition(float deltaTime);
@@ -53,6 +58,7 @@ private:
     std::unique_ptr<Text> livesText_;
     static constexpr int kInitialLives = 5;
     int remainingLives_ = kInitialLives;
+    int maximumLives_ = kInitialLives;
     MapChipStage mapChipStage_;
     RuinsBackground ruinsBackground_;
     std::unique_ptr<MapChipPlayer> player_;
@@ -89,4 +95,6 @@ private:
     Vector3 lifeRelayOrbStartPosition_ = { 0.0f, 0.0f, 0.0f };
     Vector3 lifeRelayOrbCurrentPosition_ = { 0.0f, 0.0f, 0.0f };
     EffectHandle lifeRelayOrbEffectHandle_ = kInvalidEffectHandle;
+    bool isClearCelebrationActive_ = false;
+    float clearCelebrationTimer_ = 0.0f;
 };

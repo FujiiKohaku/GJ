@@ -18,6 +18,7 @@ constexpr const char* kBookLeather = "resources/Models/StageSelectBook/BookLeath
 constexpr const char* kPrintedPage = "resources/Models/StageSelectBook/Pages/page_001.png";
 constexpr const char* kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
+constexpr float kTitleTransitionDuration = 0.55f;
 }
 
 void GameOverScene::Initialize()
@@ -96,14 +97,14 @@ void GameOverScene::Initialize()
     slimeShower_->SpawnRain(60, { 0.0f, 8.0f, 1.5f }, 5.5f);
 
     titleText_ = std::make_unique<Text>();
-    titleText_->Initialize(kDefaultFont);
+    titleText_->Initialize(kDefaultFont, true); // Rasterize at 96px for the 60px title.
     titleText_->SetText("GAME OVER");
     titleText_->SetPosition({ 640.0f, 260.0f });
     titleText_->SetAnchorPoint({ 0.5f, 0.5f });
     titleText_->SetFontSize(60.0f);
     titleText_->SetColor({ 1.0f, 0.35f, 0.40f, 1.0f });
     titleText_->SetOutlineColor({ 0.08f, 0.0f, 0.01f, 1.0f });
-    titleText_->SetOutlineWidth(2.0f);
+    titleText_->SetOutlineWidth(4.0f); // Preserve the outline thickness with the 2x atlas.
 
     instructionText_ = std::make_unique<Text>();
     instructionText_->Initialize(kDefaultFont);
@@ -112,8 +113,20 @@ void GameOverScene::Initialize()
     instructionText_->SetAnchorPoint({ 0.5f, 0.5f });
     instructionText_->SetFontSize(28.0f);
     instructionText_->SetColor({ 0.82f, 0.74f, 0.74f, 1.0f });
+
+    titleTransitionFadeSprite_ = std::make_unique<Sprite>();
+    titleTransitionFadeSprite_->Initialize(
+        SpriteManager::GetInstance(), "resources/Textures/white.png");
+    titleTransitionFadeSprite_->SetAnchorPoint({ 0.5f, 0.5f });
+    titleTransitionFadeSprite_->SetPosition({ 640.0f, 360.0f });
+    titleTransitionFadeSprite_->SetSize({ 1280.0f, 720.0f });
+    titleTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+    titleTransitionFadeSprite_->Update();
+
     sceneTime_ = 0.0f;
     slimeRevealTime_ = 0.0f;
+    titleTransitionTime_ = 0.0f;
+    titleTransitionActive_ = false;
     slimeRevealActive_ = PageTransition::ConsumeSlimeReveal();
     SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     if (slimeRevealActive_) {
@@ -135,14 +148,16 @@ void GameOverScene::Finalize()
 void GameOverScene::Update()
 {
     Input* input = Input::GetInstance();
-    if (!slimeRevealActive_ && sceneTime_ >= 1.0f &&
+    if (!slimeRevealActive_ && !titleTransitionActive_ && sceneTime_ >= 1.0f &&
         (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE))) {
-        SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
-        return;
+        StartTitleTransition();
     }
 
     const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
     sceneTime_ += deltaTime;
+    if (UpdateTitleTransition(deltaTime)) {
+        return;
+    }
     if (slimeRevealActive_) {
         constexpr float kRevealDuration = 1.05f;
         slimeRevealTime_ += deltaTime;
@@ -226,11 +241,44 @@ void GameOverScene::Update()
     instructionText_->Update();
 }
 
+void GameOverScene::StartTitleTransition()
+{
+    titleTransitionActive_ = true;
+    titleTransitionTime_ = 0.0f;
+}
+
+bool GameOverScene::UpdateTitleTransition(float deltaTime)
+{
+    if (!titleTransitionActive_) {
+        return false;
+    }
+
+    titleTransitionTime_ += deltaTime;
+    const float progress = std::clamp(
+        titleTransitionTime_ / kTitleTransitionDuration, 0.0f, 1.0f);
+    const float alpha = progress * progress * (3.0f - 2.0f * progress);
+    titleTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha });
+    titleTransitionFadeSprite_->Update();
+
+    if (progress < 1.0f) {
+        return false;
+    }
+
+    PageTransition::RequestReveal(
+        { 0.0f, 0.0f, 0.0f, 1.0f }, kTitleTransitionDuration);
+    SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
+    return true;
+}
+
 void GameOverScene::Draw2D()
 {
     TextRenderer::GetInstance()->PreDraw();
     titleText_->Draw();
     instructionText_->Draw();
+    if (titleTransitionActive_) {
+        SpriteManager::GetInstance()->PreDraw();
+        titleTransitionFadeSprite_->Draw();
+    }
 }
 
 void GameOverScene::Draw3D()

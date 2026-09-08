@@ -22,7 +22,12 @@ public:
     bool CheckCollision(const AABB& aabb, class SwingingBridgeGimmick** outHitBridge = nullptr) const;
 
     // 他の橋から衝突されたときの反応用
-    void ForceStuck() { isPermanentlyStuck_ = true; }
+    void ApplyAdhesive() { isStuck_ = true; }
+    bool HasAdhesive() const { return isStuck_; }
+    void ForceStuck() {
+        isStuck_ = true;
+        isPermanentlyStuck_ = true;
+    }
     void ForceBounce() { timeDirection_ *= -1.0f; }
 
 private:
@@ -41,7 +46,7 @@ private:
     float phase_ = 0.0f;
     
     bool isEditorMode_ = false;
-    bool isStuck_ = false; // デバッグ用のりフラグ
+    bool isStuck_ = false; // 硬化スライムが付着して接着性を持つ状態
     bool isPermanentlyStuck_ = false; // 衝突して完全に固定された状態
     float timeDirection_ = 1.0f; // 時間の進行方向（1.0 or -1.0）
     

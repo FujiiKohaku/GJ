@@ -5,9 +5,77 @@
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/CollisionManager/CollisionManager.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
+#include "Engine/Time/TimeManager.h"
+#include "Engine/Time/TimeManager.h"
+#include "Engine/3D/LaserBeamRenderer.h"
 #include <algorithm>
+#include <cmath>
 #include <format>
 #include <numbers>
+
+namespace {
+constexpr float kLaserThickness = 0.2f;
+constexpr float kPlayerDeathDelay = 0.15f;
+
+bool OverlapsLaserWidth(
+    const AABB& box,
+    const Vector3& emitterPosition,
+    int dx,
+    int dy)
+{
+    const Vector3 halfSize = box.size * 0.5f;
+    const float halfThickness = kLaserThickness * 0.5f;
+    if (std::abs(box.center.z - emitterPosition.z) >
+        halfSize.z + halfThickness) {
+        return false;
+    }
+
+    if (dx != 0) {
+        return std::abs(box.center.y - emitterPosition.y) <=
+            halfSize.y + halfThickness;
+    }
+    if (dy != 0) {
+        return std::abs(box.center.x - emitterPosition.x) <=
+            halfSize.x + halfThickness;
+    }
+    return false;
+}
+
+float GetBlockDistanceFromHardenedSlime(
+    const AABB& box,
+    const Vector3& emitterPosition,
+    int dx,
+    int dy)
+{
+    if (!OverlapsLaserWidth(box, emitterPosition, dx, dy)) {
+        return -1.0f;
+    }
+
+    const Vector3 halfSize = box.size * 0.5f;
+    if (dx > 0) {
+        const float muzzle = emitterPosition.x + 0.5f;
+        if (box.center.x + halfSize.x < muzzle) return -1.0f;
+        return (std::max)(0.0f, box.center.x - halfSize.x - muzzle);
+    }
+    if (dx < 0) {
+        const float muzzle = emitterPosition.x - 0.5f;
+        if (box.center.x - halfSize.x > muzzle) return -1.0f;
+        return (std::max)(0.0f, muzzle - (box.center.x + halfSize.x));
+    }
+    if (dy > 0) {
+        const float muzzle = emitterPosition.y + 0.5f;
+        if (box.center.y + halfSize.y < muzzle) return -1.0f;
+        return (std::max)(0.0f, box.center.y - halfSize.y - muzzle);
+    }
+    if (dy < 0) {
+        const float muzzle = emitterPosition.y - 0.5f;
+        if (box.center.y - halfSize.y > muzzle) return -1.0f;
+        return (std::max)(0.0f, muzzle - (box.center.y + halfSize.y));
+    }
+    return -1.0f;
+}
+}
 
 LaserGimmick::LaserGimmick()
 {
@@ -15,7 +83,7 @@ LaserGimmick::LaserGimmick()
 
 bool LaserGimmick::Initialize(
     const Vector3& position,
-    const std::string& /*texturePath*/, // 外部からのテクスチャパスは無視
+    const std::string& texturePath,
     const BaseGimmickParam* gimmickParam)
 {
     position_ = position;
@@ -31,9 +99,20 @@ bool LaserGimmick::Initialize(
     emitterObject_ = std::make_unique<Object3d>();
     emitterObject_->Initialize(Object3dManager::GetInstance());
     
-    std::string emitterModel = "LaserEmitter/LaserEmitter.obj";
-    ModelManager::GetInstance()->Load(emitterModel);
-    emitterObject_->SetModel(emitterModel);
+    std::string emitterModel = texturePath;
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("LaserEmitter")) {
+        emitterModel = metaData->defaultModelPath;
+    }
+
+    if (!emitterModel.empty()) {
+        ModelManager::GetInstance()->Load(emitterModel);
+        emitterObject_->SetModel(emitterModel);
+    } else {
+        Model* model = ModelManager::GetInstance()->CreateCube();
+        if (model) {
+            emitterObject_->SetModel(model);
+        }
+    }
     emitterObject_->SetTranslate(position_);
     emitterObject_->SetScale({1.0f, 1.0f, 1.0f});
     emitterObject_->SetEnableLighting(true);
@@ -54,17 +133,13 @@ bool LaserGimmick::Initialize(
     emitterObject_->SetRotate({0.0f, 0.0f, rotationZ});
     emitterObject_->Update();
 
-    // --- レーザービーム(Cube)の初期化 ---
-    beamObject_ = std::make_unique<Object3d>();
-    beamObject_->Initialize(Object3dManager::GetInstance());
-    
-    // レーザービームを赤いCubeとして描画
-    std::string beamTexture = "resources/Textures/white.png"; // 白いテクスチャ(エンジンでプリロード済み)
-    Model* beamModel = ModelManager::GetInstance()->CreateCube(beamTexture);
-    beamObject_->SetModel(beamModel);
-    beamObject_->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f }); // 赤色に設定
-    beamObject_->SetEnableLighting(true);
-    // レーザーを赤っぽくする場合は Material を弄るなど。ここでは一旦そのまま使用。
+    // レーザーを世界観（自然環境、焚き火）と危険度に合わせてオレンジ〜赤色系に設定
+    // スライム（青）に対して補色となるため非常に見やすくなります
+    beamParams_.color = { 1.0f, 0.3f, 0.0f, 1.0f };       // オーラ: 濃いオレンジ
+    beamParams_.coreColor = { 1.0f, 0.9f, 0.5f, 1.0f };   // コア: まぶしい黄白色
+    beamParams_.intensity = 8.0f;
+    beamParams_.coreIntensity = 40.0f;
+    beamParams_.noiseScale = 1.2f;
 
     return true;
 }
@@ -117,11 +192,32 @@ void LaserGimmick::Update()
 
     float floatDist = static_cast<float>(distance);
 
+    // 硬化したスライムの実形状を遮蔽物として扱い、最も手前でレーザーを止める。
+    for (BaseMapChipGimmick* gimmick : stage_->GetGimmicks()) {
+        if (!gimmick || !gimmick->IsHardenedSlime()) {
+            continue;
+        }
+        for (const AABB& bodyBox : gimmick->GetCollisionBoxes()) {
+            const float blockDistance = GetBlockDistanceFromHardenedSlime(
+                bodyBox,
+                position_,
+                dx,
+                dy);
+            if (blockDistance >= 0.0f) {
+                floatDist = (std::min)(floatDist, blockDistance);
+            }
+        }
+    }
+    
+    staticLaserLength_ = floatDist;
+
     // --- Step 2: レーザービームのAABBを仮作成 ---
     // 発射口（本体の中心から少し前）から、障害物の手前までの長さ
-    float laserThickness = 0.2f;
     Vector3 laserCenter = position_;
-    Vector3 laserSize = { laserThickness, laserThickness, laserThickness };
+    Vector3 laserSize = {
+        kLaserThickness,
+        kLaserThickness,
+        kLaserThickness };
 
     if (dx != 0) {
         laserSize.x = floatDist;
@@ -175,27 +271,24 @@ void LaserGimmick::Update()
     laserAABB_.center = laserCenter;
     laserAABB_.size = laserSize;
 
-    // --- Step 4: ビームの描画（Object3d）のスケールと位置を更新 ---
-    beamObject_->SetTranslate(laserCenter);
-    // スケールは size と一致させる（Cube は元サイズが 1.0x1.0x1.0 を想定）
-    beamObject_->SetScale(laserSize);
-    beamObject_->Update();
+    // ビーム描画用モデル（beamObject_）の更新処理は不要になりました
+    // 代わりに LaserBeamRenderer を使用して Draw() で描画します
 
     // --- Step 5: プレイヤーとの接触イベント処理 ---
     if (hitPlayer) {
         if (!wasPlayerColliding_) {
             Logger::Log(std::format("[LaserGimmick] Player hit by laser at ({}, {}, {})\n",
                                     position_.x, position_.y, position_.z));
-            
-            // =====================================================================================
-            // TODO: ここにチームメンバーが「プレイヤーへのダメージ」や「死体のスポーン」処理を実装する
-            // =====================================================================================
-            // 例: player->TakeDamage(1);
-            // =====================================================================================
+        }
+        playerHitTime_ += TimeManager::GetInstance()->GetUnscaledDeltaTime();
+        if (playerHitTime_ >= kPlayerDeathDelay) {
+            player->RequestDeath();
+            playerHitTime_ = 0.0f;
         }
         wasPlayerColliding_ = true;
     } else {
         wasPlayerColliding_ = false;
+        playerHitTime_ = 0.0f;
     }
 }
 
@@ -206,8 +299,59 @@ void LaserGimmick::Draw()
     }
     
     // レーザーの長さがある場合のみビームを描画
-    if (beamObject_ && currentLaserLength_ > 0.01f) {
-        beamObject_->Draw();
+    if (staticLaserLength_ > 0.01f) {
+        int dx = 0;
+        int dy = 0;
+        if (param_->direction_ == 0) dy = 1;
+        if (param_->direction_ == 1) dy = -1;
+        if (param_->direction_ == 2) dx = -1;
+        if (param_->direction_ == 3) dx = 1;
+
+        float visualLaserLength = staticLaserLength_;
+
+        // --- 描画タイミングでの最新のプレイヤー位置を用いて長さを切り詰める ---
+        if (stage_) {
+            MapChipPlayer* player = stage_->GetPlayer();
+            if (player) {
+                AABB playerAABB = player->GetAABB();
+                
+                Vector3 laserCenter = position_;
+                Vector3 laserSize = { kLaserThickness, kLaserThickness, kLaserThickness };
+                if (dx != 0) {
+                    laserSize.x = visualLaserLength;
+                    laserCenter.x += (visualLaserLength / 2.0f) * dx + 0.5f * dx; 
+                } else if (dy != 0) {
+                    laserSize.y = visualLaserLength;
+                    laserCenter.y += (visualLaserLength / 2.0f) * dy + 0.5f * dy;
+                }
+                
+                AABB tempLaserAABB;
+                tempLaserAABB.center = laserCenter;
+                tempLaserAABB.size = laserSize;
+
+                if (CollisionManager::Intersect(playerAABB, tempLaserAABB).isHit) {
+                    float distToPlayer = 0.0f;
+                    if (dx != 0) {
+                        distToPlayer = std::abs(playerAABB.center.x - position_.x) - (playerAABB.size.x / 2.0f) - 0.5f;
+                    } else if (dy != 0) {
+                        distToPlayer = std::abs(playerAABB.center.y - position_.y) - (playerAABB.size.y / 2.0f) - 0.5f;
+                    }
+                    visualLaserLength = (std::max)(0.0f, distToPlayer);
+                }
+            }
+        }
+
+        // 発射口の位置（0.5マス分オフセット）
+        Vector3 startPos = position_;
+        startPos.x += 0.5f * dx;
+        startPos.y += 0.5f * dy;
+
+        // 先端の位置
+        Vector3 endPos = startPos;
+        endPos.x += visualLaserLength * dx;
+        endPos.y += visualLaserLength * dy;
+
+        LaserBeamRenderer::GetInstance()->Draw(startPos, endPos, kLaserThickness, beamParams_);
     }
 }
 

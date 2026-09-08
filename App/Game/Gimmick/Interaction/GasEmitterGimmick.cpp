@@ -8,17 +8,26 @@
 #include "Engine/3D/Object3d.h"
 #include "App/Game/Map/MapChipStage.h"
 #include "Engine/Logger/Logger.h"
+#include "Engine/LevelEditor/GimmickMetaDataManager.h"
+#include "Engine/Time/TimeManager.h"
+
+namespace {
+    const float kFillDelay = 1.0f;     // ガスが充満するまでのディレイ
+    const float kIgnitionDelay = 0.5f; // 引火してから爆発するまでのディレイ
+}
 
 GasEmitterGimmick::GasEmitterGimmick()
     : stage_(nullptr)
     , position_({0, 0, 0})
     , size_({1, 1, 1})
     , isEditorMode_(false)
-    , isEmitting_(false)
 {
 }
 
-GasEmitterGimmick::~GasEmitterGimmick() = default;
+GasEmitterGimmick::~GasEmitterGimmick()
+{
+    StopParticles();
+}
 
 bool GasEmitterGimmick::Initialize(
     const Vector3& position,
@@ -36,10 +45,20 @@ bool GasEmitterGimmick::Initialize(
     object_ = std::make_unique<Object3d>();
     object_->Initialize(Object3dManager::GetInstance());
 
-    // 指定されたVentモデルをロード
-    const std::string modelFile = "Vent/Venct.obj"; // 指定通りのパス
-    ModelManager::GetInstance()->Load(modelFile);
-    object_->SetModel(modelFile);
+    std::string finalModelPath = texturePath;
+    if (const auto* metaData = GimmickMetaDataManager::GetInstance()->GetMetaData("GasEmitter")) {
+        finalModelPath = metaData->defaultModelPath;
+    }
+
+    if (!finalModelPath.empty()) {
+        ModelManager::GetInstance()->Load(finalModelPath);
+        object_->SetModel(finalModelPath);
+    } else {
+        Model* model = ModelManager::GetInstance()->CreateCube();
+        if (model) {
+            object_->SetModel(model);
+        }
+    }
 
     object_->SetTranslate(position_);
     object_->SetScale(size_);
@@ -55,10 +74,32 @@ void GasEmitterGimmick::Update()
         object_->Update();
     }
 
-    if (isEditorMode_) return;
+    if (isEditorMode_) {
+        StopParticles(); // エディタモードに切り替わったら再生停止
+        return;
+    }
 
-    if (isEmitting_) {
-        // TODO: ガス放出中のエフェクト（パーティクル）の更新処理など
+    // FSM Update
+    if (currentState_ != State::Idle && currentState_ != State::Finished) {
+        stateTimer_ += TimeManager::GetInstance()->GetDeltaTime();
+        UpdateParticles();
+
+        switch (currentState_) {
+        case State::Filling:
+            if (stateTimer_ >= kFillDelay) {
+                Logger::Log("GasEmitterGimmick: stateTimer_ reached kFillDelay, State -> Active\n");
+                ChangeState(State::Active);
+            }
+            break;
+        case State::Ignited:
+            if (stateTimer_ >= kIgnitionDelay) {
+                Logger::Log("GasEmitterGimmick: stateTimer_ reached kIgnitionDelay, State -> Finished (Exploding)\n");
+                ChangeState(State::Finished);
+            }
+            break;
+        default:
+            break;
+        }
     }
 }
 
@@ -106,7 +147,6 @@ void GasEmitterGimmick::SetStage(MapChipStage* stage)
 {
     stage_ = stage;
     if (stage_ && param_) {
-        // イベント名が設定されていれば、そのイベントを受信した際に StartEmitting() を実行するよう登録
         if (!param_->listenEventName_.empty()) {
             stage_->GetEventManager().Subscribe(param_->listenEventName_, [this]() {
                 StartEmitting();
@@ -117,15 +157,46 @@ void GasEmitterGimmick::SetStage(MapChipStage* stage)
 
 void GasEmitterGimmick::StartEmitting()
 {
-    if (isEmitting_) return;
-    isEmitting_ = true;
-    Logger::Log("GasEmitterGimmick: Started emitting gas\n");
-    // TODO: ガス発生のパーティクル再生開始
+    if (currentState_ != State::Idle) return;
+    Logger::Log("GasEmitterGimmick: Started emitting gas, State -> Filling\n");
+    ChangeState(State::Filling);
+}
+
+void GasEmitterGimmick::ChangeState(State nextState)
+{
+    if (currentState_ == nextState) return;
+    currentState_ = nextState;
+    stateTimer_ = 0.0f;
+
+    switch (currentState_) {
+    case State::Idle:
+        StopParticles();
+        break;
+    case State::Filling:
+        StartParticles(); // 充満開始時に煙を出す
+        break;
+    case State::Active:
+        // 充満完了、着火待ち（エフェクトは維持）
+        break;
+    case State::Ignited:
+        // 引火演出を追加する場合はここに記述
+        break;
+    case State::Finished:
+        // 爆発を発生させる
+        if (param_) {
+            stage_->CreateExplosionGrid(position_, param_->leftBlocks_, param_->rightBlocks_, param_->upBlocks_, param_->downBlocks_);
+        } else {
+            stage_->CreateExplosion(position_, 3.0f);
+        }
+        StopParticles(); // 爆発と同時にエフェクト停止
+        break;
+    }
 }
 
 void GasEmitterGimmick::OnSpark(const Vector3& origin)
 {
-    if (!isEmitting_ || !stage_ || isEditorMode_) return;
+    // ガスが充満している (Active) 状態の時のみ着火を受け付ける
+    if (currentState_ != State::Active || !stage_ || isEditorMode_) return;
 
     // スパーク座標が自分のガスエリアに入っているか判定する
     AABB gasArea = GetGasAABB();
@@ -136,15 +207,70 @@ void GasEmitterGimmick::OnSpark(const Vector3& origin)
     bool inRangeZ = std::abs(diff.z) <= gasArea.size.z * 0.5f;
 
     if (inRangeX && inRangeY && inRangeZ) {
-        // ガスに引火！大爆発を発生させる
-        // 爆発の半径はガスエリアより少し広いか、同等とする
-        float explosionRadius = (std::max)({gasArea.size.x, gasArea.size.y, gasArea.size.z});
-        
-        // 爆発を発生させる
-        stage_->CreateExplosion(position_, explosionRadius);
-        
-        // 爆発後、ガスは消滅する（または放出元が壊れる）
-        isEmitting_ = false;
-        // TODO: 自身のモデルを非表示にするなどの処理
+        // ガスに引火
+        Logger::Log("GasEmitterGimmick: Spark hit gas area! State -> Ignited\n");
+        ChangeState(State::Ignited);
+    }
+}
+
+void GasEmitterGimmick::StartParticles()
+{
+    if (!effectHandles_.empty()) { return; }
+    if (!param_) { return; }
+    EffectManager* effects = EffectManager::GetInstance();
+    
+    // ガスが充満する設定範囲（上下左右のブロック数）をループし、
+    // 各ブロックの中心座標にエフェクト（Smoke）を敷き詰めます。
+    // ブロックサイズは 2.0f として計算します。
+    for (int y = -static_cast<int>(param_->downBlocks_); y <= static_cast<int>(param_->upBlocks_); ++y) {
+        for (int x = -static_cast<int>(param_->leftBlocks_); x <= static_cast<int>(param_->rightBlocks_); ++x) {
+            Vector3 offset = {
+                static_cast<float>(x) * 1.0f,
+                static_cast<float>(y) * 1.0f,
+                0.0f
+            };
+            Vector3 source = position_ + particleOffset_ + offset;
+            
+            // 先ほど作成した毒ガスエフェクト（緑色）を使用します
+            EffectHandle handle = effects->PlayLoopEffect("PoisonGas", source);
+            if (handle != kInvalidEffectHandle) {
+                effectHandles_.push_back(handle);
+            }
+        }
+    }
+}
+
+void GasEmitterGimmick::StopParticles()
+{
+    if (!effectHandles_.empty()) {
+        EffectManager* effects = EffectManager::GetInstance();
+        for (EffectHandle handle : effectHandles_) {
+            effects->StopEffect(handle);
+        }
+        effectHandles_.clear();
+    }
+}
+
+void GasEmitterGimmick::UpdateParticles()
+{
+    if (effectHandles_.empty() || !param_) { return; }
+    EffectManager* effects = EffectManager::GetInstance();
+    
+    int index = 0;
+    for (int y = -static_cast<int>(param_->downBlocks_); y <= static_cast<int>(param_->upBlocks_); ++y) {
+        for (int x = -static_cast<int>(param_->leftBlocks_); x <= static_cast<int>(param_->rightBlocks_); ++x) {
+            if (index >= effectHandles_.size()) { break; }
+            EffectHandle handle = effectHandles_[index++];
+            
+            if (effects->IsEffectAlive(handle)) {
+                Vector3 offset = {
+                    static_cast<float>(x) * 1.0f,
+                    static_cast<float>(y) * 1.0f,
+                    0.0f
+                };
+                Vector3 source = position_ + particleOffset_ + offset;
+                effects->SetEffectPosition(handle, source);
+            }
+        }
     }
 }

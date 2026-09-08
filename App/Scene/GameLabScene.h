@@ -10,6 +10,8 @@
 #include "Engine/PostEffect/PostEffectType.h"
 #include "PageTransition.h"
 #include "App/Effect/DeathSlimeShower.h"
+#include "App/Game/Map/MapChipStage.h"
+#include "App/Game/Background/RuinsBackground.h"
 
 #include <memory>
 #include <array>
@@ -37,12 +39,16 @@ private:
     void UpdatePostEffectPreviewParameters();
     void UpdateSmokePreview();
     void UpdateFlamePreview();
+    void UpdateExplosionPreview(float deltaTime);
     void ApplyPostEffectToggle(PostEffectToggle& toggle);
 
 private:
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
-    std::unique_ptr<Object3d> backdrop_;
+    RuinsBackground ruinsBackground_;
+    MapChipStage stagePreview_;
+    bool showStageBlocks_ = true;
+    bool showLabFloor_ = true;
     std::unique_ptr<Text> titleText_;
     std::unique_ptr<Text> instructionText_;
     std::vector<PostEffectToggle> postEffectToggles_;
@@ -60,6 +66,9 @@ private:
         kInvalidEffectHandle, kInvalidEffectHandle };
     bool isFlameEnabled_ = false;
     Vector3 flamePosition_ = { 0.0f, 0.05f, -2.0f };
+    Vector3 explosionPosition_ = { 0.0f, 1.0f, 0.0f };
+    float explosionPreviewTimer_ = 0.0f;
+    bool autoExplosionEnabled_ = true;
     Vector3 fireworkLaunchPosition_ = { 0.0f, 4.0f, 0.0f };
     std::unique_ptr<DeathSlimeShower> deathSlimeShower_;
     PageTransition::RevealOverlay pageReveal_;

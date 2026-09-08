@@ -12,18 +12,15 @@ public:
         const BaseGimmickParam* gimmickParam = nullptr) override;
     void Update() override;
     void Draw() override;
-    void EnableToonLighting() override
-    {
-        if (object_) {
-            object_->EnableToonLighting();
-        }
-    }
+    void EnableToonLighting() override;
     void SetEditorMode(bool isEditorMode) override { isEditorMode_ = isEditorMode; }
     
     AABB GetAABB() const override;
     Vector3 GetDeltaPosition() const override;
 
 private:
+    void ApplyWoodMaterial();
+
     std::unique_ptr<Object3d> object_;
     Vector3 basePosition_ = { 0.0f, 0.0f, 0.0f };
     Vector3 currentPosition_ = { 0.0f, 0.0f, 0.0f };

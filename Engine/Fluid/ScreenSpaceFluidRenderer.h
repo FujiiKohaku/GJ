@@ -33,6 +33,7 @@ public:
     void SetSettings(const Settings& settings);
     const Settings& GetSettings() const { return settings_; }
 
+    void RenderDepth(const std::vector<const GpuSphFluid*>& fluids, const Camera& camera);
     void RenderDepth(const GpuSphFluid& fluid, const Camera& camera);
     void SmoothDepth();
     void Composite(
@@ -127,6 +128,13 @@ private:
         float eyeHalfHeightPixels;
         float eyeVisibility;
         Vector2 eyeGazeDirection;
+        float deathEyes;
+        Vector3 paddingEyes;
+        Vector2 eyeCenterUv;
+        Vector2 paddingEyeCenter;
+        float idleFaceAmount;
+        float idleFaceTime;
+        Vector2 paddingIdleFace;
     };
 
     static constexpr uint32_t kDefaultFirstRtvIndex = 8;

@@ -21,7 +21,7 @@ public:
     std::unique_ptr<BaseGimmickParam> Clone() const override;
 
 public:
-    std::string fireEventName_; ///< 発火するイベント名
+    std::string fireEventName_; ///< 感圧板や着火時に送信されるイベント名
     int switchType_;            ///< 種類 (0: 感圧盤, 2: 篝火/着火源)
     int requiredWeight_;        ///< 作動に必要な重さ (感圧盤用)
 };

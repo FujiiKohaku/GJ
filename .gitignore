@@ -390,6 +390,8 @@ Tools/UIAnimationEditor/ai_settings.json
 
 # Ignore other compiled shaders
 /resources/CompiledShaders/**/*.dxil
+/resources/Effects/**/*.dxil
+/resources/Shaders/**/*.dxil
 
 # ImGui local layout configuration
 imgui.ini

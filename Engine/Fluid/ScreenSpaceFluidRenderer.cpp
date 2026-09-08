@@ -90,15 +90,13 @@ void ScreenSpaceFluidRenderer::SetSettings(const Settings& settings)
 }
 
 void ScreenSpaceFluidRenderer::RenderDepth(
-    const GpuSphFluid& fluid,
+    const std::vector<const GpuSphFluid*>& fluids,
     const Camera& camera)
 {
     assert(dxCommon_ != nullptr);
-    if (fluid.GetParticleCount() == 0) {
+    if (fluids.empty()) {
         return;
     }
-
-    UpdatePerViewParameter(fluid, camera);
 
     particleDepthTarget_.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET);
     particleThicknessTarget_.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -127,16 +125,32 @@ void ScreenSpaceFluidRenderer::RenderDepth(
     commandList->SetGraphicsRootSignature(depthRootSignature_.Get());
     commandList->SetPipelineState(depthPipelineState_.Get());
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    commandList->SetGraphicsRootDescriptorTable(
-        0,
-        fluid.GetParticleSrvHandleGPU());
-    commandList->SetGraphicsRootConstantBufferView(
-        1,
-        perViewResource_->GetGPUVirtualAddress());
-    commandList->DrawInstanced(6, fluid.GetParticleCount(), 0, 0);
+
+    for (const GpuSphFluid* fluid : fluids) {
+        if (fluid == nullptr || fluid->GetParticleCount() == 0) {
+            continue;
+        }
+
+        UpdatePerViewParameter(*fluid, camera);
+
+        commandList->SetGraphicsRootDescriptorTable(
+            0,
+            fluid->GetParticleSrvHandleGPU());
+        commandList->SetGraphicsRootConstantBufferView(
+            1,
+            perViewResource_->GetGPUVirtualAddress());
+        commandList->DrawInstanced(6, fluid->GetParticleCount(), 0, 0);
+    }
 
     particleDepthTarget_.Transition(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     particleThicknessTarget_.Transition(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+}
+
+void ScreenSpaceFluidRenderer::RenderDepth(
+    const GpuSphFluid& fluid,
+    const Camera& camera)
+{
+    RenderDepth(std::vector<const GpuSphFluid*>{ &fluid }, camera);
 }
 
 void ScreenSpaceFluidRenderer::SmoothDepth()
@@ -564,17 +578,21 @@ void ScreenSpaceFluidRenderer::UpdateCompositeParameter(
     compositeData_->specularStrength = settings_.specularStrength;
     compositeData_->fresnelStrength = settings_.fresnelStrength;
     compositeData_->floorHeightWorld = fluid.GetSettings().floorHeight;
-    compositeData_->groundClipEnabled = fluid.IsGrounded() ? 1.0f : 0.0f;
+    // The depth buffer is already resolved against the fluid/ground collision.
+    // Reconstructing world Y here used the post-projection depth convention and
+    // clipped the entire blob while grounded (it reappeared as soon as jumping
+    // disabled this mask). Keep the complete fluid silhouette visible.
+    compositeData_->groundClipEnabled = 0.0f;
     compositeData_->padding0 = 0.0f;
     compositeData_->invViewProj = MatrixMath::Inverse(camera.GetViewProjectionMatrix());
     compositeData_->viewProj = camera.GetViewProjectionMatrix();
     compositeData_->eyeWorldPosition = fluid.GetSettings().corePosition;
     compositeData_->eyeWorldPosition.x += fluid.GetEyeOffsetX();
-    compositeData_->eyeWorldPosition.y += 0.015f;
+    compositeData_->eyeWorldPosition.y += fluid.GetEyeOffsetY() + 0.015f;
     compositeData_->eyeWorldPosition.z = 0.0f;
     compositeData_->eyeHalfWidthPixels = 9.0f;
     compositeData_->eyeHalfHeightPixels = 22.0f;
-    compositeData_->eyeVisibility = 1.0f;
+    compositeData_->eyeVisibility = fluid.IsEyeHidden() ? 0.0f : 1.0f;
     const Vector3& gazeVelocity = fluid.GetSettings().targetVelocity;
     const float gazeSpeed = std::sqrt(
         gazeVelocity.x * gazeVelocity.x +
@@ -582,6 +600,22 @@ void ScreenSpaceFluidRenderer::UpdateCompositeParameter(
     compositeData_->eyeGazeDirection = gazeSpeed > 0.1f
         ? Vector2{ gazeVelocity.x / gazeSpeed, gazeVelocity.y / gazeSpeed }
         : Vector2{ 0.0f, 0.0f };
+    compositeData_->deathEyes = fluid.HasDeathEyes() ? 1.0f : 0.0f;
+    compositeData_->paddingEyes = { 0.0f, 0.0f, 0.0f };
+    // Use the camera's established CPU projection. The fullscreen shader's
+    // matrix packing differs from the particle vertex shader, which caused
+    // a separately reprojected eye position to drift away from the blob.
+    const Vector2 eyeScreenPosition =
+        camera.WorldToScreen(compositeData_->eyeWorldPosition);
+    compositeData_->eyeCenterUv = {
+        eyeScreenPosition.x / static_cast<float>(WinApp::kClientWidth),
+        eyeScreenPosition.y / static_cast<float>(WinApp::kClientHeight)
+    };
+    compositeData_->paddingEyeCenter = { 0.0f, 0.0f };
+    const float idleDuration = fluid.GetIdleDuration();
+    compositeData_->idleFaceAmount = fluid.GetIdleExpressionBlend();
+    compositeData_->idleFaceTime = idleDuration;
+    compositeData_->paddingIdleFace = { 0.0f, 0.0f };
 }
 
 void ScreenSpaceFluidRenderer::DrawFullScreen(

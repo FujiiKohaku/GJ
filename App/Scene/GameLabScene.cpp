@@ -2,11 +2,11 @@
 
 #include "ArchiveScene.h"
 #include "Engine/2D/Text/TextRenderer.h"
-#include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/Debug/DebugRenderer.h"
 #include "Engine/Effect/EffectManager.h"
 #include "Engine/Input/Input.h"
+#include "Engine/LevelEditor/LevelDataLoader.h"
 #include "Engine/PostEffect/PostEffectType.h"
 #include "Engine/Time/TimeManager.h"
 #include "SceneManager.h"
@@ -18,7 +18,6 @@
 namespace {
 constexpr const char* kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
-constexpr const char* kArchiveRoomModel = "StageSelectBook/ArchiveRoom.obj";
 constexpr int32_t kGridHalfExtent = 10;
 constexpr float kGridSpacing = 1.0f;
 constexpr Vector3 kSmokePreviewPosition = { 3.0f, 0.05f, 2.0f };
@@ -84,7 +83,7 @@ void GameLabScene::Initialize()
     previousSonicBoomProgress_ = sceneManager->GetSonicBoomProgress();
     postEffectPreviewProgress_ = 0.05f;
     sceneManager->ClearPostEffects();
-    sceneManager->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
+    sceneManager->SetPostEffectType(PostEffectType::Copy);
     sceneManager->SetArchiveApproach(0.0f);
     sceneManager->SetPostEffectKickStrength(1.0f);
     sceneManager->SetPaintIntensity(1.0f);
@@ -93,7 +92,8 @@ void GameLabScene::Initialize()
 
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
-    camera_->LookAt({ 0.0f, 3.8f, -35.0f }, { 0.0f, -1.0f, 1.0f });
+    // Match Stage1: default projection, horizontal view, 12 units from play plane.
+    camera_->LookAt({ 1.0f, 1.0f, -12.0f }, { 1.0f, 1.0f, 0.0f });
     camera_->Update();
     Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
 
@@ -105,15 +105,32 @@ void GameLabScene::Initialize()
     isSmokeEnabled_ = false;
     flameEffectHandles_.fill(kInvalidEffectHandle);
     isFlameEnabled_ = false;
+    explosionPreviewTimer_ = 2.0f;
+    autoExplosionEnabled_ = true;
 
     InitializePostEffectList();
 
-    backdrop_ = std::make_unique<Object3d>();
-    backdrop_->Initialize(Object3dManager::GetInstance());
-    backdrop_->SetModel(ModelManager::GetInstance()->Load(kArchiveRoomModel));
-    backdrop_->SetEnableLighting(false);
-    backdrop_->SetColor({ 0.58f, 0.61f, 0.65f, 1.0f });
-    backdrop_->Update();
+    // Reuse Stage1's terrain and materials without activating gameplay gimmicks.
+    LevelDataLoader stageLoader;
+    LevelData stageData = stageLoader.Load("resources/Maps/stage1.json");
+    stageData.objects.clear();
+    for (auto& tileMap : stageData.tileMaps) {
+        for (int32_t& tile : tileMap.data) {
+            const auto type = static_cast<MapChipType>(tile);
+            if (!MapChipRegistry::IsSolidBlock(type) || MapChipRegistry::GetConfig(type).isGimmick) {
+                tile = static_cast<int32_t>(MapChipType::Blank);
+            }
+        }
+    }
+    stagePreview_.SetEditorMode(true);
+    stagePreview_.Initialize(stageData);
+    stagePreview_.ApplyMaterialProperties();
+    showStageBlocks_ = true;
+    showLabFloor_ = true;
+
+    RuinsBackground::Settings backgroundSettings;
+    backgroundSettings.mapLength = static_cast<float>(stagePreview_.GetField().GetBlockWidth());
+    ruinsBackground_.Initialize(backgroundSettings);
 
     // 死亡ぽよぽよスライムシャワーの初期化
     deathSlimeShower_ = std::make_unique<DeathSlimeShower>();
@@ -182,6 +199,7 @@ void GameLabScene::Update()
     UpdatePostEffectPreviewParameters();
     UpdateSmokePreview();
     UpdateFlamePreview();
+    UpdateExplosionPreview(TimeManager::GetInstance()->GetDeltaTime());
     EffectManager::GetInstance()->Update();
     debugCameraController_.Update();
     debugCameraController_.SetDebugMode(true);
@@ -189,7 +207,8 @@ void GameLabScene::Update()
     camera_->Update();
     EffectManager::GetInstance()->SetCamera(camera_.get());
     EffectManager::GetInstance()->UpdatePerView();
-    backdrop_->Update();
+    ruinsBackground_.Update();
+    stagePreview_.Update();
 
     if (deathSlimeShower_) {
         deathSlimeShower_->Update(TimeManager::GetInstance()->GetDeltaTime());
@@ -210,7 +229,10 @@ void GameLabScene::Draw2D()
 void GameLabScene::Draw3D()
 {
     Object3dManager::GetInstance()->PreDraw();
-    backdrop_->Draw();
+    ruinsBackground_.Draw(showLabFloor_);
+    if (showStageBlocks_) {
+        stagePreview_.Draw();
+    }
     if (deathSlimeShower_) {
         deathSlimeShower_->Draw();
     }
@@ -228,6 +250,14 @@ void GameLabScene::DrawImGui()
 #ifdef USE_IMGUI
     ImGui::SetNextWindowSize(ImVec2(410.0f, 620.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("GAMELAB - Engine Post Effects");
+    ImGui::Checkbox("Show Stage1 Blocks", &showStageBlocks_);
+    ImGui::Checkbox("Show Lab Floor", &showLabFloor_);
+
+    if (ImGui::Button("Reset Stage1 Camera")) {
+        camera_->LookAt({ 1.0f, 1.0f, -12.0f }, { 1.0f, 1.0f, 0.0f });
+        camera_->Update();
+        debugCameraController_.SetTargetCamera(camera_.get());
+    }
 
     if (ImGui::Button("START TIME")) {
         TimeManager::GetInstance()->SetTimeScale(1.0f);
@@ -247,6 +277,24 @@ void GameLabScene::DrawImGui()
         camera_->LookAt(
             { flamePosition_.x + 3.0f, flamePosition_.y + 2.5f, flamePosition_.z - 6.0f },
             { flamePosition_.x, flamePosition_.y + 1.2f, flamePosition_.z });
+        camera_->Update();
+        debugCameraController_.SetTargetCamera(camera_.get());
+    }
+
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(1.0f, 0.48f, 0.10f, 1.0f), "--- EXPLOSION EFFECT ---");
+    ImGui::Checkbox("Auto Explosion", &autoExplosionEnabled_);
+    ImGui::DragFloat3("Explosion Position", &explosionPosition_.x, 0.05f, -20.0f, 20.0f);
+    if (ImGui::Button("PLAY EXPLOSION")) {
+        EffectManager::GetInstance()->PlayEffect("Explosion", explosionPosition_);
+        explosionPreviewTimer_ = 0.0f;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Focus Explosion")) {
+        camera_->LookAt(
+            { explosionPosition_.x + 3.5f, explosionPosition_.y + 2.2f,
+                explosionPosition_.z - 7.0f },
+            explosionPosition_);
         camera_->Update();
         debugCameraController_.SetTargetCamera(camera_.get());
     }
@@ -368,6 +416,23 @@ void GameLabScene::UpdateFlamePreview()
             handle = kInvalidEffectHandle;
         }
     }
+}
+
+void GameLabScene::UpdateExplosionPreview(float deltaTime)
+{
+    if (!autoExplosionEnabled_) {
+        explosionPreviewTimer_ = 0.0f;
+        return;
+    }
+
+    explosionPreviewTimer_ += deltaTime;
+    constexpr float kExplosionPreviewInterval = 2.0f;
+    if (explosionPreviewTimer_ < kExplosionPreviewInterval) {
+        return;
+    }
+
+    explosionPreviewTimer_ = 0.0f;
+    EffectManager::GetInstance()->PlayEffect("Explosion", explosionPosition_);
 }
 
 void GameLabScene::ApplyPostEffectToggle(PostEffectToggle& toggle)

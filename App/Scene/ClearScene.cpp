@@ -13,6 +13,7 @@
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/Time/TimeManager.h"
 #include "Engine/math/MatrixMath.h"
+#include "PageTransition.h"
 #include "SceneManager.h"
 #include <algorithm>
 #include <cmath>
@@ -26,7 +27,6 @@ constexpr const char* kSkyBoxTexture = "resources/Textures/skybox.dds";
 constexpr const char* kArchiveRoomModel = "StageSelectBook/ArchiveRoom.obj";
 constexpr const char* kMeadowTreeTrunkModel = "ClearMeadow/MeadowTreeTrunk.obj";
 constexpr const char* kMeadowTreeCanopyModel = "ClearMeadow/MeadowTreeCanopy.obj";
-constexpr const char* kMeadowMountainModel = "ClearMeadow/MeadowMountain.obj";
 constexpr const char* kBookLeather = "resources/Models/StageSelectBook/BookLeather.png";
 constexpr const char* kPrintedPage = "resources/Models/StageSelectBook/Pages/page_001.png";
 constexpr const char* kPrintedPageDirectory = "resources/Models/StageSelectBook/Pages";
@@ -36,6 +36,8 @@ constexpr uint32_t kOpeningPageCount = 24;
 constexpr uint32_t kOpeningPageStripCount = 16;
 constexpr float kBookPageWidth = 4.45f;
 constexpr float kBookPageHeight = 5.05f;
+constexpr float kSlimeDrainDuration = 1.2f;
+constexpr float kArchiveTransitionDuration = 0.55f;
 
 enum class ArchiveMaterialMode : int32_t { Paper = 3, Leather = 4, Brass = 5 };
 
@@ -59,7 +61,11 @@ float SmoothStep(float value)
 
 void ClearScene::Initialize()
 {
-    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
+    SceneManager* sceneManager = SceneManager::GetInstance();
+    sceneManager->SetPostEffectType(PostEffectType::Copy);
+    sceneManager->SetSlimeScreenProgress(1.0f);
+    sceneManager->AddPostEffect(
+        PostEffectType::ClearSlimeRise, PostEffectStage::AfterParticle);
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
     camera_->LookAt({ 0.0f, 4.0f, -32.0f }, { 0.0f, -2.0f, 1.0f });
@@ -82,19 +88,19 @@ void ClearScene::Initialize()
     archiveRoom_->SetColor({ 0.58f, 0.61f, 0.65f, 1.0f });
     archiveRoom_->Update();
 
-    Model* whiteCube = models->CreateCube(kWhiteTexture);
     grassGround_ = std::make_unique<Object3d>();
     grassGround_->Initialize(objects);
-    grassGround_->SetModel(whiteCube);
-    grassGround_->SetScale({ 60.0f, 0.35f, 70.0f });
-    grassGround_->SetTranslate({ 0.0f, -7.15f, 18.0f });
-    grassGround_->SetColor({ 0.12f, 0.48f, 0.16f, 1.0f });
+    grassGround_->SetModel(models->CreatePlane(kWhiteTexture));
+    grassGround_->SetScale({ 60.0f, 70.0f, 1.0f });
+    grassGround_->SetRotate({ std::numbers::pi_v<float> * 0.5f, 0.0f, 0.0f });
+    grassGround_->SetTranslate({ 0.0f, -6.975f, 18.0f });
+    grassGround_->SetColor({ 0.58f, 0.74f, 0.40f, 1.0f });
     grassGround_->SetEnableLighting(false);
+    grassGround_->GetMaterial()->enableLighting = 9;
     grassGround_->Update();
 
     Model* treeTrunkModel = models->Load(kMeadowTreeTrunkModel);
     Model* treeCanopyModel = models->Load(kMeadowTreeCanopyModel);
-    Model* mountainModel = models->Load(kMeadowMountainModel);
     const Vector3 treePositions[] = {
         { -12.0f, -6.8f, 3.0f }, { 11.0f, -6.8f, 5.0f },
         { -16.0f, -6.8f, 11.0f }, { 15.5f, -6.8f, 13.0f },
@@ -125,6 +131,11 @@ void ClearScene::Initialize()
         canopy->Update();
         meadowTreeCanopies_.push_back(std::move(canopy));
     }
+    constexpr const char* mountainModels[] = {
+        "Nature/mountain_ridge_low.obj",
+        "Nature/mountain_ridge_wide.obj",
+        "Nature/mountain_peak_tall.obj",
+    };
     const Vector3 mountainPositions[] = {
         { -18.0f, -7.0f, 43.0f }, { 0.0f, -7.0f, 49.0f },
         { 19.0f, -7.0f, 44.0f },
@@ -132,15 +143,50 @@ void ClearScene::Initialize()
     for (uint32_t index = 0; index < std::size(mountainPositions); ++index) {
         auto mountain = std::make_unique<Object3d>();
         mountain->Initialize(objects);
+        Model* mountainModel = models->Load(mountainModels[index]);
+        for (uint32_t material = 0; material < mountainModel->GetModelData().materials.size(); ++material) {
+            mountainModel->SetTexture(kWhiteTexture, material);
+        }
         mountain->SetModel(mountainModel);
         const float scale = 1.7f + static_cast<float>(index) * 0.18f;
         mountain->SetScale({ scale, scale, scale });
         mountain->SetTranslate(mountainPositions[index]);
-        mountain->SetColor({ 0.20f, 0.34f + index * 0.025f, 0.19f, 1.0f });
-        mountain->SetEnableLighting(false);
+        mountain->SetColor({ 0.46f, 0.55f, 0.49f, 1.0f });
+        mountain->SetEnableLighting(true);
+        mountain->GetMaterial()->enableLighting = 12;
         mountain->Update();
         meadowMountains_.push_back(std::move(mountain));
     }
+
+    const auto addRuin = [&](const char* path, const Vector3& position,
+                             float scale, const Vector4& color, bool useModelTextures = false) {
+        Model* model = models->Load(path);
+        if (!useModelTextures) {
+            for (uint32_t material = 0; material < model->GetModelData().materials.size(); ++material) {
+                model->SetTexture(kWhiteTexture, material);
+            }
+        }
+        auto ruin = std::make_unique<Object3d>();
+        ruin->Initialize(objects);
+        ruin->SetModel(model);
+        ruin->SetTranslate(position);
+        ruin->SetScale({ scale, scale, scale });
+        ruin->SetColor(color);
+        ruin->SetEnableLighting(true);
+        ruin->GetMaterial()->enableLighting = 10;
+        ruin->Update();
+        meadowRuins_.push_back(std::move(ruin));
+    };
+    addRuin("Ruins/ruin_broken_wall.obj", { -8.0f, -6.98f, 25.0f }, 0.85f,
+        { 0.60f, 0.59f, 0.55f, 1.0f });
+    addRuin("Ruins/ruin_fallen_pillar.obj", { 7.0f, -6.98f, 27.0f }, 0.85f,
+        { 0.60f, 0.59f, 0.55f, 1.0f });
+    addRuin("Ruins/ruin_broken_arch.obj", { -13.0f, -6.98f, 34.0f }, 1.05f,
+        { 0.68f, 0.68f, 0.65f, 1.0f });
+    addRuin("Ruins/ruin_pillar.obj", { 12.0f, -6.98f, 35.0f }, 1.05f,
+        { 0.68f, 0.68f, 0.65f, 1.0f });
+    addRuin("Ruins/ruin_watchtower.obj", { 24.0f, -6.98f, 39.0f }, 0.9f,
+        { 0.80f, 0.82f, 0.80f, 1.0f }, true);
 
     InitializeArchiveBook();
 
@@ -149,13 +195,20 @@ void ClearScene::Initialize()
     flashSprite_->SetSize({ 1280.0f, 720.0f });
     flashSprite_->SetColor({ 1.0f, 0.94f, 0.70f, 0.0f });
 
+    archiveTransitionFadeSprite_ = std::make_unique<Sprite>();
+    archiveTransitionFadeSprite_->Initialize(
+        SpriteManager::GetInstance(), kWhiteTexture);
+    archiveTransitionFadeSprite_->SetSize({ 1280.0f, 720.0f });
+    archiveTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+    archiveTransitionFadeSprite_->Update();
+
     titleText_ = std::make_unique<Text>();
     titleText_->Initialize(kDefaultFont);
     titleText_->SetText("STAGE CLEAR");
     titleText_->SetPosition({ 640.0f, 190.0f });
     titleText_->SetAnchorPoint({ 0.5f, 0.5f });
     titleText_->SetFontSize(64.0f);
-    titleText_->SetColor({ 1.0f, 0.88f, 0.28f, 0.0f });
+    titleText_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
     titleText_->SetOutlineColor({ 0.10f, 0.20f, 0.04f, 1.0f });
     titleText_->SetOutlineWidth(3.0f);
 
@@ -171,10 +224,14 @@ void ClearScene::Initialize()
     fireworkTimer_ = 0.0f;
     fireworkIndex_ = 0;
     meadowRevealed_ = false;
+    archiveTransitionTime_ = 0.0f;
+    archiveTransitionActive_ = false;
 }
 
 void ClearScene::Finalize()
 {
+    SceneManager::GetInstance()->RemovePostEffect(PostEffectType::ClearSlimeRise);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     EffectManager::GetInstance()->StopAllEffects();
     EffectManager::GetInstance()->SetCamera(nullptr);
     Object3dManager::GetInstance()->SetDefaultCamera(nullptr);
@@ -184,6 +241,16 @@ void ClearScene::Update()
 {
     const float dt = TimeManager::GetInstance()->GetDeltaTime();
     sceneTime_ += dt;
+    if (UpdateArchiveTransition(dt)) {
+        return;
+    }
+
+    const float drainProgress = SmoothStep(sceneTime_ / kSlimeDrainDuration);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(1.0f - drainProgress);
+    if (sceneTime_ >= kSlimeDrainDuration) {
+        SceneManager::GetInstance()->RemovePostEffect(
+            PostEffectType::ClearSlimeRise);
+    }
 
     const float approach = SmoothStep(sceneTime_ / 2.2f);
     if (!meadowRevealed_) {
@@ -222,13 +289,12 @@ void ClearScene::Update()
     if (sceneTime_ >= 5.0f) {
         Input* input = Input::GetInstance();
         if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE)) {
-            SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
-            return;
+            StartArchiveTransition();
         }
     }
 
     const float titleAlpha = SmoothStep((sceneTime_ - 4.35f) / 0.75f);
-    titleText_->SetColor({ 1.0f, 0.88f, 0.28f, titleAlpha });
+    titleText_->SetColor({ 0.0f, 0.0f, 0.0f, titleAlpha });
     instructionText_->SetColor({ 1.0f, 1.0f, 1.0f,
         SmoothStep((sceneTime_ - 5.0f) / 0.65f) });
     camera_->Update();
@@ -238,6 +304,7 @@ void ClearScene::Update()
     for (auto& tree : meadowTrees_) tree->Update();
     for (auto& canopy : meadowTreeCanopies_) canopy->Update();
     for (auto& mountain : meadowMountains_) mountain->Update();
+    for (auto& ruin : meadowRuins_) ruin->Update();
     EffectManager::GetInstance()->Update();
     EffectManager::GetInstance()->SetCamera(camera_.get());
     EffectManager::GetInstance()->UpdatePerView();
@@ -253,6 +320,10 @@ void ClearScene::Draw2D()
     TextRenderer::GetInstance()->PreDraw();
     titleText_->Draw();
     instructionText_->Draw();
+    if (archiveTransitionActive_) {
+        SpriteManager::GetInstance()->PreDraw();
+        archiveTransitionFadeSprite_->Draw();
+    }
 }
 
 void ClearScene::Draw3D()
@@ -265,6 +336,7 @@ void ClearScene::Draw3D()
     if (meadowRevealed_) {
         grassGround_->Draw();
         for (const auto& mountain : meadowMountains_) mountain->Draw();
+        for (const auto& ruin : meadowRuins_) ruin->Draw();
         for (const auto& tree : meadowTrees_) tree->Draw();
         for (const auto& canopy : meadowTreeCanopies_) canopy->Draw();
     } else {
@@ -292,6 +364,35 @@ void ClearScene::DrawParticle()
 
 void ClearScene::DrawImGui()
 {
+}
+
+void ClearScene::StartArchiveTransition()
+{
+    archiveTransitionActive_ = true;
+    archiveTransitionTime_ = 0.0f;
+}
+
+bool ClearScene::UpdateArchiveTransition(float deltaTime)
+{
+    if (!archiveTransitionActive_) {
+        return false;
+    }
+
+    archiveTransitionTime_ += deltaTime;
+    const float progress = std::clamp(
+        archiveTransitionTime_ / kArchiveTransitionDuration, 0.0f, 1.0f);
+    const float alpha = SmoothStep(progress);
+    archiveTransitionFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha });
+    archiveTransitionFadeSprite_->Update();
+
+    if (progress < 1.0f) {
+        return false;
+    }
+
+    PageTransition::RequestReveal(
+        { 0.0f, 0.0f, 0.0f, 1.0f }, kArchiveTransitionDuration);
+    SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
+    return true;
 }
 
 void ClearScene::InitializeArchiveBook()

@@ -13,6 +13,7 @@
 #include "Engine/SrvManager/SrvManager.h"
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/input/Input.h"
+#include "Engine/3D/LaserBeamRenderer.h"
 
 Renderer::Renderer() = default;
 
@@ -27,12 +28,17 @@ void Renderer::Initialize()
     // Post effect chain setup
     postEffectManager_ = std::make_unique<PostEffectManager>();
     postEffectManager_->Initialize(DirectXCommon::GetInstance());
+
+    LaserBeamRenderer::GetInstance()->Initialize();
 }
 
 void Renderer::Update()
 {
     Camera* defaultCamera = Object3dManager::GetInstance()->GetDefaultCamera();
     postEffectManager_->Update(defaultCamera);
+
+    LaserBeamRenderer::GetInstance()->SetCamera(defaultCamera);
+    LaserBeamRenderer::GetInstance()->Update(1.0f / 60.0f); // Fixed deltaTime for now or maybe use TimeManager
 }
 
 void Renderer::DrawImGui()
@@ -66,6 +72,7 @@ void Renderer::Draw(SceneManager* sceneManager)
     postEffectManager_->PreDrawDepth();
     offscreenRenderer_->PreDraw(postEffectManager_->GetDepthDSVHandle());
     sceneManager->Draw3D();
+
     postEffectManager_->PostDrawDepth();
     offscreenRenderer_->PostDraw();
 
@@ -82,6 +89,7 @@ void Renderer::Draw(SceneManager* sceneManager)
     postEffectManager_->PrepareDepthForParticleDraw();
     postEffectManager_->BeginParticleDraw();
     sceneManager->DrawParticle();
+    LaserBeamRenderer::GetInstance()->DrawAll();
     postEffectManager_->EndParticleDraw();
     postEffectManager_->PostDrawDepth();
 

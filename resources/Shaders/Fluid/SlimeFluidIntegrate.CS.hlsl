@@ -285,7 +285,15 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     }
     else
     {
-        particle.padding = 9999.0f;
+        // 本体が固形状態でも、歩行時に放出した粒子だけは短時間で消す。
+        if (particle.padding < 9000.0f)
+        {
+            particle.padding -= deltaTime;
+            if (particle.padding <= 0.0f)
+            {
+                particle.padding = 9999.0f;
+            }
+        }
     }
 
     float32_t3 acceleration =
@@ -319,7 +327,10 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
     particle.position += particle.velocity * deltaTime;
 
-    float32_t envelopeBlend = saturate(1.0f - liquidBlend * 1.35f);
+    float32_t emittedDroplet = particle.padding < 9000.0f ? 1.0f : 0.0f;
+    float32_t envelopeBlend = emittedDroplet > 0.5f
+        ? 0.0f
+        : saturate(1.0f - liquidBlend * 1.35f);
     if (envelopeBlend > 0.001f) {
         ResolveSlimeEnvelope(particle, envelopeBlend);
     } else {

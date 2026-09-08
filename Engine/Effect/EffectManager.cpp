@@ -1054,6 +1054,34 @@ bool EffectManager::SetEffectVelocity(EffectHandle handle, const Vector3& veloci
     return true;
 }
 
+bool EffectManager::SetEffectScale(EffectHandle handle, float scale)
+{
+    const size_t index = FindActiveEffectIndex(handle);
+    if (index == static_cast<size_t>(-1)) {
+        return false;
+    }
+
+    ActiveEffectResource& resource = activeResources_[index];
+    const ActiveEffect& activeEffect = activeEffects_[index];
+    const EffectRuntime& runtime = effects_[activeEffect.effectName];
+
+    EffectSettings* settings = resource.effectSettingsData;
+    EmitterSphere* emitter = resource.emitterData;
+    if (!settings || !emitter) {
+        return false;
+    }
+
+    settings->startScale = runtime.settings.startScale * scale;
+    settings->endScale = runtime.settings.endScale * scale;
+    settings->velocity = runtime.settings.velocity * scale;
+    emitter->radius = runtime.emitRadius * scale;
+    
+    settings->noiseStrength = runtime.settings.noiseStrength * scale;
+    settings->attractionStrength = runtime.settings.attractionStrength;
+    
+    return true;
+}
+
 bool EffectManager::SetEffectSkeletonPose(
     EffectHandle handle,
     const EffectSkeletonPose& skeletonPose)
@@ -2040,9 +2068,13 @@ void EffectManager::UpdateActiveEffect(size_t index)
 
     resource.emitterData->translate = activeEffect.position;
     resource.emitterData->prevTranslate = activeEffect.prevPosition;
-    resource.emitterData->radius = runtime.emitRadius;
-    resource.emitterData->count = runtime.emitCount;
-    resource.emitterData->frequency = runtime.emitFrequency;
+    
+    // NOTE: radius, count, frequency は初期化時に設定済み。
+    // 毎フレーム runtime の初期値で上書きすると、SetEffectScale などの API で変更した値が
+    // 潰されてしまう（横幅が変わらないバグの原因になる）ためコメントアウト。
+    // resource.emitterData->radius = runtime.emitRadius;
+    // resource.emitterData->count = runtime.emitCount;
+    // resource.emitterData->frequency = runtime.emitFrequency;
 
     if (!activeEffect.isEmitting) {
         resource.emitterData->emit = 0;

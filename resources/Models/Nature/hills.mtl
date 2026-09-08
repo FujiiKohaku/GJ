@@ -1,0 +1,4 @@
+newmtl hill_grass
+Kd 0.43 0.66 0.32
+Ks 0 0 0
+map_Kd ../../Textures/white.png

@@ -7,8 +7,12 @@ const char* GetPostEffectTypeName(PostEffectType type)
         return "Copy";
     case PostEffectType::ArchiveAtmosphere:
         return "ArchiveAtmosphere";
+    case PostEffectType::FantasyMenu:
+        return "FantasyMenu";
     case PostEffectType::SlimeScreen:
         return "SlimeScreen";
+    case PostEffectType::ClearSlimeRise:
+        return "ClearSlimeRise";
     case PostEffectType::GrayScale:
         return "GrayScale";
     case PostEffectType::Vignette:

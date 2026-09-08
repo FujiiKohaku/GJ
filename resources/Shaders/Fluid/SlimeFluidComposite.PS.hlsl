@@ -27,7 +27,48 @@ cbuffer SlimeFluidCompositeParameter : register(b0)
     float32_t eyeHalfHeightPixels;
     float32_t eyeVisibility;
     float32_t2 eyeGazeDirection;
+    float32_t deathEyes;
+    float32_t3 paddingEyes;
+    float32_t2 eyeCenterUv;
+    float32_t2 paddingEyeCenter;
+    float32_t idleFaceAmount;
+    float32_t idleFaceTime;
+    float32_t2 paddingIdleFace;
 };
+
+float32_t Hash31(float32_t3 value)
+{
+    value = frac(value * 0.1031f);
+    value += dot(value, value.yzx + 33.33f);
+    return frac((value.x + value.y) * value.z);
+}
+
+float32_t ValueNoise(float32_t3 position)
+{
+    float32_t3 cell = floor(position);
+    float32_t3 local = frac(position);
+    local = local * local * (3.0f - 2.0f * local);
+    float32_t n000 = Hash31(cell + float32_t3(0.0f, 0.0f, 0.0f));
+    float32_t n100 = Hash31(cell + float32_t3(1.0f, 0.0f, 0.0f));
+    float32_t n010 = Hash31(cell + float32_t3(0.0f, 1.0f, 0.0f));
+    float32_t n110 = Hash31(cell + float32_t3(1.0f, 1.0f, 0.0f));
+    float32_t n001 = Hash31(cell + float32_t3(0.0f, 0.0f, 1.0f));
+    float32_t n101 = Hash31(cell + float32_t3(1.0f, 0.0f, 1.0f));
+    float32_t n011 = Hash31(cell + float32_t3(0.0f, 1.0f, 1.0f));
+    float32_t n111 = Hash31(cell + float32_t3(1.0f, 1.0f, 1.0f));
+    return lerp(
+        lerp(lerp(n000, n100, local.x), lerp(n010, n110, local.x), local.y),
+        lerp(lerp(n001, n101, local.x), lerp(n011, n111, local.x), local.y),
+        local.z);
+}
+
+float32_t NebulaNoise(float32_t3 position)
+{
+    float32_t value = ValueNoise(position);
+    value += ValueNoise(position * 2.03f + 17.0f) * 0.50f;
+    value += ValueNoise(position * 4.07f - 11.0f) * 0.25f;
+    return value / 1.75f;
+}
 
 float32_t4 main(VertexShaderOutput input) : SV_TARGET
 {
@@ -81,10 +122,6 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
         edgeAA *= groundMask;
     }
 
-    if (edgeAA <= 0.0f) {
-        return gSceneColor.SampleLevel(gSampler, input.texcoord, 0);
-    }
-
     float32_t depthRight = gFluidDepth.SampleLevel(gSampler, input.texcoord + float32_t2(texelSize.x * 2.0f, 0.0f), 0);
     float32_t depthLeft = gFluidDepth.SampleLevel(gSampler, input.texcoord - float32_t2(texelSize.x * 2.0f, 0.0f), 0);
     float32_t depthBottom = gFluidDepth.SampleLevel(gSampler, input.texcoord + float32_t2(0.0f, texelSize.y * 2.0f), 0);
@@ -130,9 +167,21 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
     float32_t3 refracted = gSceneColor.SampleLevel(gSampler, input.texcoord + refractOffset, 0).rgb;
 
     float32_t thickness = saturate(density * 2.2f);
-    float32_t3 jellyColor =
-        slimeColor * (0.58f + thickness * 0.42f) +
-        float32_t3(0.03f, 0.10f, 0.03f);
+    // 低周波の星雲だけで色を作る。高周波の星ノイズは移動時に細かく
+    // 明滅して見えたため使わず、広い色面がゆっくり移る表現にする。
+    float32_t3 cosmicPosition = worldPosition.xyz * 0.78f + normal * 0.22f;
+    float32_t nebulaWide = NebulaNoise(cosmicPosition * 0.72f);
+    float32_t nebulaAccent = NebulaNoise(cosmicPosition * 1.12f + 5.0f);
+    float32_t nebulaBlend = lerp(nebulaWide, nebulaAccent, 0.30f);
+    float32_t violetBand = smoothstep(0.28f, 0.78f, nebulaBlend);
+    float32_t cyanBand = smoothstep(0.34f, 0.82f, 1.0f - nebulaWide * 0.55f + nebulaAccent * 0.45f);
+    float32_t3 deepSpace = lerp(
+        float32_t3(0.008f, 0.010f, 0.070f),
+        float32_t3(0.018f, 0.105f, 0.205f),
+        thickness);
+    float32_t3 violetNebula = float32_t3(0.24f, 0.055f, 0.52f) * violetBand;
+    float32_t3 cyanNebula = float32_t3(0.025f, 0.44f, 0.62f) * cyanBand;
+    float32_t3 jellyColor = deepSpace + violetNebula * 0.46f + cyanNebula * 0.42f;
 
     float32_t3 halfVec = normalize(lightDir + viewDir);
     float32_t spec =
@@ -143,8 +192,11 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
         lerp(jellyColor, refracted * jellyColor, translucency * 0.28f);
     finalColor += jellyColor * 0.34f;
 
-    float32_t3 rimColor = float32_t3(0.8f, 1.0f, 0.9f);
-    finalColor += rimColor * (fresnel * fresnelStrength * topHighlightMask);
+    float32_t3 rimColor = lerp(
+        float32_t3(0.22f, 0.08f, 0.75f),
+        float32_t3(0.20f, 0.95f, 1.0f),
+        saturate(normal.y * 0.5f + 0.5f));
+    finalColor += rimColor * (fresnel * fresnelStrength * 1.35f);
 
     finalColor += float32_t3(1.0f, 1.0f, 1.0f) * spec;
 
@@ -156,55 +208,112 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
         smoothstep(threshold - 0.006f, threshold + 0.018f, density);
     float32_t outlineFactor = saturate(outlineOuter * outlineInner);
     finalColor =
-        lerp(finalColor, float32_t3(0.0f, 0.10f, 0.04f), outlineFactor * 0.62f);
+        lerp(finalColor, float32_t3(0.005f, 0.010f, 0.075f), outlineFactor * 0.78f);
     alpha = lerp(alpha, 0.98f, outlineFactor);
 
     // 縦長カプセル状の青い目。十分な流体密度がある領域だけに描き、
     // 半透明のスライム色を少し残すことで体内に沈んで見せる。
-    float32_t4 eyeClipPosition = mul(float32_t4(eyeWorldPosition, 1.0f), gViewProj);
-    float32_t2 eyeCenterUv = float32_t2(
-        eyeClipPosition.x / max(abs(eyeClipPosition.w), 0.0001f) * 0.5f + 0.5f,
-        0.5f - eyeClipPosition.y / max(abs(eyeClipPosition.w), 0.0001f) * 0.5f);
     float32_t2 eyePointBase = (input.texcoord - eyeCenterUv) / texelSize;
+    // When idle, the pair of eyes glances around the body with a slow,
+    // uneven rhythm. Movement resets idleFaceAmount, bringing the gaze back
+    // to center immediately.
+    // Look around for a while, then settle back to center before repeating.
+    // The vertical offset is intentionally upward so the idle pose also scans
+    // the space above the player.
+    float32_t gazeCycle = frac(idleFaceTime * 0.16f);
+    // Take over a second to leave center and to return. This is deliberately
+    // slower than the glance motion, avoiding any visible eye teleport.
+    float32_t gazeActive = smoothstep(0.08f, 0.28f, gazeCycle) *
+        (1.0f - smoothstep(0.56f, 0.82f, gazeCycle));
+    float32_t glanceX = sin(idleFaceTime * 0.58f) * 38.0f;
+    float32_t glanceY = -12.0f - abs(sin(idleFaceTime * 0.43f + 0.65f)) * 12.0f;
+    float32_t2 idleGazeOffset =
+        float32_t2(glanceX, glanceY) * idleFaceAmount * gazeActive;
+    eyePointBase -= idleGazeOffset;
+    // Preserve the gaze transition strength for the highlight. Normalizing
+    // this vector made the glint jump to its full offset on the first frame.
+    float32_t2 idleHighlightGaze = float32_t2(
+        idleGazeOffset.x / 38.0f,
+        idleGazeOffset.y / 24.0f);
     static const float32_t kEyeSeparationPixels = 18.0f;
     float32_t2 leftEyePoint = eyePointBase + float32_t2(kEyeSeparationPixels, 0.0f);
     float32_t2 rightEyePoint = eyePointBase - float32_t2(kEyeSeparationPixels, 0.0f);
+    // A real blink closes the rendered eye vertically to a thin horizontal
+    // line for a short moment, instead of merely shrinking the whole eye.
+    float32_t blinkPhase = frac(idleFaceTime * 0.58f);
+    float32_t blinkPulse = saturate(
+        smoothstep(0.70f, 0.78f, blinkPhase) -
+        smoothstep(0.82f, 0.92f, blinkPhase));
+    blinkPulse *= idleFaceAmount;
+    float32_t blinkVerticalScale = lerp(1.0f, 0.12f, blinkPulse);
+    float32_t idleSquint = idleFaceAmount * 0.16f;
+    float32_t currentEyeHalfHeight = lerp(
+        eyeHalfHeightPixels, eyeHalfWidthPixels * 0.68f, idleSquint);
     float32_t eyeStraightHalfHeight =
-        max(eyeHalfHeightPixels - eyeHalfWidthPixels, 0.0f);
+        max(currentEyeHalfHeight - eyeHalfWidthPixels, 0.0f);
     leftEyePoint.y -= clamp(
         leftEyePoint.y, -eyeStraightHalfHeight, eyeStraightHalfHeight);
     rightEyePoint.y -= clamp(
         rightEyePoint.y, -eyeStraightHalfHeight, eyeStraightHalfHeight);
+    leftEyePoint.y /= blinkVerticalScale;
+    rightEyePoint.y /= blinkVerticalScale;
     float32_t leftEyeDistance = length(leftEyePoint) - eyeHalfWidthPixels;
     float32_t rightEyeDistance = length(rightEyePoint) - eyeHalfWidthPixels;
     float32_t leftEyeMask =
         1.0f - smoothstep(-1.0f, 1.0f, leftEyeDistance);
     float32_t rightEyeMask =
         1.0f - smoothstep(-1.0f, 1.0f, rightEyeDistance);
+    // Last-life rupture: replace both capsule eyes with a clear "X" mark.
+    float32_t leftCrossBand = min(abs(leftEyePoint.x - leftEyePoint.y),
+        abs(leftEyePoint.x + leftEyePoint.y));
+    float32_t rightCrossBand = min(abs(rightEyePoint.x - rightEyePoint.y),
+        abs(rightEyePoint.x + rightEyePoint.y));
+    float32_t leftCrossExtent = max(abs(leftEyePoint.x), abs(leftEyePoint.y));
+    float32_t rightCrossExtent = max(abs(rightEyePoint.x), abs(rightEyePoint.y));
+    float32_t leftCrossMask =
+        (1.0f - smoothstep(2.2f, 3.7f, leftCrossBand)) *
+        (1.0f - smoothstep(10.0f, 12.0f, leftCrossExtent));
+    float32_t rightCrossMask =
+        (1.0f - smoothstep(2.2f, 3.7f, rightCrossBand)) *
+        (1.0f - smoothstep(10.0f, 12.0f, rightCrossExtent));
+    leftEyeMask = lerp(leftEyeMask, leftCrossMask, deathEyes);
+    rightEyeMask = lerp(rightEyeMask, rightCrossMask, deathEyes);
     float32_t eyeMask = max(leftEyeMask, rightEyeMask) * eyeVisibility;
-    // 輪郭付近の低密度領域には描かず、常に体内側へ余白を残す。
+    // The eye center can overlap the floor's depth silhouette while grounded.
+    // Do not gate it by the local thickness sample: that sample is a soft
+    // metaball edge and becomes zero exactly where the grounded blob is most
+    // compressed, which made the eyes appear only after jumping.
     float32_t insideMask = smoothstep(threshold + 0.10f, threshold + 0.24f, density);
-    eyeMask *= insideMask * edgeAA;
+    eyeMask *= eyeVisibility;
     float32_t closestEyeDistance = min(leftEyeDistance, rightEyeDistance);
     float32_t eyeInnerMask =
         1.0f - smoothstep(-3.2f, -1.2f, closestEyeDistance);
-    eyeInnerMask *= insideMask * edgeAA * eyeVisibility;
+    eyeInnerMask *= eyeVisibility;
     float32_t eyeRimMask = saturate(eyeMask - eyeInnerMask);
 
-    // 本体色を残した半透明ガラス色。完全な青で塗り潰さない。
-    float32_t3 transparentBlue = float32_t3(0.055f, 0.48f, 0.92f);
-    float32_t3 submergedBlue = lerp(jellyColor, transparentBlue, 0.62f);
-    finalColor = lerp(finalColor, submergedBlue, eyeMask * 0.54f);
+    // Dark eyes deliberately contrast the luminous cosmic body.
+    float32_t3 eyeCoreColor = float32_t3(0.002f, 0.004f, 0.025f);
+    finalColor = lerp(finalColor, eyeCoreColor, eyeMask * 0.98f);
     finalColor = lerp(
         finalColor,
-        float32_t3(0.18f, 0.67f, 1.0f),
-        eyeRimMask * 0.30f);
+        float32_t3(0.20f, 0.78f, 1.0f),
+        eyeRimMask * 0.76f);
 
     float32_t2 eyeHighlightCenter =
-        float32_t2(-eyeHalfWidthPixels * 0.28f, -eyeHalfHeightPixels * 0.36f);
-    eyeHighlightCenter += float32_t2(
+        float32_t2(-eyeHalfWidthPixels * 0.28f, -currentEyeHalfHeight * 0.36f);
+    // The white glint follows both movement gaze and the idle look-around
+    // direction, making the player visibly look toward each glance target.
+    float32_t2 highlightGaze = float32_t2(
         eyeGazeDirection.x,
-        -eyeGazeDirection.y) * eyeHalfWidthPixels * 0.48f;
+        -eyeGazeDirection.y) + idleHighlightGaze;
+    eyeHighlightCenter += highlightGaze * eyeHalfWidthPixels * 0.58f;
+    // Keep the glint fully inside the dark pupil even at the far-left glance.
+    // The highlight radius is up to 34% of the pupil radius, so its center
+    // must remain well inside the horizontal edge.
+    eyeHighlightCenter.x = clamp(
+        eyeHighlightCenter.x,
+        -eyeHalfWidthPixels * 0.40f,
+        eyeHalfWidthPixels * 0.40f);
     float32_t leftEyeHighlight =
         1.0f - smoothstep(eyeHalfWidthPixels * 0.10f, eyeHalfWidthPixels * 0.34f,
             length(eyePointBase - float32_t2(-kEyeSeparationPixels, 0.0f) - eyeHighlightCenter));
@@ -213,10 +322,13 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
             length(eyePointBase - float32_t2(kEyeSeparationPixels, 0.0f) - eyeHighlightCenter));
     float32_t eyeHighlight = max(leftEyeHighlight, rightEyeHighlight);
     finalColor +=
-        float32_t3(0.38f, 0.76f, 1.0f) * eyeHighlight * eyeMask * 0.36f;
+        float32_t3(0.72f, 0.93f, 1.0f) * eyeHighlight * eyeMask * 0.72f;
 
     float32_t3 background = gSceneColor.SampleLevel(gSampler, input.texcoord, 0).rgb;
-    float32_t3 result = lerp(background, finalColor, alpha * edgeAA);
+    // Keep the eye visible even when its pixel lands in a low-thickness part
+    // of a grounded metaball. The eye mask itself supplies the coverage there.
+    float32_t eyeAwareEdge = max(edgeAA, eyeMask);
+    float32_t3 result = lerp(background, finalColor, alpha * eyeAwareEdge);
 
     return float32_t4(result, 1.0f);
 }

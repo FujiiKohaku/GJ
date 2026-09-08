@@ -32,6 +32,8 @@ public:
     bool IsGamepadButtonTrigger(WORD button) const;
     float GetGamepadLeftStickX() const;
     float GetGamepadLeftStickY() const;
+    float GetGamepadRightStickX() const;
+    float GetGamepadRightStickY() const;
 
 public:
     class ConstructorKey {

@@ -39,6 +39,9 @@ void GpuSphFluid::Initialize(
     previousCorePosition_ = settings_.corePosition;
     hasPreviousCorePosition_ = false;
     coreVelocity_ = { 0.0f, 0.0f, 0.0f };
+    idleDuration_ = 0.0f;
+    idleStillDuration_ = 0.0f;
+    idleExpressionBlend_ = 0.0f;
     liquidBlend_ = isLiquidated_ ? 1.0f : 0.0f;
     emitCursor_ = 0;
     pendingEmitCount_ = 0;
@@ -64,6 +67,9 @@ void GpuSphFluid::Reset(const Settings& settings)
     previousCorePosition_ = settings_.corePosition;
     hasPreviousCorePosition_ = false;
     coreVelocity_ = { 0.0f, 0.0f, 0.0f };
+    idleDuration_ = 0.0f;
+    idleStillDuration_ = 0.0f;
+    idleExpressionBlend_ = 0.0f;
     liquidBlend_ = isLiquidated_ ? 1.0f : 0.0f;
     liquidationBurstStrength_ = 0.0f;
     emitCursor_ = 0;
@@ -92,11 +98,15 @@ void GpuSphFluid::SetControlState(
 void GpuSphFluid::SetEmitter(
     bool enabled,
     const Vector3& position,
-    const Vector3& velocity)
+    const Vector3& velocity,
+    float rateScale,
+    float lifetimeScale)
 {
     emitterEnabled_ = enabled;
     emitterPosition_ = position;
     emitterVelocity_ = velocity;
+    emitterRateScale_ = std::clamp(rateScale, 0.0f, 1.0f);
+    emitterLifetimeScale_ = (std::max)(lifetimeScale, 0.05f);
 }
 
 void GpuSphFluid::TriggerEmitBurst(uint32_t count)
@@ -536,7 +546,8 @@ void GpuSphFluid::UpdateSimulationParameter(float deltaTime, bool includeEmissio
     simulationParameterData_->emitStartIndex = emitCursor_;
     simulationParameterData_->emitCount = includeEmission ? pendingEmitCount_ : 0;
     simulationParameterData_->obstacleCount = obstacleCount_;
-    simulationParameterData_->particleLifetime = settings_.particleLifetime;
+    simulationParameterData_->particleLifetime =
+        settings_.particleLifetime * emitterLifetimeScale_;
     simulationParameterData_->emitterPosition = emitterPosition_;
     simulationParameterData_->emitterRadius = settings_.emitterRadius;
     simulationParameterData_->emitterVelocity = emitterVelocity_;
@@ -577,9 +588,33 @@ void GpuSphFluid::UpdateFrameState(float deltaTime)
     }
     previousCorePosition_ = settings_.corePosition;
 
+    const float targetSpeedSquared =
+        settings_.targetVelocity.x * settings_.targetVelocity.x +
+        settings_.targetVelocity.y * settings_.targetVelocity.y +
+        settings_.targetVelocity.z * settings_.targetVelocity.z;
+    const bool isIdle = !isLiquidated_ && targetSpeedSquared < 0.01f;
+    if (isIdle) {
+        idleDuration_ = (std::min)(idleDuration_ + safeDeltaTime, 60.0f);
+        idleStillDuration_ = (std::min)(idleStillDuration_ + safeDeltaTime, 60.0f);
+    } else {
+        idleStillDuration_ = 0.0f;
+    }
+
+    const float targetIdleExpression = idleStillDuration_ >= 0.75f ? 1.0f : 0.0f;
+    const float blendSpeed = targetIdleExpression > idleExpressionBlend_
+        ? 2.0f : 3.0f;
+    idleExpressionBlend_ = MoveTowards(
+        idleExpressionBlend_, targetIdleExpression, safeDeltaTime * blendSpeed);
+    // Keep the final gaze phase during the fade-out, then reset it only after
+    // the eyes have naturally returned to their normal center position.
+    if (!isIdle && idleExpressionBlend_ <= 0.0f) {
+        idleDuration_ = 0.0f;
+    }
+
     pendingEmitCount_ = 0;
     if (emitterEnabled_ && safeDeltaTime > 0.0f) {
-        emitAccumulator_ += settings_.emitterRate * safeDeltaTime;
+        emitAccumulator_ +=
+            settings_.emitterRate * emitterRateScale_ * safeDeltaTime;
         pendingEmitCount_ =
             (std::min<uint32_t>)(
                 static_cast<uint32_t>(emitAccumulator_),
@@ -658,4 +693,141 @@ void GpuSphFluid::ReleaseDescriptor(uint32_t& descriptorIndex)
 
     srvManager_->Free(descriptorIndex);
     descriptorIndex = kInvalidDescriptorIndex;
+}
+
+std::vector<GpuSphFluid::Particle> GpuSphFluid::GetParticlesCPU() const
+{
+    std::vector<Particle> result(settings_.particleCount);
+    if (!particleResource_ || settings_.particleCount == 0 || dxCommon_ == nullptr) {
+        return result;
+    }
+
+    ID3D12Device* device = dxCommon_->GetDevice();
+    ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+    ID3D12CommandQueue* commandQueue = dxCommon_->GetCommandQueue();
+    ID3D12CommandAllocator* commandAllocator = dxCommon_->GetCommandAllocator();
+    if (!device || !commandList || !commandQueue || !commandAllocator) {
+        return result;
+    }
+
+    const UINT64 bufferSize = sizeof(Particle) * static_cast<UINT64>(settings_.particleCount);
+
+    D3D12_HEAP_PROPERTIES heapProperties {};
+    heapProperties.Type = D3D12_HEAP_TYPE_READBACK;
+
+    D3D12_RESOURCE_DESC bufferDesc {};
+    bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bufferDesc.Width = bufferSize;
+    bufferDesc.Height = 1;
+    bufferDesc.DepthOrArraySize = 1;
+    bufferDesc.MipLevels = 1;
+    bufferDesc.SampleDesc.Count = 1;
+    bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> readbackBuffer;
+    HRESULT hr = device->CreateCommittedResource(
+        &heapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &bufferDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&readbackBuffer));
+    if (FAILED(hr)) return result;
+
+    D3D12_RESOURCE_STATES oldState = particleState_;
+    const_cast<GpuSphFluid*>(this)->TransitionResource(
+        particleResource_.Get(),
+        const_cast<GpuSphFluid*>(this)->particleState_,
+        D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    commandList->CopyResource(readbackBuffer.Get(), particleResource_.Get());
+
+    const_cast<GpuSphFluid*>(this)->TransitionResource(
+        particleResource_.Get(),
+        const_cast<GpuSphFluid*>(this)->particleState_,
+        oldState);
+
+    commandList->Close();
+    ID3D12CommandList* ppCommandLists[] = { commandList };
+    commandQueue->ExecuteCommandLists(1, ppCommandLists);
+    dxCommon_->WaitForGPU();
+
+    commandAllocator->Reset();
+    commandList->Reset(commandAllocator, nullptr);
+
+    void* mappedData = nullptr;
+    D3D12_RANGE readRange{ 0, bufferSize };
+    if (SUCCEEDED(readbackBuffer->Map(0, &readRange, &mappedData))) {
+        std::memcpy(result.data(), mappedData, bufferSize);
+        readbackBuffer->Unmap(0, nullptr);
+    }
+
+    return result;
+}
+
+void GpuSphFluid::SetParticlesCPU(const std::vector<Particle>& particles)
+{
+    if (!particleResource_ || particles.empty() || dxCommon_ == nullptr) return;
+
+    ID3D12Device* device = dxCommon_->GetDevice();
+    ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+    ID3D12CommandQueue* commandQueue = dxCommon_->GetCommandQueue();
+    ID3D12CommandAllocator* commandAllocator = dxCommon_->GetCommandAllocator();
+    if (!device || !commandList || !commandQueue || !commandAllocator) return;
+
+    const UINT64 bufferSize = (std::min)(
+        sizeof(Particle) * static_cast<UINT64>(settings_.particleCount),
+        sizeof(Particle) * static_cast<UINT64>(particles.size()));
+
+    D3D12_HEAP_PROPERTIES heapProperties {};
+    heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    D3D12_RESOURCE_DESC bufferDesc {};
+    bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bufferDesc.Width = bufferSize;
+    bufferDesc.Height = 1;
+    bufferDesc.DepthOrArraySize = 1;
+    bufferDesc.MipLevels = 1;
+    bufferDesc.SampleDesc.Count = 1;
+    bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> uploadBuffer;
+    HRESULT hr = device->CreateCommittedResource(
+        &heapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &bufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&uploadBuffer));
+    if (FAILED(hr)) return;
+
+    void* mappedData = nullptr;
+    D3D12_RANGE writeRange{ 0, 0 };
+    if (SUCCEEDED(uploadBuffer->Map(0, &writeRange, &mappedData))) {
+        std::memcpy(mappedData, particles.data(), bufferSize);
+        uploadBuffer->Unmap(0, nullptr);
+    }
+
+    D3D12_RESOURCE_STATES oldState = particleState_;
+    TransitionResource(
+        particleResource_.Get(),
+        particleState_,
+        D3D12_RESOURCE_STATE_COPY_DEST);
+
+    commandList->CopyBufferRegion(particleResource_.Get(), 0, uploadBuffer.Get(), 0, bufferSize);
+
+    TransitionResource(
+        particleResource_.Get(),
+        particleState_,
+        oldState);
+
+    commandList->Close();
+    ID3D12CommandList* ppCommandLists[] = { commandList };
+    commandQueue->ExecuteCommandLists(1, ppCommandLists);
+    dxCommon_->WaitForGPU();
+
+    commandAllocator->Reset();
+    commandList->Reset(commandAllocator, nullptr);
+
+    needsReset_ = false;
 }

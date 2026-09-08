@@ -111,6 +111,7 @@ public:
 
     bool SetEffectPosition(EffectHandle handle, const Vector3& position);
     bool SetEffectVelocity(EffectHandle handle, const Vector3& velocity);
+    bool SetEffectScale(EffectHandle handle, float scale);
     bool SetEffectSkeletonPose(
         EffectHandle handle,
         const EffectSkeletonPose& skeletonPose);

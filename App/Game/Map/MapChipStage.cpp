@@ -2,6 +2,8 @@
 
 #include "App/Game/Gimmick/MapChipGimmickFactory.h"
 #include "App/Game/Gimmick/GoalGimmick.h"
+#include "App/Game/Gimmick/CheckpointGimmick.h"
+#include "App/Game/Gimmick/SwingingBridgeGimmick.h"
 #include "App/Game/Gimmick/Interaction/SwitchGimmick.h"
 #include "App/Game/Gimmick/Interaction/GasEmitterGimmick.h"
 #include "App/Game/Gimmick/Interaction/DestructibleWallGimmick.h"
@@ -9,6 +11,7 @@
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3d.h"
 #include "Engine/3D/Object3dManager.h"
+#include <algorithm>
 
 MapChipStage::~MapChipStage() = default;
 
@@ -71,6 +74,8 @@ void MapChipStage::Initialize(
             // 今回は "StoneBlock/StoneBlock.obj" が設定されているはずなのでそれをロードする
             if (!config.modelPath.empty()) {
                 model = ModelManager::GetInstance()->Load(config.modelPath);
+            } else if (!config.texturePath.empty()) {
+                model = ModelManager::GetInstance()->CreateCube(config.texturePath);
             }
 
             // GPUメモリ枯渇(VRAMリーク)を防ぐため、既存の Object3d を再利用する
@@ -88,6 +93,14 @@ void MapChipStage::Initialize(
                 block->Update();
                 blockObjects_.push_back(std::move(block));
             }
+            // Reused objects must lose the material mode of their previous tile.
+            Object3d* placedBlock = blockObjects_[currentBlockIndex].get();
+            placedBlock->SetEnableLighting(true);
+            placedBlock->SetEnableEnvironmentMap(false);
+            placedBlock->SetEnvironmentMapStrength(0.0f);
+            if (type == MapChipType::Foundation) {
+                placedBlock->GetMaterial()->enableLighting = 8;
+            }
             currentBlockIndex++;
         }
     }
@@ -104,16 +117,22 @@ void MapChipStage::Initialize(
 
         if (obj.type == "Goal") {
             gimmick = std::make_unique<GoalGimmick>();
-            modelFile = obj.fileName.empty() ? "GoalPost/GoalPost.obj" : obj.fileName;
+            modelFile = obj.fileName;
+        } else if (obj.type == "Checkpoint") {
+            gimmick = std::make_unique<CheckpointGimmick>();
+            modelFile = obj.fileName;
         } else if (obj.type == "Switch") {
             gimmick = std::make_unique<SwitchGimmick>();
+            modelFile = obj.fileName;
         } else if (obj.type == "GasEmitter") {
             gimmick = std::make_unique<GasEmitterGimmick>();
+            modelFile = obj.fileName;
         } else if (obj.type == "DestructibleWall") {
             gimmick = std::make_unique<DestructibleWallGimmick>();
+            modelFile = obj.fileName;
         } else if (obj.type == "Spike") {
             gimmick = std::make_unique<SpikeGimmick>();
-            modelFile = obj.fileName.empty() ? "Thorn/Thorn.obj" : obj.fileName;
+            modelFile = obj.fileName;
         }
 
         if (gimmick) {
@@ -125,40 +144,49 @@ void MapChipStage::Initialize(
     }
 }
 
-void MapChipStage::EnableToonLighting()
+void MapChipStage::ApplyMaterialProperties()
 {
+    // 全オブジェクトにToonLightingを適用
     for (const std::unique_ptr<Object3d>& block : blockObjects_) {
+        // Foundation keeps its procedural stone material in gameplay as well.
+        if (block->GetMaterial()->enableLighting == 8) {
+            continue;
+        }
         block->EnableToonLighting();
     }
     for (const std::unique_ptr<BaseMapChipGimmick>& gimmick : gimmicks_) {
         gimmick->EnableToonLighting();
     }
-}
 
-void MapChipStage::EnableMossTerrain()
-{
-    EnableToonLighting();
-    Model* terrainModel = ModelManager::GetInstance()->CreateCube(
-        "resources/Textures/Terrain/MossSoil.png");
+    // マテリアルタイプに応じた特殊処理 (例: Moss の表面高さ計算)
     const uint32_t width = field_.GetBlockWidth();
     const uint32_t height = field_.GetBlockHeight();
     std::vector<float> surfaceHeights(width, 0.0f);
+    
     size_t blockIndex = 0;
     for (uint32_t y = 0; y < height; ++y) {
         for (uint32_t x = 0; x < width; ++x) {
-            if (field_.GetMapChipTypeByIndex(x, y) != MapChipType::Block) {
-                continue;
+            MapChipType type = field_.GetMapChipTypeByIndex(x, y);
+            if (!MapChipRegistry::IsSolidBlock(type) || MapChipRegistry::GetConfig(type).isGimmick) {
+                continue; // ソリッドな静的ブロック以外はスキップ
             }
-            // Each uninterrupted column shares its exposed surface height.
-            // Underground blocks therefore do not repeat the moss edge.
-            if (y == 0 || field_.GetMapChipTypeByIndex(x, y - 1) != MapChipType::Block) {
-                surfaceHeights[x] = field_.GetMapChipPositionByIndex(x, y).y + 0.5f;
+            
+            const auto& config = MapChipRegistry::GetConfig(type);
+            
+            // "Moss" マテリアルの特殊なシェーダー設定
+            if (config.materialType == "Moss") {
+                // 上面に空きがあるか判定し、高さを記録
+                if (y == 0 || field_.GetMapChipTypeByIndex(x, y - 1) != type) {
+                    surfaceHeights[x] = field_.GetMapChipPositionByIndex(x, y).y + 0.5f;
+                }
+                
+                if (blockIndex < blockObjects_.size()) {
+                    Material* material = blockObjects_[blockIndex]->GetMaterial();
+                    material->enableLighting = 7; // Moss用のライティングモード
+                    material->environmentCoefficient = surfaceHeights[x];
+                }
             }
-            blockObjects_[blockIndex]->SetModel(terrainModel);
-            Material* material = blockObjects_[blockIndex]->GetMaterial();
-            material->enableLighting = 7;
-            // In terrain mode this slot carries height, not reflectivity.
-            material->environmentCoefficient = surfaceHeights[x];
+            
             ++blockIndex;
         }
     }
@@ -206,6 +234,97 @@ std::vector<BaseMapChipGimmick*> MapChipStage::GetGimmicks() const
     return result;
 }
 
+void MapChipStage::AddGimmick(std::unique_ptr<BaseMapChipGimmick> gimmick)
+{
+    if (!gimmick) {
+        return;
+    }
+    gimmick->SetStage(this);
+    gimmicks_.push_back(std::move(gimmick));
+    if (gimmicks_.back()->IsHardenedSlime()) {
+        ResolveHardenedSlimeAdhesion(*gimmicks_.back());
+    }
+}
+
+void MapChipStage::LimitHardenedSlimeCount(size_t maximumCount)
+{
+    size_t count = 0;
+    for (const auto& gimmick : gimmicks_) {
+        if (gimmick->IsHardenedSlime()) ++count;
+    }
+
+    // gimmicks_ は追加順。先頭から消すことで最も古い死体を先に取り除く。
+    for (auto it = gimmicks_.begin(); count > maximumCount && it != gimmicks_.end();) {
+        if ((*it)->IsHardenedSlime()) {
+            it = gimmicks_.erase(it);
+            --count;
+        } else {
+            ++it;
+        }
+    }
+}
+
+bool MapChipStage::RemoveLatestHardenedSlime()
+{
+    // 末尾ほど新しく追加されたギミックなので、逆順で直近の死体を探す。
+    for (auto it = gimmicks_.rbegin(); it != gimmicks_.rend(); ++it) {
+        if ((*it)->IsHardenedSlime()) {
+            gimmicks_.erase(std::next(it).base());
+            return true;
+        }
+    }
+    return false;
+}
+
+void MapChipStage::ResolveHardenedSlimeAdhesion(
+    const BaseMapChipGimmick& hardenedSlime)
+{
+    const std::vector<AABB> bodyBoxes = hardenedSlime.GetCollisionBoxes();
+    std::vector<SwingingBridgeGimmick*> touchedBridges;
+    bool touchesTerrain = false;
+
+    for (const AABB& bodyBox : bodyBoxes) {
+        for (uint32_t y = 0; y < field_.GetBlockHeight(); ++y) {
+            for (uint32_t x = 0; x < field_.GetBlockWidth(); ++x) {
+                const MapChipType type = field_.GetMapChipTypeByIndex(x, y);
+                if (!MapChipRegistry::IsSolidBlock(type)) {
+                    continue;
+                }
+                const AABB terrainBox = {
+                    field_.GetMapChipPositionByIndex(x, y),
+                    { 1.0f, 1.0f, 1.0f } };
+                if (CollisionManager::Intersect(bodyBox, terrainBox).isHit) {
+                    touchesTerrain = true;
+                }
+            }
+        }
+
+        for (const std::unique_ptr<BaseMapChipGimmick>& gimmick : gimmicks_) {
+            auto* bridge = dynamic_cast<SwingingBridgeGimmick*>(gimmick.get());
+            if (!bridge ||
+                !CollisionManager::Intersect(bodyBox, bridge->GetAABB()).isHit) {
+                continue;
+            }
+            if (std::find(
+                    touchedBridges.begin(),
+                    touchedBridges.end(),
+                    bridge) == touchedBridges.end()) {
+                touchedBridges.push_back(bridge);
+            }
+        }
+    }
+
+    for (SwingingBridgeGimmick* bridge : touchedBridges) {
+        bridge->ApplyAdhesive();
+    }
+
+    if (touchesTerrain || touchedBridges.size() >= 2) {
+        for (SwingingBridgeGimmick* bridge : touchedBridges) {
+            bridge->ForceStuck();
+        }
+    }
+}
+
 std::vector<BaseMapChipGimmick*> MapChipStage::GetGimmicksInSphere(const Vector3& center, float radius)
 {
     std::vector<BaseMapChipGimmick*> result;
@@ -235,5 +354,46 @@ void MapChipStage::CreateExplosion(const Vector3& origin, float radius)
     auto targets = GetGimmicksInSphere(origin, radius);
     for (auto* target : targets) {
         target->OnExplosion(origin, radius);
+    }
+}
+
+void MapChipStage::CreateExplosionGrid(const Vector3& origin, uint32_t left, uint32_t right, uint32_t up, uint32_t down)
+{
+    const float blockSize = 1.0f;
+    
+    int iLeft = -static_cast<int>(left);
+    int iRight = static_cast<int>(right);
+    int iDown = -static_cast<int>(down);
+    int iUp = static_cast<int>(up);
+
+    for (const auto& gimmick : gimmicks_) {
+        Vector3 center = gimmick->GetAABB().center;
+        
+        // origin からの相対距離
+        float diffX = center.x - origin.x;
+        float diffY = center.y - origin.y;
+        
+        // Z座標が同じ平面上にあるか確認（高さ違いのギミックを巻き込まないため）
+        if (std::abs(center.z - origin.z) > 0.5f) {
+            continue;
+        }
+        
+        // 座標から相対マス目インデックス（何マス離れているか）を算出
+        int dx = static_cast<int>(std::round(diffX / blockSize));
+        int dy = static_cast<int>(std::round(diffY / blockSize));
+
+        // そのギミックがガスの範囲（矩形）のX軸・Y軸それぞれに収まっているか
+        bool inGasX = (dx >= iLeft && dx <= iRight);
+        bool inGasY = (dy >= iDown && dy <= iUp);
+        
+        // 十字方向で外側に1マスだけ面しているか（隣接判定）
+        bool isAdjacentX = inGasY && (dx == iLeft - 1 || dx == iRight + 1);
+        bool isAdjacentY = inGasX && (dy == iDown - 1 || dy == iUp + 1);
+        
+        // ガス範囲内、または十字方向に隣接するマスであれば爆破対象
+        if ((inGasX && inGasY) || isAdjacentX || isAdjacentY) {
+            float dist = Vector3Length(center - origin);
+            gimmick->OnExplosion(origin, dist);
+        }
     }
 }

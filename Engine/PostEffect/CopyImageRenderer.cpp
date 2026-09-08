@@ -221,8 +221,12 @@ const wchar_t* CopyImageRenderer::GetPixelShaderPath(PostEffectType type) const
         return L"resources/Shaders/PostEffect/Fullscreen.PS.hlsl";
     case PostEffectType::ArchiveAtmosphere:
         return L"resources/Shaders/PostEffect/ArchiveAtmosphere.PS.hlsl";
+    case PostEffectType::FantasyMenu:
+        return L"resources/Shaders/PostEffect/FantasyMenu.PS.hlsl";
     case PostEffectType::SlimeScreen:
         return L"resources/Shaders/PostEffect/SlimeScreen.PS.hlsl";
+    case PostEffectType::ClearSlimeRise:
+        return L"resources/Shaders/PostEffect/ClearSlimeRise.PS.hlsl";
     case PostEffectType::Bloom:
         [[fallthrough]];
     case PostEffectType::Fog:
@@ -360,6 +364,7 @@ void CopyImageRenderer::CreatePostEffectParameterResource()
     postEffectParameterData_->outlineThreshold = 0.02f;
     postEffectParameterData_->outlineSoftness = 0.04f;
     postEffectParameterData_->slimeScreenProgress = 0.0f;
+    postEffectParameterData_->fantasyMenuStrength = 0.0f;
     postEffectParameterData_->time = 0.0f;
 
     postEffectParameterData_->radialBlurCenter = { 0.5f, 0.5f };

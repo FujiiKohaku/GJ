@@ -50,7 +50,9 @@ enum class PostEffectType {
     HexShield,
     BlackHoleDistortion,
     ArchiveAtmosphere,
+    FantasyMenu,
     SlimeScreen,
+    ClearSlimeRise,
 };
 
 const char* GetPostEffectTypeName(PostEffectType type);

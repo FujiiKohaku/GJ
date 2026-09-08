@@ -49,7 +49,7 @@ void SwitchParam::DrawImGui()
     if (ImGui::InputText("Fire Event Name", buffer, sizeof(buffer))) {
         fireEventName_ = buffer;
     }
-
+    
     // スイッチの種類
     const char* typeItems[] = { "PressurePlate (0)", "Button (1)", "Bonfire (2)" };
     if (ImGui::Combo("Switch Type", &switchType_, typeItems, IM_ARRAYSIZE(typeItems))) {
@@ -64,6 +64,13 @@ void SwitchParam::DrawImGui()
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "[Global Settings]");
         ImGui::DragFloat3("AABB Offset", &SwitchGimmick::s_pressurePlateAABBOffset.x, 0.05f);
         ImGui::DragFloat3("AABB Size", &SwitchGimmick::s_pressurePlateAABBSize.x, 0.05f, 0.01f, 5.0f);
+    }
+    // 篝火の場合のグローバルエフェクト設定を表示
+    else if (switchType_ == 2) {
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "[Global Settings (Bonfire)]");
+        ImGui::DragFloat3("Effect Offset", &SwitchGimmick::s_bonfireEffectOffset.x, 0.05f);
+        ImGui::DragFloat("Effect Scale", &SwitchGimmick::s_bonfireEffectScale, 0.05f, 0.1f, 10.0f);
     }
 #endif
 }
