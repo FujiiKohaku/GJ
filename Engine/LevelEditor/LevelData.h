@@ -27,17 +27,17 @@ struct LevelData {
         struct ColliderData {
             bool exists = false;
             std::string type;
-            Vector3 center;
-            Vector3 size;
+            Vector3 center = { 0.0f, 0.0f, 0.0f };
+            Vector3 size = { 0.0f, 0.0f, 0.0f };
         } collider;
 
         struct TriggerData {
             bool exists = false;
             std::string type;
             std::string name;
-            Vector3 center;
-            Vector3 size;
-            Vector3 force;
+            Vector3 center = { 0.0f, 0.0f, 0.0f };
+            Vector3 size = { 0.0f, 0.0f, 0.0f };
+            Vector3 force = { 0.0f, 0.0f, 0.0f };
         } trigger;
 
         struct HazardData {
@@ -50,7 +50,7 @@ struct LevelData {
             bool exists = false;
             std::string type;
             float speed = 0.0f;
-            Vector3 range;
+            Vector3 range = { 0.0f, 0.0f, 0.0f };
             Vector3 axis = { 0.0f, 1.0f, 0.0f };
         } gimmick; // TODO: 段階的に削除予定
 
@@ -64,7 +64,7 @@ struct LevelData {
         struct CameraPointData {
             bool exists = false;
             std::string name;
-            Vector3 target;
+            Vector3 target = { 0.0f, 0.0f, 0.0f };
             float moveTime = 0.0f;
         } cameraPoint;
 

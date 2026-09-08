@@ -17,6 +17,7 @@
 #include "Engine/Camera/Camera.h"
 #include "Engine/debugcamera/DebugCameraController.h"
 #include "PageTransition.h"
+#include <cstddef>
 #include <memory>
 
 class GamePlayScene : public BaseScene {
@@ -57,11 +58,14 @@ private:
     void StartStageSelectTransition();
     void UpdateStageSelectTransition(float deltaTime);
     void UpdateFantasyMenuEffect(float deltaTime);
+    void UpdateStage1Tutorial();
 
     std::unique_ptr<Camera> camera_;
     DebugCameraController debugCameraController_;
     std::unique_ptr<SkyBox> skyBox_;
     std::unique_ptr<Text> instructionText_;
+    std::unique_ptr<Sprite> tutorialPanelSprite_;
+    std::unique_ptr<Text> tutorialText_;
     std::unique_ptr<Text> collisionText_;
     std::unique_ptr<Text> livesText_;
     static constexpr int kInitialLives = 5;
@@ -97,6 +101,9 @@ private:
     Vector3 playerStartPosition_ = { 0.0f, 0.0f, 0.0f };
     bool selfDestructSlowActive_ = false;
     float timeScaleBeforeSelfDestruct_ = 1.0f;
+
+    std::size_t nextStage1TutorialIndex_ = 0;
+    bool stage1ShapeTutorialShown_ = false;
 
     bool isLifeRelayActive_ = false;
     float lifeRelayTimer_ = 0.0f;

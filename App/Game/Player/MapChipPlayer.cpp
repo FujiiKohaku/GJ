@@ -127,7 +127,7 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
         deltaTime = 0.0f;
     }
 
-    if (input->IsKeyTrigger(DIK_T)) {
+    if (input->IsMouseTrigger(1)) {
         if (isShapingSelfDestruct_) {
             hardenedBody_ = GetAABB();
             hardenedBodyReady_ = true;
