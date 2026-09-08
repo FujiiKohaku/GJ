@@ -30,6 +30,10 @@ namespace {
 constexpr const char *kSkyBoxTexture = "resources/Textures/skybox.dds";
 constexpr const char *kMapChipTexture = "resources/Textures/checkerboard.png";
 constexpr const char *kWhiteTexture = "resources/Textures/white.png";
+constexpr const char *kLifeSlimeTexture = "resources/Textures/Slime.png";
+constexpr const char *kDeadSlimeTexture = "resources/Textures/deadSlime.png";
+constexpr const char *kLifeSlimeMaterial =
+    "resources/Shaders/Sprite/LifeSlime";
 constexpr const char *kFantasyMenuMaterial =
     "resources/Shaders/Sprite/FantasyMenu";
 constexpr float kCameraDistance = 12.0f;
@@ -333,22 +337,10 @@ void GamePlayScene::Initialize() {
   skyBox_->SetTexture(kSkyBoxTexture);
   skyBox_->Update(camera_.get());
 
-  instructionText_ = std::make_unique<Text>();
-  instructionText_->Initialize(kDefaultFont);
-  instructionText_->SetText(
-      "MOVE : A/D OR LEFT/RIGHT   JUMP : SPACE/W/UP   "
-      "RIGHT CLICK : SLOW/SHAPE, RIGHT CLICK AGAIN : SELF-DESTRUCT   R : RESTART   "
-      "F1 : FREE CAM   TAB : MENU");
-  instructionText_->SetPosition({32.0f, 32.0f});
-  instructionText_->SetFontSize(24.0f);
-  instructionText_->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
-  instructionText_->SetOutlineColor({0.0f, 0.0f, 0.0f, 1.0f});
-  instructionText_->SetOutlineWidth(2.0f);
-
   TextureManager::GetInstance()->LoadTexture(kWhiteTexture);
   tutorialPanelSprite_ = std::make_unique<Sprite>();
   tutorialPanelSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
-  tutorialPanelSprite_->SetPosition({60.0f, 105.0f});
+  tutorialPanelSprite_->SetPosition({60.0f, 16.0f});
   tutorialPanelSprite_->SetSize({1160.0f, 92.0f});
   tutorialPanelSprite_->SetColor({0.02f, 0.05f, 0.12f, 0.0f});
   tutorialPanelSprite_->Update();
@@ -356,7 +348,7 @@ void GamePlayScene::Initialize() {
   tutorialText_ = std::make_unique<Text>();
   tutorialText_->Initialize(kDefaultFont);
   tutorialText_->SetAnchorPoint({0.5f, 0.5f});
-  tutorialText_->SetPosition({640.0f, 150.0f});
+  tutorialText_->SetPosition({640.0f, 61.0f});
   tutorialText_->SetFontSize(42.0f);
   tutorialText_->SetColor({1.0f, 1.0f, 1.0f, 0.0f});
   tutorialText_->SetOutlineWidth(0.0f);
@@ -376,21 +368,17 @@ void GamePlayScene::Initialize() {
     tutorialText_->Update();
   }
 
-  collisionText_ = std::make_unique<Text>();
-  collisionText_->Initialize(kDefaultFont);
-  collisionText_->SetPosition({32.0f, 68.0f});
-  collisionText_->SetFontSize(22.0f);
-  collisionText_->SetColor({0.2f, 0.9f, 1.0f, 1.0f});
-  collisionText_->SetOutlineColor({0.0f, 0.0f, 0.0f, 1.0f});
-  collisionText_->SetOutlineWidth(2.0f);
-  UpdateCollisionText();
-
-  livesText_ = std::make_unique<Text>();
-  livesText_->Initialize(kDefaultFont);
-  livesText_->SetAnchorPoint({1.0f, 0.0f});
-  livesText_->SetFontSize(32.0f);
-  livesText_->SetOutlineColor({0.02f, 0.10f, 0.08f, 1.0f});
-  livesText_->SetOutlineWidth(3.0f);
+  TextureManager::GetInstance()->LoadTexture(kLifeSlimeTexture);
+  TextureManager::GetInstance()->LoadTexture(kDeadSlimeTexture);
+  livesNumberText_ = std::make_unique<Text>();
+  // 数字は96pxの高解像度字形から縮小して描画し、輪郭のぼやけを防ぐ。
+  livesNumberText_->Initialize(kDefaultFont, true);
+  livesNumberText_->SetAnchorPoint({1.0f, 0.5f});
+  livesNumberText_->SetFontSize(48.0f);
+  livesNumberText_->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
+  livesNumberText_->SetOutlineColor({0.0f, 0.015f, 0.04f, 1.0f});
+  livesNumberText_->SetOutlineWidth(2.0f);
+  livesNumberText_->SetShadowColor({0.0f, 0.0f, 0.0f, 0.0f});
   UpdateLivesText();
 
   // メニューUIの初期化
@@ -586,18 +574,10 @@ void GamePlayScene::Update() {
       .Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
   ruinsBackground_.Update();
   bool hardenedThisFrame = false;
-  // 形状調整用のスロー中は、トラップ接触や落下などによる死亡を無効にする。
-  // Trap gimmicks continue updating while the life relay is playing. Consume
-  // their requests so a laser touching the departed player cannot spend more
-  // lives during the respawn animation.
+  // 旧形式の死亡通知が残っていても即死させず、自滅準備へ移行する。
   const bool deathRequested = player_->ConsumeJustDied();
   if (!isClearCelebrationActive_ && !isLifeRelayActive_ && deathRequested) {
-    if (!isSlowMotion) {
-      LoseLife();
-      if (isDeathTransitionActive_)
-        return;
-      hardenedThisFrame = true;
-    }
+    player_->BeginSelfDestructShape();
   }
 
   // player_->Update(mapChipStage_.GetGimmicks());
@@ -648,6 +628,12 @@ void GamePlayScene::Update() {
     }
   }
 
+  // プレイヤー更新中の圧死・落下なども、即死ではなく自滅準備にする。
+  if (!isClearCelebrationActive_ && !isLifeRelayActive_ &&
+      player_->ConsumeJustDied()) {
+    player_->BeginSelfDestructShape();
+  }
+
     if (!isClearCelebrationActive_ && player_->IsShapingSelfDestruct() && !selfDestructSlowActive_) {
     TimeManager *timeManager = TimeManager::GetInstance();
     timeScaleBeforeSelfDestruct_ = timeManager->GetTimeScale();
@@ -664,15 +650,6 @@ void GamePlayScene::Update() {
       return;
     hardenedThisFrame = true;
   }
-  
-    // トラップや圧死などによる死亡通知の受け取り
-    if (!isClearCelebrationActive_ && !hardenedThisFrame && player_->ConsumeJustDied()) {
-    LoseLife();
-    if (isDeathTransitionActive_)
-      return;
-    hardenedThisFrame = true;
-  }
-
   if (gpuSphFluid_) {
     const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
     const std::vector<BaseMapChipGimmick *> gimmicks =
@@ -791,12 +768,9 @@ void GamePlayScene::Update() {
   EffectManager::GetInstance()->SetCamera(camera_.get());
   EffectManager::GetInstance()->Update();
   skyBox_->Update(camera_.get());
-  instructionText_->Update();
   UpdateStage1Tutorial();
   tutorialPanelSprite_->Update();
   tutorialText_->Update();
-  UpdateCollisionText();
-  collisionText_->Update();
 }
 
 void GamePlayScene::UpdateStage1Tutorial() {
@@ -836,8 +810,12 @@ void GamePlayScene::UpdateStage1Tutorial() {
 
 void GamePlayScene::Draw2D() {
   if (isDeathTransitionActive_) {
+    SpriteManager::GetInstance()->PreDraw();
+    for (const auto& lifeSprite : lifeSprites_) {
+      lifeSprite->Draw();
+    }
     TextRenderer::GetInstance()->PreDraw();
-    livesText_->Draw();
+    livesNumberText_->Draw();
     return;
   }
   if (showForces_) {
@@ -846,12 +824,13 @@ void GamePlayScene::Draw2D() {
 
   SpriteManager::GetInstance()->PreDraw();
   tutorialPanelSprite_->Draw();
+  for (const auto& lifeSprite : lifeSprites_) {
+    lifeSprite->Draw();
+  }
 
   TextRenderer::GetInstance()->PreDraw();
-  instructionText_->Draw();
   tutorialText_->Draw();
-  collisionText_->Draw();
-  livesText_->Draw();
+  livesNumberText_->Draw();
   pageReveal_.Draw();
 
   // メニュー表示中は最前面に暗幕とメニューパネルを描画
@@ -1076,15 +1055,50 @@ void GamePlayScene::UpdateClearCelebration(float unscaledDeltaTime) {
 }
 
 void GamePlayScene::UpdateLivesText() {
-  if (!livesText_)
+  if (displayedLives_ == remainingLives_)
     return;
+
+  displayedLives_ = remainingLives_;
+  lifeSprites_.clear();
+
   const float width = static_cast<float>(WinApp::GetInstance()->GetRenderWidth());
-  livesText_->SetPosition({width - 32.0f, 108.0f});
-  livesText_->SetText("残機 × " + std::to_string(remainingLives_));
-  livesText_->SetColor(remainingLives_ <= 2
-                           ? Vector4{1.0f, 0.40f, 0.30f, 1.0f}
-                           : Vector4{0.30f, 1.0f, 0.72f, 1.0f});
-  livesText_->Update();
+  const float height = static_cast<float>(WinApp::GetInstance()->GetRenderHeight());
+  constexpr float kLifeIconSize = 46.0f;
+  constexpr float kLifeIconGap = 8.0f;
+  constexpr float kLifeIconBottomMargin = 18.0f;
+  const float rowWidth =
+      kLifeIconSize * static_cast<float>(maximumLives_) +
+      kLifeIconGap * static_cast<float>((std::max)(maximumLives_ - 1, 0));
+  const float rowLeft = (width - rowWidth) * 0.5f;
+  const float rowTop = height - kLifeIconSize - kLifeIconBottomMargin;
+
+  livesNumberText_->SetPosition({rowLeft - 18.0f, rowTop + kLifeIconSize * 0.5f});
+  livesNumberText_->SetText(std::to_string(remainingLives_));
+  livesNumberText_->SetColor(remainingLives_ <= 2
+      ? Vector4{1.0f, 0.35f, 0.25f, 1.0f}
+      : Vector4{1.0f, 1.0f, 1.0f, 1.0f});
+  livesNumberText_->Update();
+
+  for (int lifeIndex = 0; lifeIndex < maximumLives_; ++lifeIndex) {
+    const bool isRemainingLife = lifeIndex < remainingLives_;
+    auto lifeSprite = std::make_unique<Sprite>();
+    lifeSprite->Initialize(SpriteManager::GetInstance(),
+                           isRemainingLife ? kLifeSlimeTexture
+                                           : kDeadSlimeTexture);
+    lifeSprite->SetSize({kLifeIconSize, kLifeIconSize});
+    lifeSprite->SetMaterial(kLifeSlimeMaterial);
+    // 生きている残機だけを少しずつ位相をずらしてぷにぷに動かす。
+    // 使用済みアイコンは静止させ、状態を見分けやすくする。
+    lifeSprite->SetEffectAmplitude(isRemainingLife ? 0.10f : 0.0f);
+    lifeSprite->SetEffectPhase(static_cast<float>(lifeIndex) * 0.62f);
+    lifeSprite->SetPosition({
+        rowLeft + (kLifeIconSize + kLifeIconGap) *
+                      static_cast<float>(lifeIndex),
+        rowTop});
+    lifeSprite->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
+    lifeSprite->Update();
+    lifeSprites_.push_back(std::move(lifeSprite));
+  }
 }
 
 void GamePlayScene::LoseLife() {
@@ -1220,23 +1234,4 @@ void GamePlayScene::UpdateFollowCamera() {
 
   camera_->LookAt({targetPosition.x, targetPosition.y, -kCameraDistance},
                   {targetPosition.x, targetPosition.y, 0.0f});
-}
-
-void GamePlayScene::UpdateCollisionText() {
-  if (!collisionText_ || !player_) {
-    return;
-  }
-
-  std::string state = "AIR";
-  if (player_->IsCrushed()) {
-    state = "CRUSHED / LIQUID";
-  } else if (player_->IsGrounded()) {
-    state = "GROUND COLLISION";
-  } else if (player_->IsColliding()) {
-    state = "WALL/CEILING COLLISION";
-  }
-  const Vector3 position = player_->GetPosition();
-  collisionText_->SetText("COLLISION : " + state +
-                          "   PLAYER X=" + std::to_string(position.x) +
-                          " Y=" + std::to_string(position.y));
 }

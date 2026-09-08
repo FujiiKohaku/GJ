@@ -1,0 +1,22 @@
+{
+  "Name": "Life Slime Gloss",
+  "Pipeline": {
+    "BlendMode": "Normal",
+    "DepthTest": false,
+    "DepthWrite": false,
+    "CullMode": "None"
+  },
+  "Mesh": {
+    "DivisionX": 12,
+    "DivisionY": 10
+  },
+  "Effect": {
+    "Amplitude": 0.10,
+    "Frequency": 1.0,
+    "Speed": 2.6,
+    "Phase": 0.0,
+    "Direction": [1.0, 0.0],
+    "Strength": 1.0,
+    "Threshold": 0.5
+  }
+}
