@@ -5,7 +5,10 @@
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/Time/TimeManager.h"
 #include <cmath>
-
+#include <numbers>
+#include <algorithm>
+#include "App/Game/Map/MapChipStage.h"
+#include "Engine/CollisionManager/CollisionManager.h"
 namespace {
 constexpr int32_t kMovingBlockWoodMaterialMode = 14;
 }
@@ -69,22 +72,71 @@ void MovingBlockGimmick::Update()
 
     previousPosition_ = currentPosition_;
 
-    if (!isEditorMode_) {
-        elapsedTime_ += TimeManager::GetInstance()->GetDeltaTime();
+    float deltaTime = isEditorMode_ ? 0.0f : TimeManager::GetInstance()->GetDeltaTime();
+
+    // 1. 位相の進行と折り返し
+    phase_ += phaseDir_ * speed_ * deltaTime;
+    if (phase_ >= std::numbers::pi_v<float>) {
+        phase_ = std::numbers::pi_v<float>;
+        phaseDir_ = -1.0f;
+    } else if (phase_ <= 0.0f) {
+        phase_ = 0.0f;
+        phaseDir_ = 1.0f;
     }
-    Vector3 position = basePosition_;
-    
-    float wave = (1.0f - std::cos(elapsedTime_ * speed_)) * 0.5f;
-    // 1ブロックの実際のワールドサイズ（現状は1.0f）
+
     float kBlockSize = 1.0f;
-    // UI上はマス数で設定し、実際の距離に変換する
     float distance = range_.x * kBlockSize;
-    
-    position.x += axis_.x * wave * distance;
-    position.y += axis_.y * wave * distance;
-    position.z += axis_.z * wave * distance;
-    
-    currentPosition_ = position;
+    if (distance <= 0.0f) distance = 0.001f; // ゼロ除算防止
+
+    // 2. 本来行きたい座標（Tentative Position）の計算
+    float wave = (1.0f - std::cos(phase_)) * 0.5f;
+    Vector3 tentativePosition = basePosition_;
+    tentativePosition.x += axis_.x * wave * distance;
+    tentativePosition.y += axis_.y * wave * distance;
+    tentativePosition.z += axis_.z * wave * distance;
+
+    // 3. 死体との衝突判定 (BeginOverlap方式)
+    bool currentlyOverlapping = false;
+
+    if (stage_ && !isEditorMode_) {
+        AABB tentativeAABB;
+        tentativeAABB.center = tentativePosition;
+        tentativeAABB.size = {1.0f, 1.0f, 1.0f};
+
+        for (BaseMapChipGimmick* gimmick : stage_->GetGimmicks()) {
+            if (gimmick && gimmick->IsHardenedSlime()) {
+                CollisionHit hit = CollisionManager::Intersect(tentativeAABB, gimmick->GetAABB());
+                if (hit.isHit) {
+                    currentlyOverlapping = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (currentlyOverlapping) {
+        if (!isOverlappingCorpse_) {
+            // 初めて重なった瞬間（BeginOverlap）にのみ1回だけ反転する
+            phaseDir_ = -phaseDir_;
+            
+            // このフレームの移動はキャンセルし、現在位置から逆再生を始める
+            tentativePosition = currentPosition_;
+            
+            // 現在位置に合わせて位相（Phase）を逆算して同期
+            Vector3 delta = tentativePosition - basePosition_;
+            float currentDist = (delta.x * axis_.x) + (delta.y * axis_.y) + (delta.z * axis_.z);
+            
+            float newWave = std::clamp(currentDist / distance, 0.0f, 1.0f);
+            phase_ = std::acos(std::clamp(1.0f - 2.0f * newWave, -1.0f, 1.0f));
+            
+            isOverlappingCorpse_ = true;
+        }
+    } else {
+        // 重なりから抜け出した瞬間（EndOverlap）にフラグをリセット
+        isOverlappingCorpse_ = false;
+    }
+
+    currentPosition_ = tentativePosition;
     object_->SetTranslate(currentPosition_);
     object_->Update();
 }
