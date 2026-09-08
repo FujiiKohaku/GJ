@@ -62,11 +62,11 @@ private:
         Test,
         GameLab,
     };
-
     struct StageData {
         std::string name;
         std::string description;
         StageDestination destination = StageDestination::GamePlay;
+        std::string jsonPath;
     };
 
     struct DustMote {
