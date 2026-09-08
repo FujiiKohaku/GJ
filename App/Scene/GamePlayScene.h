@@ -57,6 +57,7 @@ private:
     std::unique_ptr<Text> collisionText_;
     std::unique_ptr<Text> livesText_;
     static constexpr int kInitialLives = 5;
+    static constexpr int kStage1Lives = 10;
     int remainingLives_ = kInitialLives;
     int maximumLives_ = kInitialLives;
     MapChipStage mapChipStage_;
