@@ -482,6 +482,10 @@ void GamePlayScene::Update() {
   UpdateFantasyMenuEffect(unscaledDeltaTime);
 
   UpdateLivesText();
+  if (isHardResetTransitionActive_) {
+    UpdateHardResetTransition(unscaledDeltaTime);
+    return;
+  }
   if (isStageSelectTransitionActive_) {
     UpdateStageSelectTransition(
         TimeManager::GetInstance()->GetUnscaledDeltaTime());
@@ -536,8 +540,7 @@ void GamePlayScene::Update() {
       return;
     }
     if (input->IsKeyTrigger(DIK_R) || (clicked && restartHovered)) {
-      SceneManager::GetInstance()->SetNextScene(
-          std::make_unique<GamePlayScene>(levelPath_));
+      StartHardResetTransition();
       return;
     }
     if (input->IsKeyTrigger(DIK_BACKSPACE) || (clicked && stageSelectHovered)) {
@@ -1019,6 +1022,63 @@ void GamePlayScene::ResetToLastRespawnPoint() {
   lifeRelayTimer_ = 0.0f;
   FinishLifeRelay();
 }
+
+void GamePlayScene::StartHardResetTransition() {
+  if (isHardResetTransitionActive_) return;
+  
+  isMenuOpen_ = false; // メニューを閉じる
+  isHardResetTransitionActive_ = true;
+  hardResetTransitionTime_ = 0.0f;
+  
+  // 【演出追加用フック箇所】
+  // 例: フェードアウト用のSpriteの色を初期化したり、パーティクルを再生したりする
+}
+
+void GamePlayScene::UpdateHardResetTransition(float deltaTime) {
+  hardResetTransitionTime_ += deltaTime;
+  
+  // 【演出進行用フック箇所】
+  // 例: 時間に応じてフェードのアルファ値を変更する
+  
+  // 演出完了の条件（今回は仮としてすぐにリセットを実行する設定）
+  constexpr float kTransitionDuration = 0.0f; // 後で演出を入れる際にここを調整（例：0.5f）
+  
+  if (hardResetTransitionTime_ >= kTransitionDuration) {
+      ExecuteHardReset();
+      isHardResetTransitionActive_ = false;
+      
+      // 【暗転明け演出追加用フック箇所】
+      // 例: 状態リセット直後に PageTransition::RequestReveal 等を呼び出してフェードインさせる
+  }
+}
+
+void GamePlayScene::ExecuteHardReset() {
+  if (selfDestructSlowActive_) {
+    TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
+    selfDestructSlowActive_ = false;
+  }
+  
+  // セーブポイント履歴を最初の状態（インデックス0: 突入時のスナップショット）のみ残して切り詰める
+  if (savePointHistory_.size() > 1) {
+    savePointHistory_.erase(savePointHistory_.begin() + 1, savePointHistory_.end());
+  }
+
+  // 動的に置かれたすべての死体を削除する
+  mapChipStage_.RemoveAllHardenedSlimes();
+
+  // ライフを最大まで回復する
+  remainingLives_ = maximumLives_;
+  UpdateLivesText();
+
+  // インデックス0（初期状態）のスナップショットからギミックの状態などを復元
+  RestoreSavePoint();
+  
+  // リスポーン演出・プレイヤー初期化フラグなどをリセット
+  isLifeRelayActive_ = false;
+  lifeRelayTimer_ = 0.0f;
+  FinishLifeRelay(); // FluidとPlayerの座標をリセットし、初期位置へ復帰
+}
+
 
 void GamePlayScene::StartClearCelebration() {
   if (isClearCelebrationActive_) return;

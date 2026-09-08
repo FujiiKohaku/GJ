@@ -67,6 +67,9 @@ private:
     void StartLifeRelay(bool leaveCorpse = true);
     void FinishLifeRelay();
     void ResetToLastRespawnPoint();
+    void StartHardResetTransition();
+    void UpdateHardResetTransition(float deltaTime);
+    void ExecuteHardReset();
     void StartClearCelebration();
     void UpdateClearCelebration(float unscaledDeltaTime);
 
@@ -110,6 +113,8 @@ private:
     bool isStageSelectTransitionActive_ = false;
     float stageSelectTransitionTime_ = 0.0f;
     float fantasyMenuEffectStrength_ = 0.0f;
+    bool isHardResetTransitionActive_ = false;
+    float hardResetTransitionTime_ = 0.0f;
     bool isDeathTransitionActive_ = false;
     float deathTransitionTime_ = 0.0f;
     bool showForces_ = false;

@@ -41,6 +41,12 @@ public:
     bool RemoveLatestHardenedSlime();
 
     /**
+     * @brief ステージ内に配置された硬化スライム（死体）をすべて削除する
+     * @details リトライ時（完全リセット）に、動的追加された障害物を初期状態に戻すために使用
+     */
+    void RemoveAllHardenedSlimes();
+
+    /**
      * @brief 現在のステージの全揮発性ギミックの状態を収集したスナップショットを作成する
      * @return スナップショットオブジェクト
      */

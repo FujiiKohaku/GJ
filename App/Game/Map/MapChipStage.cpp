@@ -302,6 +302,16 @@ bool MapChipStage::RemoveLatestHardenedSlime()
     return false;
 }
 
+void MapChipStage::RemoveAllHardenedSlimes()
+{
+    gimmicks_.erase(
+        std::remove_if(gimmicks_.begin(), gimmicks_.end(),
+            [](const std::unique_ptr<BaseMapChipGimmick>& gimmick) {
+                return gimmick && gimmick->IsHardenedSlime();
+            }),
+        gimmicks_.end());
+}
+
 void MapChipStage::ResolveHardenedSlimeAdhesion(
     const BaseMapChipGimmick& hardenedSlime)
 {
