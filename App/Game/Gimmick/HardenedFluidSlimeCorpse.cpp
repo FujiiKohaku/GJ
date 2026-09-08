@@ -1,6 +1,7 @@
 #include "HardenedFluidSlimeCorpse.h"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 HardenedFluidSlimeCorpse::HardenedFluidSlimeCorpse() = default;
 
@@ -28,11 +29,44 @@ bool HardenedFluidSlimeCorpse::InitializeFromParticles(
     corpseSettings.damping = 100.0f;
     corpseSettings.viscosity = 100.0f;
 
+    // 変形中に硬化すると、操作用コアは元の位置のままでも粒子群は別の
+    // 位置・形に広がっている。死体の顔は粒子群の中心を基準にする。
+    std::vector<GpuSphFluid::Particle> frozenParticles = sourceParticles;
+    Vector3 particleCenter {0.0f, 0.0f, 0.0f};
+    for (const auto& particle : frozenParticles) {
+        particleCenter.x += particle.position.x;
+        particleCenter.y += particle.position.y;
+        particleCenter.z += particle.position.z;
+    }
+    const float particleCount = static_cast<float>(frozenParticles.size());
+    particleCenter.x /= particleCount;
+    particleCenter.y /= particleCount;
+    particleCenter.z /= particleCount;
+
+    // Use a real particle nearest the center rather than an empty point in a
+    // concave shape. The × mark is therefore always anchored inside the body.
+    const GpuSphFluid::Particle* faceParticle = &frozenParticles.front();
+    // Windows headers define max as a macro, so call the numeric-limits
+    // function through parentheses to prevent macro expansion.
+    float nearestDistanceSq = (std::numeric_limits<float>::max)();
+    for (const auto& particle : frozenParticles) {
+        const float dx = particle.position.x - particleCenter.x;
+        const float dy = particle.position.y - particleCenter.y;
+        const float dz = particle.position.z - particleCenter.z;
+        const float distanceSq = dx * dx + dy * dy + dz * dz;
+        if (distanceSq < nearestDistanceSq) {
+            nearestDistanceSq = distanceSq;
+            faceParticle = &particle;
+        }
+    }
+    corpseSettings.corePosition = faceParticle->position;
+
     fluid_ = std::make_unique<GpuSphFluid>();
     fluid_->Initialize(dxCommon, srvManager, corpseSettings);
-    fluid_->SetHideEyes(true);
+    // 硬化した死体には、通常の目ではなく死亡を示す×印の目を描画する。
+    fluid_->SetHideEyes(false);
+    fluid_->SetDeathEyes(true);
 
-    std::vector<GpuSphFluid::Particle> frozenParticles = sourceParticles;
     for (auto& p : frozenParticles) {
         p.velocity = { 0.0f, 0.0f, 0.0f };
     }

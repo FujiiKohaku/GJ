@@ -179,11 +179,39 @@ void ScreenSpaceFluidRenderer::SmoothDepth()
 }
 
 void ScreenSpaceFluidRenderer::Composite(
-    const GpuSphFluid& fluid,
+    const std::vector<const GpuSphFluid*>& fluids,
     const Camera& camera,
     D3D12_GPU_DESCRIPTOR_HANDLE sceneColorHandle)
 {
-    UpdateCompositeParameter(fluid, camera);
+    assert(!fluids.empty());
+    UpdateCompositeParameter(*fluids[0], camera);
+
+    // The fluid silhouette is rendered together, but each hardened slime has
+    // its own face position. Pass every corpse eye to the composite shader so
+    // they are not lost behind the live player's single face parameter.
+    compositeData_->extraEyeCount = 0;
+    for (size_t i = 0;
+         i < fluids.size() &&
+         compositeData_->extraEyeCount < CompositeParameter::kMaxExtraEyes;
+         ++i) {
+        const GpuSphFluid* fluid = fluids[i];
+        if (fluid == nullptr || fluid->IsEyeHidden() || !fluid->HasDeathEyes()) {
+            continue;
+        }
+
+        Vector3 eyeWorldPosition = fluid->GetSettings().corePosition;
+        eyeWorldPosition.x += fluid->GetEyeOffsetX();
+        eyeWorldPosition.y += fluid->GetEyeOffsetY() + 0.015f;
+        eyeWorldPosition.z = 0.0f;
+        const Vector2 eyeScreenPosition = camera.WorldToScreen(eyeWorldPosition);
+        compositeData_->extraEyeCenterUvs[compositeData_->extraEyeCount++] = {
+            eyeScreenPosition.x / static_cast<float>(WinApp::kClientWidth),
+            eyeScreenPosition.y / static_cast<float>(WinApp::kClientHeight),
+            0.0f,
+            0.0f
+        };
+    }
+    compositeData_->paddingExtraEyes = { 0.0f, 0.0f, 0.0f };
     DrawFullScreen(
         fullScreenRootSignature_.Get(),
         compositePipelineState_.Get(),
@@ -200,7 +228,7 @@ void ScreenSpaceFluidRenderer::Render(
 {
     RenderDepth(fluid, camera);
     SmoothDepth();
-    Composite(fluid, camera, sceneColorHandle);
+    Composite(std::vector<const GpuSphFluid*>{ &fluid }, camera, sceneColorHandle);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE ScreenSpaceFluidRenderer::GetDepthSrvHandleGPU() const
@@ -592,7 +620,11 @@ void ScreenSpaceFluidRenderer::UpdateCompositeParameter(
     compositeData_->eyeWorldPosition.z = 0.0f;
     compositeData_->eyeHalfWidthPixels = 9.0f;
     compositeData_->eyeHalfHeightPixels = 22.0f;
-    compositeData_->eyeVisibility = fluid.IsEyeHidden() ? 0.0f : 1.0f;
+    // Death marks are always drawn through the unified corpse-eye list in
+    // Composite(). Keeping them out of this legacy single-face path prevents
+    // the first corpse from receiving a different-looking ×.
+    compositeData_->eyeVisibility =
+        (fluid.IsEyeHidden() || fluid.HasDeathEyes()) ? 0.0f : 1.0f;
     const Vector3& gazeVelocity = fluid.GetSettings().targetVelocity;
     const float gazeSpeed = std::sqrt(
         gazeVelocity.x * gazeVelocity.x +
@@ -600,7 +632,7 @@ void ScreenSpaceFluidRenderer::UpdateCompositeParameter(
     compositeData_->eyeGazeDirection = gazeSpeed > 0.1f
         ? Vector2{ gazeVelocity.x / gazeSpeed, gazeVelocity.y / gazeSpeed }
         : Vector2{ 0.0f, 0.0f };
-    compositeData_->deathEyes = fluid.HasDeathEyes() ? 1.0f : 0.0f;
+    compositeData_->deathEyes = 0.0f;
     compositeData_->paddingEyes = { 0.0f, 0.0f, 0.0f };
     // Use the camera's established CPU projection. The fullscreen shader's
     // matrix packing differs from the particle vertex shader, which caused

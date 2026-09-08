@@ -20,6 +20,7 @@
 #include "ClearScene.h"
 #include "SceneManager.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <format>
 #include <string>
@@ -45,11 +46,58 @@ constexpr float kMenuRestartY = 380.0f;
 constexpr float kMenuStageSelectY = 460.0f;
 constexpr float kStageSelectFadeDuration = 0.45f;
 constexpr float kFantasyMenuBlendDuration = 0.20f;
+struct Stage1TutorialStep {
+  float triggerX;
+  const char *message;
+};
+
+constexpr std::array<Stage1TutorialStep, 10> kStage1TutorialSteps = {{
+    {0.0f, "A / D で移動　SPACE でジャンプ"},
+    {17.0f, "トゲは飛び越えられない。ここで死ぬと硬化スライムが足場になる"},
+    {30.0f, "感圧板を踏むと扉が開く"},
+    {34.0f, "感圧板の上で硬化すると、扉を開けたままにできる"},
+    {52.0f, "橋の揺れを見て、タイミングよく跳ぼう"},
+    {58.0f, "届かない場所は、硬化スライムで橋をつなげよう"},
+    {74.0f, "硬化スライムはレーザーを防ぐ"},
+    {84.0f, "感圧板の上で硬化して、ガスを出そう"},
+    {87.0f, "炎がガスに引火すると、壁を壊せる"},
+    {101.0f, "ゴールはもうすぐ。足場とジャンプを使い分けよう"},
+}};
+constexpr const char *kStage1ShapeTutorialMessage =
+    "左クリック長押しで、硬化する前のスライムの形を少し変えられる";
 
 bool IsPointInMenuButton(const Vector2 &point, float y) {
   return point.x >= kMenuButtonX &&
          point.x <= kMenuButtonX + kMenuButtonWidth && point.y >= y &&
          point.y <= y + kMenuButtonHeight;
+}
+
+bool IntersectsAABB(const AABB &left, const AABB &right) {
+  const Vector3 leftHalfSize = left.size * 0.5f;
+  const Vector3 rightHalfSize = right.size * 0.5f;
+  return std::abs(left.center.x - right.center.x) <=
+             leftHalfSize.x + rightHalfSize.x &&
+         std::abs(left.center.y - right.center.y) <=
+             leftHalfSize.y + rightHalfSize.y &&
+         std::abs(left.center.z - right.center.z) <=
+             leftHalfSize.z + rightHalfSize.z;
+}
+
+bool IsPlayerOnGasPressurePlate(const MapChipStage &stage,
+                                const MapChipPlayer &player) {
+  for (BaseMapChipGimmick *gimmick : stage.GetGimmicks()) {
+    if (!gimmick || gimmick->GetLinkName() != "Event_2") {
+      continue;
+    }
+
+    const AABB switchAABB = gimmick->GetAABB();
+    // Event_2 には篝火も含まれるため、x=85 の感圧板だけを対象にする。
+    if (switchAABB.center.x < 86.0f &&
+        IntersectsAABB(player.GetAABB(), switchAABB)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 Vector3 MakeFluidCorePosition(const MapChipPlayer &player) {
@@ -289,13 +337,44 @@ void GamePlayScene::Initialize() {
   instructionText_->Initialize(kDefaultFont);
   instructionText_->SetText(
       "MOVE : A/D OR LEFT/RIGHT   JUMP : SPACE/W/UP   "
-      "T : SLOW/SHAPE, T AGAIN : SELF-DESTRUCT   R : UNDO 1 STEP   "
+      "RIGHT CLICK : SLOW/SHAPE, RIGHT CLICK AGAIN : SELF-DESTRUCT   R : RESTART   "
       "F1 : FREE CAM   TAB : MENU");
   instructionText_->SetPosition({32.0f, 32.0f});
   instructionText_->SetFontSize(24.0f);
   instructionText_->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
   instructionText_->SetOutlineColor({0.0f, 0.0f, 0.0f, 1.0f});
   instructionText_->SetOutlineWidth(2.0f);
+
+  TextureManager::GetInstance()->LoadTexture(kWhiteTexture);
+  tutorialPanelSprite_ = std::make_unique<Sprite>();
+  tutorialPanelSprite_->Initialize(SpriteManager::GetInstance(), kWhiteTexture);
+  tutorialPanelSprite_->SetPosition({60.0f, 105.0f});
+  tutorialPanelSprite_->SetSize({1160.0f, 92.0f});
+  tutorialPanelSprite_->SetColor({0.02f, 0.05f, 0.12f, 0.0f});
+  tutorialPanelSprite_->Update();
+
+  tutorialText_ = std::make_unique<Text>();
+  tutorialText_->Initialize(kDefaultFont);
+  tutorialText_->SetAnchorPoint({0.5f, 0.5f});
+  tutorialText_->SetPosition({640.0f, 150.0f});
+  tutorialText_->SetFontSize(42.0f);
+  tutorialText_->SetColor({1.0f, 1.0f, 1.0f, 0.0f});
+  tutorialText_->SetOutlineWidth(0.0f);
+  tutorialText_->SetShadowColor({0.0f, 0.0f, 0.0f, 0.0f});
+
+  // チュートリアル表示中に字形生成や頂点バッファの拡張が起きないよう、
+  // stage1の全メッセージをロード中に一度だけ非表示で更新して先読みする。
+  if (levelPath_.find("stage1.json") != std::string::npos) {
+    std::string tutorialPreloadText;
+    for (const Stage1TutorialStep& step : kStage1TutorialSteps) {
+      tutorialPreloadText += step.message;
+    }
+    tutorialPreloadText += kStage1ShapeTutorialMessage;
+    tutorialText_->SetText(tutorialPreloadText);
+    tutorialText_->Update();
+    tutorialText_->SetText("");
+    tutorialText_->Update();
+  }
 
   collisionText_ = std::make_unique<Text>();
   collisionText_->Initialize(kDefaultFont);
@@ -494,6 +573,12 @@ void GamePlayScene::Update() {
   debugCameraController_.Update();
   const bool isFreeCameraMode = debugCameraController_.GetDebugMode();
 
+  // 形状作成中のスローは、レーザーなどのトラップ判定より先に無敵を
+  // 設定する。これにより、形状を作っている最中にトラップ死から
+  // リスポーン処理へ入ることを防ぐ。
+  const bool isSlowMotion = TimeManager::GetInstance()->GetTimeScale() < 0.999f;
+  player_->SetInvincible(isSlowMotion);
+
   mapChipStage_
       .Update(); // Playerの前にGimmickを更新して移動量を出しておくのが理想的
   ruinsBackground_.Update();
@@ -568,7 +653,7 @@ void GamePlayScene::Update() {
 
   AABB hardenedBody;
     if (!isClearCelebrationActive_ && player_->ConsumeHardenedBody(hardenedBody)) {
-    // T による確定自爆はスロー中でも有効にする。
+    // 右クリックによる確定自爆はスロー中でも有効にする。
     // スロー中に無効化するのはトラップ・落下などの意図しない死亡だけ。
     LoseLife();
     if (isDeathTransitionActive_)
@@ -703,8 +788,46 @@ void GamePlayScene::Update() {
   EffectManager::GetInstance()->Update();
   skyBox_->Update(camera_.get());
   instructionText_->Update();
+  UpdateStage1Tutorial();
+  tutorialPanelSprite_->Update();
+  tutorialText_->Update();
   UpdateCollisionText();
   collisionText_->Update();
+}
+
+void GamePlayScene::UpdateStage1Tutorial() {
+  if (!tutorialText_ || !tutorialPanelSprite_ || !player_ ||
+      levelPath_.find("stage1.json") == std::string::npos) {
+    return;
+  }
+
+  // 最初に右クリックで形作りを始めた瞬間だけ、変形操作を案内する。
+  if (!stage1ShapeTutorialShown_ && player_->IsShapingSelfDestruct()) {
+    tutorialText_->SetText(kStage1ShapeTutorialMessage);
+    tutorialPanelSprite_->SetColor({0.02f, 0.05f, 0.12f, 0.82f});
+    tutorialText_->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
+    stage1ShapeTutorialShown_ = true;
+    return;
+  }
+
+  if (nextStage1TutorialIndex_ >= kStage1TutorialSteps.size()) {
+    return;
+  }
+
+  const Stage1TutorialStep &step =
+      kStage1TutorialSteps[nextStage1TutorialIndex_];
+  if (player_->GetPosition().x < step.triggerX) {
+    return;
+  }
+  if (nextStage1TutorialIndex_ == 7 &&
+      !IsPlayerOnGasPressurePlate(mapChipStage_, *player_)) {
+    return;
+  }
+
+  tutorialText_->SetText(step.message);
+  tutorialPanelSprite_->SetColor({0.02f, 0.05f, 0.12f, 0.82f});
+  tutorialText_->SetColor({1.0f, 1.0f, 1.0f, 1.0f});
+  ++nextStage1TutorialIndex_;
 }
 
 void GamePlayScene::Draw2D() {
@@ -717,8 +840,12 @@ void GamePlayScene::Draw2D() {
     fluidForceRenderer_->Draw(*gpuSphFluid_, *camera_);
   }
 
+  SpriteManager::GetInstance()->PreDraw();
+  tutorialPanelSprite_->Draw();
+
   TextRenderer::GetInstance()->PreDraw();
   instructionText_->Draw();
+  tutorialText_->Draw();
   collisionText_->Draw();
   livesText_->Draw();
   pageReveal_.Draw();
