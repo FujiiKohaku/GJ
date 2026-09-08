@@ -1103,4 +1103,16 @@
     <None Include="resources\Shaders\Fluid\SlimeFluidSphere.VS.hlsl" />
     <None Include="resources\Shaders\Fluid\SlimeFluidSphere.PS.hlsl" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Engine\Network\EosMultiplayer.cpp" />
+    <ClCompile Include="App\Scene\LobbyPanel.cpp" />
+    <ClCompile Include="App\Scene\OnlineGamePlayScene.cpp" />
+    <ClInclude Include="Engine\Network\EosMultiplayer.h" />
+    <ClInclude Include="Engine\Network\OnlineProtocol.h" />
+    <ClInclude Include="App\Scene\LobbyPanel.h" />
+    <ClInclude Include="App\Scene\OnlineGamePlayScene.h" />
+    <None Include="Tools\EOS.props" />
+    <None Include="resources\Config\eos.example.json" />
+    <None Include="docs\EOS_SETUP.md" />
+  </ItemGroup>
 </Project>

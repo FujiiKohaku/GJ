@@ -5,6 +5,7 @@
 #include "Engine/3D/Object3d.h"
 #include "Engine/3D/LaserBeamRenderer.h"
 #include <memory>
+class MapChipPlayer;
 
 /**
  * @class LaserGimmick
@@ -64,4 +65,5 @@ private:
 
     bool wasPlayerColliding_ = false;         // 前フレームのプレイヤー衝突フラグ
     float playerHitTime_ = 0.0f;              // レーザー接触から死亡までの経過時間
+    MapChipPlayer* hitPlayer_ = nullptr;
 };

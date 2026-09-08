@@ -163,6 +163,7 @@ private:
     std::unique_ptr<Renderer> renderer_;
 
     bool isMouseCursorVisible_ = false;
+    bool manualMouseCursorVisible_ = false;
     bool showDebugUI_ = true;
 
 #if defined(_DEBUG) || defined(ENABLE_PERFORMANCE_LOG)

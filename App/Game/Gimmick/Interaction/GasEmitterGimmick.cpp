@@ -117,11 +117,11 @@ void GasEmitterGimmick::Update()
         UpdateParticles();
 
         // 充満中(Filling)、充満完了(Active)、着火済み(Ignited)の間はプレイヤーを死亡させる
-        if (stage_ && stage_->GetPlayer()) {
-            AABB playerBox = stage_->GetPlayer()->GetAABB();
+        if (stage_) for (MapChipPlayer* player : stage_->GetPlayers()) {
+            AABB playerBox = player->GetAABB();
             AABB gasBox = GetGasAABB();
             if (CollisionManager::Intersect(playerBox, gasBox).isHit) {
-                stage_->GetPlayer()->Kill();
+                player->Kill();
             }
         }
 

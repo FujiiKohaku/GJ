@@ -7,6 +7,7 @@
 #include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include "Engine/Time/TimeManager.h"
 #include <algorithm>
+#include <cmath>
 
 namespace {
 constexpr const char* kDefaultSpringModel = "Spring/Spring.obj";
@@ -66,11 +67,15 @@ void SpringGimmick::Update()
             scaleY = 1.0f - (1.0f - kCompressedScale) * progress;
         } else {
             if (!hasLaunchedPlayer_ && stage_ != nullptr) {
-                MapChipPlayer* player = stage_->GetPlayer();
-                if (player != nullptr) {
-                    player->LaunchUpward(kLaunchSpeed);
-                    hasLaunchedPlayer_ = true;
+                for (MapChipPlayer* player : stage_->GetPlayers()) {
+                    const auto box = player->GetAABB();
+                    // Launch only players standing on this spring.
+                    if (std::abs(box.center.x - position_.x) < 0.5f + box.size.x * 0.5f &&
+                        std::abs(box.center.y - box.size.y * 0.5f - (position_.y + 0.5f)) < 0.3f) {
+                        player->LaunchUpward(kLaunchSpeed);
+                    }
                 }
+                hasLaunchedPlayer_ = true;
             }
 
             const float reboundProgress = std::clamp(

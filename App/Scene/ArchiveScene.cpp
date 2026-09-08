@@ -9,7 +9,12 @@
 #include "Engine/PostEffect/PostEffectType.h"
 #include "Engine/Time/TimeManager.h"
 #include "Engine/math/MatrixMath.h"
+
+#include "GamePlayScene.h"
+#include "OnlineGamePlayScene.h"
+#include "Engine/Network/EosMultiplayer.h"
 #include "LoadingScene.h"
+
 #include "SceneManager.h"
 #include "PageTransition.h"
 #include "TestScene.h"
@@ -108,6 +113,7 @@ void ArchiveScene::Initialize()
     InitializeTurningPage();
     InitializeOpeningPages();
     InitializeInterface();
+    lobbyPanel_.Initialize();
     InitializeDustMotes();
 
     SoundManager* audio = SoundManager::GetInstance();
@@ -119,6 +125,7 @@ void ArchiveScene::Initialize()
 
     RefreshStageText();
     EnterTitleMode();
+    if (openStageSelect_) StartArchiveApproach();
     pageReveal_.InitializeIfRequested();
 }
 
@@ -545,6 +552,34 @@ void ArchiveScene::UpdateTitleReturn(float deltaTime)
 
 void ArchiveScene::Update()
 {//deltaTimeを取得
+    auto& online = EosMultiplayer::Get();
+    if (online.Playing()) {
+        SceneManager::GetInstance()->SetNextScene(std::make_unique<OnlineGamePlayScene>(online.StageFile()));
+        return;
+    }
+    if (state_ == BookSelectState::Idle) {
+        if (online.IsHost() && !online.Busy()) {
+            online.SelectStage(std::filesystem::path(stages_[currentStageIndex_].levelPath).filename().string());
+        } else if (online.InLobby() && !online.IsHost() && !online.StageFile().empty()) {
+            for (size_t i = 0; i < stages_.size(); ++i) {
+                if (std::filesystem::path(stages_[i].levelPath).filename().string() == online.StageFile()) {
+                    currentStageIndex_ = static_cast<int32_t>(i); RefreshStageText(); break;
+                }
+            }
+        }
+    }
+    if (state_ == BookSelectState::Idle || state_ == BookSelectState::CardOpening ||
+        state_ == BookSelectState::CardClosing || state_ == BookSelectState::PageTurning) {
+        const auto action = lobbyPanel_.Update(state_ == BookSelectState::Idle);
+        switch (action) {
+        case LobbyPanel::Action::PreviousStage: StartPageTurn(PageTurnDirection::Left); break;
+        case LobbyPanel::Action::NextStage: StartPageTurn(PageTurnDirection::Right); break;
+        case LobbyPanel::Action::Solo: ConfirmStage(); break;
+        case LobbyPanel::Action::Start:
+            online.Start(std::filesystem::path(stages_[currentStageIndex_].levelPath).filename().string()); break;
+        default: break;
+        }
+    }
     const float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
     pageReveal_.Update(deltaTime);
     //埃を動かす
@@ -565,7 +600,7 @@ bool ArchiveScene::HandleInput()
     
     // 開発用：F12でエディタへ遷移
 #ifndef NDEBUG
-    if (input->IsKeyTrigger(DIK_F12)) {
+    if (input->IsKeyTrigger(DIK_F12) && !EosMultiplayer::Get().InLobby() && !EosMultiplayer::Get().Busy()) {
         SceneManager::GetInstance()->SetNextScene(std::make_unique<EditorScene>());
         return true;
     }
@@ -582,7 +617,7 @@ bool ArchiveScene::HandleInput()
             return true;
         }
 		// タイトル画面でEnterまたはSpaceが押されたら資料庫へ移行する。
-        if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE)) {
+        if (input->IsKeyTrigger(DIK_RETURN) || input->IsKeyTrigger(DIK_SPACE) || input->IsMouseTrigger(0)) {
             StartArchiveApproach();
         }
 	// クレジット画面からタイトルへ戻る。
@@ -594,12 +629,14 @@ bool ArchiveScene::HandleInput()
         }
 		// タイトル画面でBackspaceが押されたらタイトル画面へ戻る。
     } else if (state_ == BookSelectState::Idle && input->IsKeyTrigger(DIK_BACKSPACE)) {
+        if (EosMultiplayer::Get().InLobby() || EosMultiplayer::Get().Busy()) return false;
         StartTitleReturn();
         return true;
     }
 
 	// 資料庫のページ選択中の処理
     if (state_ == BookSelectState::Idle) {
+        if (EosMultiplayer::Get().InLobby() || EosMultiplayer::Get().Busy()) return false;
 		// 左右のキー入力でページをめくる。
         if (input->IsKeyTrigger(DIK_RIGHT) || input->IsKeyTrigger(DIK_D)) {
             StartPageTurn(PageTurnDirection::Right);
@@ -1115,6 +1152,7 @@ void ArchiveScene::RefreshStageText()
 
 void ArchiveScene::ConfirmStage()
 {
+    if (EosMultiplayer::Get().InLobby() || EosMultiplayer::Get().Busy()) return;
     state_ = BookSelectState::StageConfirmed;
     SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.75f);
     const StageData& stage = stages_[currentStageIndex_];
@@ -1221,7 +1259,12 @@ void ArchiveScene::Draw2D()
         creditsTitleText_->Draw();
         creditsBodyText_->Draw();
     }
-    instructionText_->Draw();
+    if (state_ == BookSelectState::TitleIdle || state_ == BookSelectState::Credits ||
+        state_ == BookSelectState::CameraApproach || state_ == BookSelectState::ReturningToTitle)
+        instructionText_->Draw();
+    if (state_ == BookSelectState::Idle || state_ == BookSelectState::CardOpening ||
+        state_ == BookSelectState::CardClosing || state_ == BookSelectState::PageTurning)
+        lobbyPanel_.Draw();
     pageReveal_.Draw();
     if (state_ == BookSelectState::StageConfirmed) {
         SpriteManager::GetInstance()->PreDraw();

@@ -396,10 +396,10 @@ void MapChipStage::CreateExplosion(const Vector3& origin, float radius)
         target->OnExplosion(origin, radius);
     }
     
-    if (player_) {
-        Vector3 diff = player_->GetAABB().center - origin;
+    for (MapChipPlayer* player : players_) {
+        Vector3 diff = player->GetAABB().center - origin;
         if (Vector3LengthSquared(diff) <= radius * radius) {
-            player_->Kill();
+            player->Kill();
         }
     }
 }
@@ -444,8 +444,8 @@ void MapChipStage::CreateExplosionGrid(const Vector3& origin, uint32_t left, uin
         }
     }
 
-    if (player_) {
-        Vector3 center = player_->GetAABB().center;
+    for (MapChipPlayer* player : players_) {
+        Vector3 center = player->GetAABB().center;
         
         // origin からの相対距離
         float diffX = center.x - origin.x;
@@ -462,7 +462,7 @@ void MapChipStage::CreateExplosionGrid(const Vector3& origin, uint32_t left, uin
             bool isAdjacentY = inGasX && (dy == iDown - 1 || dy == iUp + 1);
             
             if ((inGasX && inGasY) || isAdjacentX || isAdjacentY) {
-                player_->Kill();
+                player->Kill();
             }
         }
     }

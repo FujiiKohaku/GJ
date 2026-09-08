@@ -693,6 +693,19 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Engine\Network\EosMultiplayer.cpp" />
+    <ClCompile Include="App\Scene\LobbyPanel.cpp" />
+    <ClCompile Include="App\Scene\OnlineGamePlayScene.cpp" />
+    <ClInclude Include="Engine\Network\EosMultiplayer.h" />
+    <ClInclude Include="Engine\Network\OnlineProtocol.h" />
+    <ClInclude Include="App\Scene\LobbyPanel.h" />
+    <ClInclude Include="App\Scene\OnlineGamePlayScene.h" />
+    <None Include="Tools\EOS.props" />
+    <None Include="resources\Config\eos.example.json" />
+    <None Include="docs\EOS_SETUP.md" />
+  </ItemGroup>
+  <Import Project="Tools\EOS.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

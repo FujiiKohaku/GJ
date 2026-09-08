@@ -7,6 +7,7 @@
 #include "Engine/LevelEditor/GimmickMetaDataManager.h"
 
 #include <format>
+#include "Engine/Network/EosMultiplayer.h"
 
 namespace {
 void CheckInitializeTime(const char* name, std::chrono::steady_clock::time_point& prevTime)
@@ -174,6 +175,7 @@ void Game::Initialize()
 void Game::Update()
 {
     TimeManager::GetInstance()->Update();
+    EosMultiplayer::Get().Tick();
     SoundManager::GetInstance()->Update();
 
     // フレーム全体の開始
@@ -199,19 +201,7 @@ void Game::Update()
     }
 
     if (Input::GetInstance()->IsKeyTrigger(DIK_F2)) {
-
-        isMouseCursorVisible_ = !isMouseCursorVisible_;
-
-        if (isMouseCursorVisible_) {
-
-            ShowCursor(TRUE);
-            UnlockCursor();
-
-        } else {
-
-            ShowCursor(FALSE);
-            LockCursorToWindow();
-        }
+        manualMouseCursorVisible_ = !manualMouseCursorVisible_;
     }
 
     if (Input::GetInstance()->IsKeyTrigger(DIK_F10)) {
@@ -243,6 +233,12 @@ void Game::Update()
     {
         ProfilerScope scope("SceneUpdate");
         SceneManager::GetInstance()->Update();
+    }
+    const bool wantsCursor = manualMouseCursorVisible_ || SceneManager::GetInstance()->WantsMouseCursor();
+    if (wantsCursor != isMouseCursorVisible_) {
+        ShowCursor(wantsCursor ? TRUE : FALSE);
+        if (wantsCursor) UnlockCursor(); else LockCursorToWindow();
+        isMouseCursorVisible_ = wantsCursor;
     }
     
     DebugRenderer::GetInstance()->Update();
@@ -285,6 +281,7 @@ void Game::Finalize()
     UnlockCursor(); // カーソルをウィンドウに固定解除
     ShowCursor(TRUE);
     SceneManager::GetInstance()->Finalize();
+    EosMultiplayer::Get().Shutdown();
     CollisionManager::Finalize();
     // EffectManagerの共通リソースはゲーム終了時にだけ破棄する。
     EffectManager::Finalize();
