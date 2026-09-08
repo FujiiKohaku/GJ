@@ -458,6 +458,9 @@ void GamePlayScene::Initialize() {
   menuTransitionFadeSprite_->Update();
 
   pageReveal_.InitializeIfRequested();
+  
+  savePointHistory_.clear();
+  PushSavePoint();
 }
 
 void GamePlayScene::Finalize() {
@@ -584,7 +587,6 @@ void GamePlayScene::Update() {
   ruinsBackground_.Update();
   bool hardenedThisFrame = false;
   // 形状調整用のスロー中は、トラップ接触や落下などによる死亡を無効にする。
-  const bool isSlowMotion = TimeManager::GetInstance()->GetTimeScale() < 0.999f;
   // Trap gimmicks continue updating while the life relay is playing. Consume
   // their requests so a laser touching the departed player cannot spend more
   // lives during the respawn animation.
@@ -613,6 +615,7 @@ void GamePlayScene::Update() {
       if (gimmick && gimmick->IsCheckpoint() &&
           gimmick->TryActivateCheckpoint(player_->GetAABB())) {
         playerStartPosition_ = gimmick->GetAABB().center;
+        PushSavePoint();
         EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks",
                                                  playerStartPosition_);
       }
@@ -641,6 +644,7 @@ void GamePlayScene::Update() {
 
     if (t >= 1.0f) {
       FinishLifeRelay();
+      PushSavePoint();
     }
   }
 
@@ -876,8 +880,29 @@ void GamePlayScene::Draw3D() {
   skyBox_->Draw(DirectXCommon::GetInstance()->GetCommandList());
 
   Object3dManager::GetInstance()->PreDraw();
-  ruinsBackground_.Draw(true);
+  ruinsBackground_.Draw(false);
   mapChipStage_.Draw();
+}
+
+void GamePlayScene::PushSavePoint() {
+  GamePlaySavePoint sp;
+  sp.playerStartPosition = playerStartPosition_;
+  sp.stageSnapshot = mapChipStage_.CreateStageSnapshot();
+  savePointHistory_.push_back(std::move(sp));
+}
+
+void GamePlayScene::PopSavePoint() {
+  if (savePointHistory_.size() > 1) {
+    savePointHistory_.pop_back();
+  }
+}
+
+void GamePlayScene::RestoreSavePoint() {
+  if (!savePointHistory_.empty()) {
+    const GamePlaySavePoint& sp = savePointHistory_.back();
+    playerStartPosition_ = sp.playerStartPosition;
+    mapChipStage_.RestoreStageSnapshot(sp.stageSnapshot);
+  }
 }
 
 void GamePlayScene::DrawParticle() {
@@ -1006,7 +1031,11 @@ void GamePlayScene::ResetToLastRespawnPoint() {
   if (mapChipStage_.RemoveLatestHardenedSlime()) {
     remainingLives_ = (std::min)(remainingLives_ + 1, maximumLives_);
     UpdateLivesText();
+    PopSavePoint();
   }
+  
+  RestoreSavePoint();
+  
   isLifeRelayActive_ = false;
   lifeRelayTimer_ = 0.0f;
   FinishLifeRelay();

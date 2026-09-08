@@ -68,6 +68,32 @@ bool GasEmitterGimmick::Initialize(
     return true;
 }
 
+std::shared_ptr<IGimmickState> GasEmitterGimmick::CreateSnapshot() const
+{
+    auto state = std::make_shared<GasEmitterState>();
+    state->currentState = currentState_;
+    return state;
+}
+
+void GasEmitterGimmick::RestoreFromSnapshot(const IGimmickState* state)
+{
+    if (const auto* gasState = dynamic_cast<const GasEmitterState*>(state)) {
+        currentState_ = gasState->currentState;
+        
+        if (currentState_ == State::Active) {
+            stateTimer_ = 0.0f;
+            StartParticles();
+        } else if (currentState_ == State::Finished) {
+            StopParticles();
+        } else if (currentState_ == State::Ignited) {
+            // Ignitedのままスナップショットが取られることはほぼ無いが、フェイルセーフとしてActiveに戻す
+            currentState_ = State::Active;
+            stateTimer_ = 0.0f;
+            StartParticles();
+        }
+    }
+}
+
 void GasEmitterGimmick::Update()
 {
     if (object_) {
