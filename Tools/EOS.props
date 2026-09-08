@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <EosSdkDir Condition="'$(EosSdkDir)' == ''">$(ProjectDir)externals\EOS\SDK</EosSdkDir>
+    <EnableEOS Condition="'$(EnableEOS)' == '' and Exists('$(EosSdkDir)\Include\eos_sdk.h')">true</EnableEOS>
+    <EnableEOS Condition="'$(EnableEOS)' == ''">false</EnableEOS>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(EnableEOS)' == 'true'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(EosSdkDir)\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GJ_WITH_EOS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(EosSdkDir)\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>EOSSDK-Win64-Shipping.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <Target Name="ValidateEOS" BeforeTargets="PrepareForBuild" Condition="'$(EnableEOS)' == 'true'">
+    <Error Condition="!Exists('$(EosSdkDir)\Include\eos_sdk.h')" Text="EOS header missing. Set EosSdkDir to the SDK folder (see docs/EOS_SETUP.md)." />
+    <Error Condition="!Exists('$(EosSdkDir)\Lib\EOSSDK-Win64-Shipping.lib')" Text="EOS Win64 import library missing." />
+    <Error Condition="!Exists('$(EosSdkDir)\Bin\EOSSDK-Win64-Shipping.dll')" Text="EOS Win64 runtime DLL missing." />
+  </Target>
+  <Target Name="CopyEOSRuntime" AfterTargets="Build" Condition="'$(EnableEOS)' == 'true'">
+    <Copy SourceFiles="$(EosSdkDir)\Bin\EOSSDK-Win64-Shipping.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

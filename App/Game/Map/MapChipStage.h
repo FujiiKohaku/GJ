@@ -32,8 +32,10 @@ public:
     
     void SetEditorMode(bool isEditor) { isEditorMode_ = isEditor; }
     
-    void SetPlayer(MapChipPlayer* player) { player_ = player; }
+    void SetPlayer(MapChipPlayer* player) { player_ = player; players_ = player ? std::vector<MapChipPlayer*>{player} : std::vector<MapChipPlayer*>{}; }
     MapChipPlayer* GetPlayer() const { return player_; }
+    void SetPlayers(const std::vector<MapChipPlayer*>& players) { players_ = players; player_ = players.empty() ? nullptr : players.front(); }
+    const std::vector<MapChipPlayer*>& GetPlayers() const { return players_; }
     
     std::vector<BaseMapChipGimmick*> GetGimmicks() const;
     void AddGimmick(std::unique_ptr<BaseMapChipGimmick> gimmick);
@@ -97,4 +99,5 @@ private:
     IrufemiEngine::EventManager eventManager_;
     bool isEditorMode_ = false;
     MapChipPlayer* player_ = nullptr;
+    std::vector<MapChipPlayer*> players_;
 };

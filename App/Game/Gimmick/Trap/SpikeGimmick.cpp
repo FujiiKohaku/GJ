@@ -68,8 +68,8 @@ void SpikeGimmick::Update()
 
     if (!stage_) return;
 
-    MapChipPlayer* player = stage_->GetPlayer();
-    if (!player) return;
+    bool anyColliding = false;
+    for (MapChipPlayer* player : stage_->GetPlayers()) {
 
     // プレイヤーのAABBとトゲのAABBの交差判定
     AABB playerAABB = player->GetAABB();
@@ -81,12 +81,12 @@ void SpikeGimmick::Update()
         if (!wasPlayerColliding_) {
             Logger::Log(std::format("[SpikeGimmick] Player touched the spike at ({:.2f}, {:.2f}, {:.2f})\n",
                                     position_.x, position_.y, position_.z));
-            player->Kill();
         }
-        wasPlayerColliding_ = true;
-    } else {
-        wasPlayerColliding_ = false;
+        player->Kill();
+        anyColliding = true;
     }
+    }
+    wasPlayerColliding_ = anyColliding;
 }
 
 void SpikeGimmick::Draw()

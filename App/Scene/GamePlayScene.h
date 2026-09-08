@@ -38,6 +38,7 @@ public:
     void Draw3D() override;
     void DrawParticle() override;
     void DrawImGui() override;
+    bool WantsMouseCursor() const override { return isMenuOpen_; }
 
 private:
     std::string levelPath_;

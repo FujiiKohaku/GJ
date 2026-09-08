@@ -104,8 +104,8 @@ void GearGimmick::Update()
     // プレイヤーとの当たり判定
     if (!stage_) return;
 
-    MapChipPlayer* player = stage_->GetPlayer();
-    if (!player) return;
+    bool anyColliding = false;
+    for (MapChipPlayer* player : stage_->GetPlayers()) {
 
     AABB playerAABB = player->GetAABB();
     
@@ -120,12 +120,12 @@ void GearGimmick::Update()
         if (!wasPlayerColliding_) {
             Logger::Log(std::format("[GearGimmick] Player touched the gear at ({:.2f}, {:.2f}, {:.2f})\n",
                                     position_.x, position_.y, position_.z));
-            player->Kill();
         }
-        wasPlayerColliding_ = true;
-    } else {
-        wasPlayerColliding_ = false;
+        player->Kill();
+        anyColliding = true;
     }
+    }
+    wasPlayerColliding_ = anyColliding;
 }
 
 void GearGimmick::Draw()

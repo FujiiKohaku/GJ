@@ -47,6 +47,7 @@ public:
     void Draw3D();
     void DrawParticle();
     bool WantsImGuiAlways() const;
+    bool WantsMouseCursor() const { return scene_ && scene_->WantsMouseCursor(); }
     // PostEffectTypeのセッターとゲッター
     void SetPostEffectType(PostEffectType postEffectType);
     PostEffectType GetPostEffectType() const;

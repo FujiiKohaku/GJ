@@ -6,6 +6,7 @@
 #include "Engine/3D/Object3d.h"
 #include "Engine/Camera/Camera.h"
 #include "PageTransition.h"
+#include "LobbyPanel.h"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -13,6 +14,7 @@
 
 class ArchiveScene : public BaseScene {
 public:
+    explicit ArchiveScene(bool openStageSelect = false) : openStageSelect_(openStageSelect) {}
     void Initialize() override;
     void Finalize() override;
     void Update() override;
@@ -20,6 +22,7 @@ public:
     void Draw3D() override;
     void DrawParticle() override;
     void DrawImGui() override;
+    bool WantsMouseCursor() const override { return true; }
 
 private:
     enum class BookSelectState {
@@ -156,4 +159,6 @@ private:
     bool openingRifflePlayed_ = false;
     bool confirmationPageSoundPlayed_ = false;
     StageDestination confirmedDestination_ = StageDestination::GamePlay;
+    LobbyPanel lobbyPanel_;
+    bool openStageSelect_ = false;
 };

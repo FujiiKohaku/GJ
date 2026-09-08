@@ -235,14 +235,13 @@ void LaserGimmick::Update()
     tempLaserAABB.size = laserSize;
 
     // --- Step 3: 動的なプレイヤーとの交差判定 ---
-    MapChipPlayer* player = stage_->GetPlayer();
+    MapChipPlayer* player = nullptr;
     bool hitPlayer = false;
 
-    if (player) {
-        AABB playerAABB = player->GetAABB();
+    for (MapChipPlayer* candidate : stage_->GetPlayers()) {
+        AABB playerAABB = candidate->GetAABB();
         if (CollisionManager::Intersect(playerAABB, tempLaserAABB).isHit) {
             // プレイヤーに当たった場合、レーザーの長さを「プレイヤーの手前」までに短縮する
-            hitPlayer = true;
             
             // プレイヤーとの距離（中心座標間の差）
             float distToPlayer = 0.0f;
@@ -253,6 +252,9 @@ void LaserGimmick::Update()
             }
 
             // 最低でも0より小さくならないようにする
+            if (distToPlayer > floatDist) continue;
+            hitPlayer = true;
+            player = candidate;
             floatDist = (std::max)(0.0f, distToPlayer);
 
             // AABBを再計算
@@ -275,6 +277,8 @@ void LaserGimmick::Update()
     // 代わりに LaserBeamRenderer を使用して Draw() で描画します
 
     // --- Step 5: プレイヤーとの接触イベント処理 ---
+    if (player != hitPlayer_) playerHitTime_ = 0.0f;
+    hitPlayer_ = player;
     if (hitPlayer) {
         if (!wasPlayerColliding_) {
             Logger::Log(std::format("[LaserGimmick] Player hit by laser at ({}, {}, {})\n",
@@ -311,8 +315,7 @@ void LaserGimmick::Draw()
 
         // --- 描画タイミングでの最新のプレイヤー位置を用いて長さを切り詰める ---
         if (stage_) {
-            MapChipPlayer* player = stage_->GetPlayer();
-            if (player) {
+            for (MapChipPlayer* player : stage_->GetPlayers()) {
                 AABB playerAABB = player->GetAABB();
                 
                 Vector3 laserCenter = position_;

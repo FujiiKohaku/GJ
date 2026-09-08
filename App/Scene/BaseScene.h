@@ -16,6 +16,7 @@ public:
     virtual void DrawParticle() = 0;
     virtual void DrawImGui() = 0;
     virtual bool WantsImGuiAlways() const { return false; }
+    virtual bool WantsMouseCursor() const { return false; }
 
     // 仮想デストラクタ（必須）
     virtual ~BaseScene() = default;

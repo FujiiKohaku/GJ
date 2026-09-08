@@ -21,6 +21,21 @@ public:
     void SetTimeScale(float timeScale);
     void SetMaxDeltaTime(float maxDeltaTime);
 
+    // Restore render-frame time automatically after a deterministic online tick.
+    class SimulationStep {
+    public:
+        explicit SimulationStep(float seconds) : time_(*GetInstance()),
+            delta_(time_.deltaTime_), unscaled_(time_.unscaledDeltaTime_) {
+            time_.deltaTime_ = time_.unscaledDeltaTime_ = seconds;
+        }
+        ~SimulationStep() { time_.deltaTime_ = delta_; time_.unscaledDeltaTime_ = unscaled_; }
+        SimulationStep(const SimulationStep&) = delete;
+        SimulationStep& operator=(const SimulationStep&) = delete;
+    private:
+        TimeManager& time_;
+        float delta_, unscaled_;
+    };
+
 private:
     TimeManager() = default;
 

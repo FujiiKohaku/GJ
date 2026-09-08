@@ -3,6 +3,7 @@
 #include "Engine/Math/MathStruct.h"
 #include "Engine/CollisionManager/CollisionManager.h"
 #include <vector>
+#include "Engine/Network/OnlineProtocol.h"
 
 class MapChipField;
 class BaseMapChipGimmick;
@@ -17,6 +18,9 @@ public:
 
     void Initialize(const MapChipField* mapChipField, const Vector3& startPosition);
     void Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmicks);
+    // Explicit input lets the online host distribute one fixed simulation step.
+    void Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmicks,
+        const OnlineProtocol::Input& input);
 
     const Vector3& GetPosition() const;
     const Vector3& GetVelocity() const;
@@ -83,4 +87,5 @@ private:
     AABB hardenedBody_ = {};
     
     BaseMapChipGimmick* baseGimmick_ = nullptr;
+    const OnlineProtocol::Input* networkInput_ = nullptr;
 };

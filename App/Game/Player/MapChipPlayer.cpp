@@ -71,6 +71,14 @@ void GetGridBounds(const Vector3& center, float extendX, float extendY, uint32_t
 
 MapChipPlayer::~MapChipPlayer() = default;
 
+void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& gimmicks,
+    const OnlineProtocol::Input& input)
+{
+    networkInput_ = &input;
+    Update(gimmicks);
+    networkInput_ = nullptr;
+}
+
 void MapChipPlayer::Initialize(const MapChipField* mapChipField, const Vector3& startPosition)
 {
     position_ = startPosition;
@@ -127,7 +135,7 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
         deltaTime = 0.0f;
     }
 
-    if (input->IsMouseTrigger(1)) {
+    if (networkInput_ ? networkInput_->shape : input->IsMouseTrigger(1)) {
         if (isShapingSelfDestruct_) {
             hardenedBody_ = GetAABB();
             hardenedBodyReady_ = true;
@@ -145,18 +153,20 @@ void MapChipPlayer::Update(const std::vector<BaseMapChipGimmick*>& dynamicGimmic
     }
 
     velocity_.x = 0.0f;
-    if (input->IsKeyPressed(DIK_A) || input->IsKeyPressed(DIK_LEFT)) {
+    if (!networkInput_ && (input->IsKeyPressed(DIK_A) || input->IsKeyPressed(DIK_LEFT))) {
         velocity_.x -= kMoveSpeed;
     }
-    if (input->IsKeyPressed(DIK_D) || input->IsKeyPressed(DIK_RIGHT)) {
+    if (!networkInput_ && (input->IsKeyPressed(DIK_D) || input->IsKeyPressed(DIK_RIGHT))) {
         velocity_.x += kMoveSpeed;
     }
 
+    if (networkInput_) velocity_.x = networkInput_->move * kMoveSpeed;
+
     if (isGrounded_) {
         const bool jumpRequested =
-            input->IsKeyTrigger(DIK_SPACE) ||
+            networkInput_ ? networkInput_->jump : (input->IsKeyTrigger(DIK_SPACE) ||
             input->IsKeyTrigger(DIK_W) ||
-            input->IsKeyTrigger(DIK_UP);
+            input->IsKeyTrigger(DIK_UP));
         if (jumpRequested) {
             velocity_.y = kJumpSpeed;
             isGrounded_ = false;
@@ -305,6 +315,10 @@ void MapChipPlayer::RequestFallDeath()
 void MapChipPlayer::UpdateSelfDestructShape(float unscaledDeltaTime)
 {
     Input* input = Input::GetInstance();
+    if (networkInput_) {
+        selfDestructRawPull_.x += networkInput_->pullX;
+        selfDestructRawPull_.y += networkInput_->pullY;
+    } else {
     // 自爆形状は左ドラッグ中だけつまんで伸ばす。
     if (input->IsMousePressed(0)) {
         selfDestructRawPull_.x +=
@@ -316,6 +330,7 @@ void MapChipPlayer::UpdateSelfDestructShape(float unscaledDeltaTime)
         input->GetGamepadRightStickX() * kStickPullSpeed * unscaledDeltaTime;
     selfDestructRawPull_.y +=
         input->GetGamepadRightStickY() * kStickPullSpeed * unscaledDeltaTime;
+    }
 
     const float length = std::sqrt(
         selfDestructRawPull_.x * selfDestructRawPull_.x +

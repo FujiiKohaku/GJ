@@ -395,3 +395,9 @@ Tools/UIAnimationEditor/ai_settings.json
 
 # ImGui local layout configuration
 imgui.ini
+
+# EOS SDK distribution and per-product credentials are installed locally.
+/externals/EOS/
+/resources/Config/eos.local.json
+/generated/eos-build/
+/generated/eos-tests/

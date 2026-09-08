@@ -98,8 +98,8 @@ void SwitchGimmick::Update()
     } else if (param_->switchType_ == 0) {
         // 感圧盤の場合：プレイヤーとの当たり判定をチェックする
         bool isStepped = false;
-        if (stage_ && stage_->GetPlayer()) {
-            AABB playerBox = stage_->GetPlayer()->GetAABB();
+        for (MapChipPlayer* player : stage_->GetPlayers()) {
+            AABB playerBox = player->GetAABB();
             if (CollisionManager::Intersect(GetAABB(), playerBox).isHit) {
                 isStepped = true;
             }
