@@ -2,6 +2,7 @@
 
 #include "BaseMapChipGimmick.h"
 #include "Engine/3D/Object3d.h"
+#include <array>
 #include <memory>
 
 // 通過すると次の命のリレー時の復帰地点を更新する中間地点。
@@ -19,7 +20,10 @@ public:
     const Vector3& GetPosition() const { return position_; }
 
 private:
-    std::unique_ptr<Object3d> object_;
+    static constexpr size_t kFlagSegmentCount = 12;
+
+    std::unique_ptr<Object3d> standObject_;
+    std::array<std::unique_ptr<Object3d>, kFlagSegmentCount> flagObjects_;
     Vector3 position_ = { 0.0f, 0.0f, 0.0f };
     Vector3 size_ = { 0.72f, 1.25f, 0.72f };
     float time_ = 0.0f;
