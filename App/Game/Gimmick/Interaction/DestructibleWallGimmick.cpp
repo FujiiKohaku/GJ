@@ -6,6 +6,7 @@
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/3D/Object3d.h"
+#include "Engine/Audio/SoundManager.h"
 #include "App/Game/Map/MapChipStage.h"
 #include "Engine/LevelEditor/GimmickMetaDataManager.h"
 
@@ -138,5 +139,6 @@ void DestructibleWallGimmick::OnExplosion(const Vector3& origin, float radius)
 
     isDestroyed_ = true;
     
-    // TODO: 破壊時のパーティクル再生やSE再生
+    // 破壊時のSE再生
+    SoundManager::GetInstance()->PlaySE("WallDestroy", 0.5f);
 }
