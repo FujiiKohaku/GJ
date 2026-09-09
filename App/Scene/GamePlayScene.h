@@ -8,7 +8,6 @@
 #include "Engine/LevelEditor/MapEditor.h"
 #endif
 #include "Engine/Fluid/GpuSphFluid.h"
-#include "Engine/Fluid/FluidForceRenderer.h"
 #include "Engine/Fluid/GpuSphFluidRenderer.h"
 #include "Engine/Effect/EffectManager.h"
 #include "Engine/2D/Sprite.h"
@@ -118,7 +117,6 @@ private:
     RuinsBackground ruinsBackground_;
     std::unique_ptr<MapChipPlayer> player_;
     std::unique_ptr<GpuSphFluid> gpuSphFluid_;
-    std::unique_ptr<FluidForceRenderer> fluidForceRenderer_;
     std::unique_ptr<GpuSphFluidRenderer> gpuSphFluidRenderer_;
     PageTransition::RevealOverlay pageReveal_;
 
@@ -142,7 +140,6 @@ private:
     float hardResetTransitionTime_ = 0.0f;
     bool isDeathTransitionActive_ = false;
     float deathTransitionTime_ = 0.0f;
-    bool showForces_ = false;
     EffectHandle walkingDustEffectHandle_ = kInvalidEffectHandle;
     float eyeOffsetX_ = 0.0f;
     Vector3 playerStartPosition_ = { 0.0f, 0.0f, 0.0f };
@@ -156,7 +153,8 @@ private:
     std::unique_ptr<Sprite> tutorialKeyASprite_;
     std::unique_ptr<Sprite> tutorialKeySSprite_;
     std::unique_ptr<Sprite> tutorialKeyDSprite_;
-    std::unique_ptr<Sprite> tutorialMouseSprite_;
+    std::unique_ptr<Sprite> tutorialMouseLeftSprite_;
+    std::unique_ptr<Sprite> tutorialMouseRightSprite_;
     std::unique_ptr<Text> controlsText_;
 
     bool isLifeRelayActive_ = false;

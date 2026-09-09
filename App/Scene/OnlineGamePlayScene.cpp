@@ -1,5 +1,6 @@
 #include "OnlineGamePlayScene.h"
 #include "ArchiveScene.h"
+#include "ClearScene.h"
 #include "SceneManager.h"
 #include "Engine/Network/EosMultiplayer.h"
 #include "Engine/Time/TimeManager.h"
@@ -10,14 +11,108 @@
 #include "Engine/2D/SpriteManager.h"
 #include "Engine/LevelEditor/LevelDataLoader.h"
 #include "Engine/Effect/EffectManager.h"
+#include "Engine/3D/SkyBox/SkyBoxManager.h"
+#include "Engine/DirectXCommon/DirectXCommon.h"
+#include "Engine/SrvManager/SrvManager.h"
+#include "Engine/TextureManager/TextureManager.h"
+#include "Engine/Winapp/WinApp.h"
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <regex>
 
 namespace {
 constexpr const char* Font = "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
-constexpr std::array<Vector4, 3> Colors{{{0.25f, 0.85f, 0.55f, 1}, {0.35f, 0.65f, 1, 1}, {1, 0.6f, 0.3f, 1}}};
+constexpr const char* SkyBoxTexture = "resources/Textures/skybox.dds";
+constexpr const char* LifeSlimeTexture = "resources/Textures/Slime.png";
+constexpr const char* DeadSlimeTexture = "resources/Textures/deadSlime.png";
+constexpr const char* LifeSlimeMaterial = "resources/Shaders/Sprite/LifeSlime";
+constexpr const char* KeyWTexture = "resources/Textures/W.png";
+constexpr const char* KeyATexture = "resources/Textures/A.png";
+constexpr const char* KeySTexture = "resources/Textures/S.png";
+constexpr const char* KeyDTexture = "resources/Textures/D.png";
+constexpr const char* MouseTexture = "resources/Textures/mouse.png";
+constexpr float NeoWorldScale = 0.36f;
+constexpr float CameraDistance = 12.0f;
+constexpr Vector3 SlimeRenderForward = {0, 0, 1};
+constexpr const char* SlowWaterSoundName = "SlowWater";
+constexpr const char* SlowWaterSoundPath = "resources/Audio/Scene/player/水中.mp3";
+constexpr const char* SlimeMoveSoundName = "SlimeMove";
+constexpr const char* SlimeMoveSoundPath = "resources/Audio/Scene/player/ゾンビの食事.mp3";
+struct TutorialStep { float triggerX; const char* message; };
+constexpr std::array<TutorialStep, 10> TutorialSteps{{
+    {0.0f, "A / D で移動　SPACE でジャンプ"},
+    {17.0f, "トゲは飛び越えられない。ここで死ぬと硬化スライムが足場になる"},
+    {30.0f, "感圧板を踏むと扉が開く"},
+    {34.0f, "感圧板の上で硬化すると、扉を開けたままにできる"},
+    {52.0f, "橋の揺れを見て、タイミングよく跳ぼう"},
+    {58.0f, "届かない場所は、硬化スライムで橋をつなげよう"},
+    {74.0f, "硬化スライムはレーザーを防ぐ"},
+    {84.0f, "感圧板の上で硬化して、ガスを出そう"},
+    {87.0f, "炎がガスに引火すると、壁を壊せる"},
+    {101.0f, "ゴールはもうすぐ。足場とジャンプを使い分けよう"},
+}};
+constexpr const char* ShapeTutorialMessage =
+    "左クリック長押しで、硬化する前のスライムの形を少し変えられる";
+
+bool Intersects(const AABB& a, const AABB& b) {
+    const Vector3 ah = a.size * 0.5f, bh = b.size * 0.5f;
+    return std::abs(a.center.x - b.center.x) <= ah.x + bh.x &&
+           std::abs(a.center.y - b.center.y) <= ah.y + bh.y &&
+           std::abs(a.center.z - b.center.z) <= ah.z + bh.z;
+}
+bool IsOnGasPressurePlate(const MapChipStage& stage,
+                          const MapChipPlayer& player) {
+    for (auto* gimmick : stage.GetGimmicks()) {
+        if (gimmick && gimmick->GetLinkName() == "Event_2" &&
+            gimmick->GetAABB().center.x < 86.0f &&
+            Intersects(player.GetAABB(), gimmick->GetAABB())) return true;
+    }
+    return false;
+}
+Vector3 FluidCorePosition(const MapChipPlayer& player) {
+    Vector3 result = player.IsShapingSelfDestruct()
+        ? player.GetAABB().center : player.GetPosition();
+    result.y += 0.086f * NeoWorldScale;
+    return result;
+}
+GpuSphFluid::CollisionObstacle FluidObstacle(
+    const Vector3& center, const Vector3& size, const Vector3& velocity) {
+    GpuSphFluid::CollisionObstacle result{};
+    result.center = center;
+    result.halfSize = {size.x * 0.5f, size.y * 0.5f, 0.65f};
+    result.velocity = {velocity.x, velocity.y, 0};
+    return result;
+}
+std::vector<GpuSphFluid::CollisionObstacle> BuildFluidObstacles(
+    const MapChipStage& stage,
+    const std::vector<BaseMapChipGimmick*>& gimmicks, float deltaTime) {
+    std::vector<GpuSphFluid::CollisionObstacle> result;
+    const auto& field = stage.GetField();
+    result.reserve(static_cast<size_t>(field.GetBlockWidth()) *
+                   field.GetBlockHeight() + gimmicks.size());
+    for (uint32_t y = 0; y < field.GetBlockHeight(); ++y) {
+        for (uint32_t x = 0; x < field.GetBlockWidth(); ++x) {
+            const auto type = field.GetMapChipTypeByIndex(x, y);
+            if (type == MapChipType::Block || type == MapChipType::Foundation) {
+                result.push_back(FluidObstacle(
+                    field.GetMapChipPositionByIndex(x, y) + stage.GetWorldOffset(),
+                    {1, 1, 1}, {}));
+            }
+        }
+    }
+    const float safeDeltaTime = (std::max)(deltaTime, 0.0001f);
+    for (auto* gimmick : gimmicks) {
+        if (!gimmick || !gimmick->IsSolid()) continue;
+        const auto delta = gimmick->GetDeltaPosition();
+        const Vector3 velocity{delta.x / safeDeltaTime, delta.y / safeDeltaTime,
+                               delta.z / safeDeltaTime};
+        for (const auto& box : gimmick->GetCollisionBoxes())
+            result.push_back(FluidObstacle(box.center, box.size, velocity));
+    }
+    return result;
+}
 void HashByte(uint64_t& hash, uint8_t byte) { hash ^= byte; hash *= 1099511628211ull; }
 uint64_t HashFile(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
@@ -28,7 +123,7 @@ uint64_t HashFile(const std::filesystem::path& path) {
 }
 bool LeaveHovered() {
     const auto p = Input::GetInstance()->GetMousePosition();
-    return p.x >= 1010 && p.x < 1250 && p.y >= 20 && p.y < 62;
+    return p.x >= 1010 && p.x < 1250 && p.y >= 124 && p.y < 166;
 }
 // Co-op uses the confirmed collision shape as a shared platform, independent
 // of each GPU's fluid simulation. Every peer builds this same geometry.
@@ -36,20 +131,14 @@ class CoopBody : public BaseMapChipGimmick {
 public:
     explicit CoopBody(AABB box) : box_(box) {}
     bool Initialize(const Vector3&, const std::string&, const BaseGimmickParam*) override {
-        object_ = std::make_unique<Object3d>();
-        object_->Initialize(Object3dManager::GetInstance());
-        object_->SetModel(ModelManager::GetInstance()->CreateCube("resources/Textures/white.png"));
-        object_->SetTranslate(box_.center); object_->SetScale(box_.size);
-        object_->SetColor({0.25f, 0.46f, 0.40f, 1}); object_->EnableToonLighting(); object_->Update();
         return true;
     }
-    void Update() override { object_->Update(); }
-    void Draw() override { object_->Draw(); }
+    void Update() override {}
+    void Draw() override {}
     AABB GetAABB() const override { return box_; }
     bool IsHardenedSlime() const override { return true; }
 private:
     AABB box_;
-    std::unique_ptr<Object3d> object_;
 };
 }
 
@@ -57,18 +146,24 @@ OnlineGamePlayScene::OnlineGamePlayScene(std::string stageFile) : stageFile_(std
 void OnlineGamePlayScene::Initialize() {
     auto& online = EosMultiplayer::Get();
     host_ = online.IsHost(); localSlot_ = online.LocalSlot(); playerCount_ = static_cast<int>(online.Members().size()); match_ = online.MatchId();
-    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
+    SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);
+    SceneManager::GetInstance()->SetArchiveApproach(0.0f);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
     TimeManager::GetInstance()->SetTimeScale(1);
     camera_ = std::make_unique<Camera>(); camera_->Initialize();
     Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
     EffectManager::GetInstance()->SetCamera(camera_.get());
-    hud_ = std::make_unique<Text>(); hud_->Initialize(Font); hud_->SetFontSize(20); hud_->SetPosition({28, 24}); hud_->SetMaxWidth(940);
+    SoundManager::GetInstance()->Load(SlowWaterSoundName, SlowWaterSoundPath,
+                                      AudioCategory::SE);
+    SoundManager::GetInstance()->Load(SlimeMoveSoundName, SlimeMoveSoundPath,
+                                      AudioCategory::SE);
+    hud_ = std::make_unique<Text>(); hud_->Initialize(Font); hud_->SetFontSize(18); hud_->SetPosition({28, 132}); hud_->SetMaxWidth(950);
     leaveText_ = std::make_unique<Text>(); leaveText_->Initialize(Font); leaveText_->SetFontSize(18);
-    leaveText_->SetPosition({1130, 41}); leaveText_->SetAnchorPoint({0.5f, 0.5f}); leaveText_->SetText("ステージセレクトへ戻る"); leaveText_->Update();
+    leaveText_->SetPosition({1130, 145}); leaveText_->SetAnchorPoint({0.5f, 0.5f}); leaveText_->SetText("ロビーへ戻る"); leaveText_->Update();
     hudBackground_ = std::make_unique<Sprite>(); hudBackground_->Initialize(SpriteManager::GetInstance(), "resources/Textures/white.png");
-    hudBackground_->SetPosition({12, 12}); hudBackground_->SetSize({1256, 108}); hudBackground_->SetColor({0.025f, 0.04f, 0.06f, 0.92f}); hudBackground_->Update();
+    hudBackground_->SetPosition({12, 124}); hudBackground_->SetSize({986, 42}); hudBackground_->SetColor({0.025f, 0.04f, 0.06f, 0.76f}); hudBackground_->Update();
     leaveButton_ = std::make_unique<Sprite>(); leaveButton_->Initialize(SpriteManager::GetInstance(), "resources/Textures/white.png");
-    leaveButton_->SetPosition({1010, 20}); leaveButton_->SetSize({240, 42});
+    leaveButton_->SetPosition({1010, 124}); leaveButton_->SetSize({240, 42});
     try {
         // Only allow bundled stage filenames; never load a path supplied by a peer.
         if (!std::regex_match(stageFile_, std::regex("stage([0-9]+|_test)\\.json")) ||
@@ -77,6 +172,9 @@ void OnlineGamePlayScene::Initialize() {
             throw std::runtime_error("Invalid stage or roster");
         const auto path = std::filesystem::path("resources/Maps") / stageFile_;
         mapHash_ = HashFile(path);
+        maximumLives_ = stageFile_ == "stage2.json" ? 20
+                      : stageFile_ == "stage1.json" ? 10 : 5;
+        lives_.fill(maximumLives_);
         LevelDataLoader loader;
         const auto level = loader.Load(path.string());
         stage_.Initialize(level); stage_.ApplyMaterialProperties();
@@ -89,12 +187,89 @@ void OnlineGamePlayScene::Initialize() {
         stage_.SetPlayers(activePlayers);
         RuinsBackground::Settings settings;
         settings.mapLength = static_cast<float>(stage_.GetField().GetBlockWidth()); background_.Initialize(settings);
-        slimes_.Initialize(camera_.get());
+
+        TextureManager::GetInstance()->LoadTexture(SkyBoxTexture);
+        skyBox_ = std::make_unique<SkyBox>();
+        skyBox_->Initialize(DirectXCommon::GetInstance());
+        skyBox_->SetTexture(SkyBoxTexture);
+        skyBox_->Update(camera_.get());
+        InitializePlayerFluids();
+
+        tutorialPanelSprite_ = std::make_unique<Sprite>();
+        tutorialPanelSprite_->Initialize(SpriteManager::GetInstance(), "resources/Textures/white.png");
+        tutorialPanelSprite_->SetPosition({60, 16});
+        tutorialPanelSprite_->SetSize({1160, 92});
+        tutorialPanelSprite_->SetColor({0.02f, 0.05f, 0.12f, 0});
+        tutorialPanelSprite_->Update();
+        tutorialText_ = std::make_unique<Text>();
+        tutorialText_->Initialize(Font); tutorialText_->SetAnchorPoint({0.5f, 0.5f});
+        tutorialText_->SetPosition({640, 61}); tutorialText_->SetFontSize(42);
+        tutorialText_->SetColor({1, 1, 1, 0}); tutorialText_->SetOutlineWidth(0);
+        tutorialText_->SetShadowColor({0, 0, 0, 0});
+        if (stageFile_ == "stage1.json") {
+            std::string preload;
+            for (const auto& step : TutorialSteps) preload += step.message;
+            preload += ShapeTutorialMessage;
+            tutorialText_->SetText(preload); tutorialText_->Update();
+            tutorialText_->SetText(""); tutorialText_->Update();
+        }
+
+        TextureManager::GetInstance()->LoadTexture(LifeSlimeTexture);
+        TextureManager::GetInstance()->LoadTexture(DeadSlimeTexture);
+        livesNumberText_ = std::make_unique<Text>();
+        livesNumberText_->Initialize(Font, true);
+        livesNumberText_->SetAnchorPoint({1, 0.5f});
+        livesNumberText_->SetFontSize(48); livesNumberText_->SetOutlineWidth(2);
+        livesNumberText_->SetOutlineColor({0, 0.015f, 0.04f, 1});
+        livesNumberText_->SetShadowColor({0, 0, 0, 0});
+        UpdateLivesDisplay();
+
+        if (stageFile_ == "stage1.json") {
+            for (const char* texture : {KeyWTexture, KeyATexture, KeySTexture, KeyDTexture, MouseTexture})
+                TextureManager::GetInstance()->LoadTexture(texture);
+            const auto makeKey = [](const char* texture, Vector2 size) {
+                auto sprite = std::make_unique<Sprite>();
+                sprite->Initialize(SpriteManager::GetInstance(), texture);
+                sprite->SetSize(size); return sprite;
+            };
+            tutorialKeyWSprite_ = makeKey(KeyWTexture, {48, 48});
+            tutorialKeyASprite_ = makeKey(KeyATexture, {48, 48});
+            tutorialKeySSprite_ = makeKey(KeySTexture, {48, 48});
+            tutorialKeyDSprite_ = makeKey(KeyDTexture, {48, 48});
+            tutorialMouseSprite_ = makeKey(MouseTexture, {72, 96});
+            const float width = static_cast<float>(WinApp::GetInstance()->GetRenderWidth());
+            const float height = static_cast<float>(WinApp::GetInstance()->GetRenderHeight());
+            const float centerX = width * 0.5f, baseY = height - 154.0f;
+            tutorialKeyWSprite_->SetPosition({centerX - 50, baseY - 50});
+            tutorialKeyASprite_->SetPosition({centerX - 100, baseY});
+            tutorialKeySSprite_->SetPosition({centerX - 50, baseY});
+            tutorialKeyDSprite_->SetPosition({centerX, baseY});
+            tutorialMouseSprite_->SetPosition({centerX + 90, baseY - 32});
+            controlsText_ = std::make_unique<Text>(); controlsText_->Initialize(Font);
+            controlsText_->SetAnchorPoint({0, 1}); controlsText_->SetPosition({20, height - 20});
+            controlsText_->SetFontSize(24); controlsText_->SetColor({1, 1, 1, 1});
+            controlsText_->SetOutlineColor({0.02f, 0.05f, 0.12f, 1});
+            controlsText_->SetOutlineWidth(2);
+            controlsText_->SetText("WASD：移動　SPACE：ジャンプ\n右クリック：自滅スロー\n右クリック(スロー中)：自滅確定\n左クリック長押し＋移動(スロー中)：変形");
+            controlsText_->Update();
+        }
         loaded_ = true; loadedPeers_[localSlot_] = true;
     } catch (...) { Fail("ステージを読み込めません。同じゲームデータを各PCに配置してください"); }
 }
 void OnlineGamePlayScene::Finalize() {
-    if (loaded_) slimes_.Finalize();
+    if (selfDestructSlowActive_)
+        TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
+    auto* audio = SoundManager::GetInstance();
+    if (slowWaterSoundHandle_.IsValid()) audio->Stop(slowWaterSoundHandle_);
+    if (slimeMoveSoundHandle_.IsValid()) audio->Stop(slimeMoveSoundHandle_);
+    auto* sceneManager = SceneManager::GetInstance();
+    sceneManager->SetScreenSpaceFluid(nullptr);
+    sceneManager->ClearExtraScreenSpaceFluids();
+    sceneManager->RemovePostEffect(PostEffectType::ClearSlimeRise);
+    sceneManager->SetSlimeScreenProgress(0);
+    for (auto& fluid : playerFluids_) if (fluid) fluid->Finalize();
+    for (auto& corpse : visualCorpses_)
+        if (corpse && corpse->GetFluid()) corpse->GetFluid()->Finalize();
     EffectManager::GetInstance()->StopAllEffects();
     EffectManager::GetInstance()->SetCamera(nullptr);
     Object3dManager::GetInstance()->SetDefaultCamera(nullptr);
@@ -103,7 +278,7 @@ void OnlineGamePlayScene::Finalize() {
 void OnlineGamePlayScene::Fail(const std::string& reason) {
     if (failed_) return;
     failed_ = true; error_ = reason;
-    EosMultiplayer::Get().EndMatch();
+    EosMultiplayer::Get().Leave();
 }
 void OnlineGamePlayScene::SendInput() {
     auto& online = EosMultiplayer::Get();
@@ -155,22 +330,377 @@ void OnlineGamePlayScene::ProcessPackets() {
         if (failed_) return;
     }
 }
+void OnlineGamePlayScene::InitializePlayerFluids() {
+    auto* sceneManager = SceneManager::GetInstance();
+    sceneManager->SetScreenSpaceFluid(nullptr);
+    for (int i = 0; i < playerCount_; ++i) {
+        GpuSphFluid::Settings settings;
+        settings.particleCount = 2048;
+        settings.particleRadius = 0.20f * NeoWorldScale;
+        settings.smoothingRadius = 0.40f * NeoWorldScale;
+        settings.particleMass = NeoWorldScale * NeoWorldScale * NeoWorldScale;
+        settings.restDensity = 3.0f;
+        settings.blobRadii = {1.2f * NeoWorldScale, 0.85f * NeoWorldScale,
+                              1.2f * NeoWorldScale};
+        settings.stiffness = 50.0f;
+        settings.shapeAttraction = 80.0f;
+        settings.velocityAttraction = 0.0f;
+        settings.viscosity = 15.0f;
+        settings.surfaceTension = 0.0f;
+        settings.gravity = {0, -20.0f * NeoWorldScale, 0};
+        settings.damping = 0.985f;
+        settings.horizontalFriction = 0.60f;
+        settings.liquidShapeAttraction = 0.0f;
+        settings.liquidVelocityAttraction = 0.0f;
+        settings.liquidViscosity = 1.15f;
+        settings.liquidSurfaceTension = 1.8f;
+        settings.liquidDamping = 0.04f;
+        settings.liquidHorizontalFriction = 0.992f;
+        settings.liquidGravityScale = 1.45f;
+        settings.sloshStrength = 0.0f;
+        settings.puddleSpread = 0.0f;
+        settings.emitterRate = 560.0f;
+        settings.emitterRadius = 0.20f * NeoWorldScale;
+        settings.emitterSpeed = 6.4f * NeoWorldScale;
+        settings.particleLifetime = 6.0f;
+        settings.collisionFriction = 0.60f;
+        settings.collisionBounce = 0.30f;
+        settings.simulationSubsteps = 1;
+        settings.corePosition = FluidCorePosition(players_[i]);
+        settings.floorHeight = players_[i].GetFluidFloorHeight();
+        settings.boundsMin = {-4, -20, -2};
+        settings.boundsMax = {
+            static_cast<float>(stage_.GetField().GetBlockWidth()) + 4,
+            static_cast<float>(stage_.GetField().GetBlockHeight()) + 8, 6};
+        playerFluids_[i] = std::make_unique<GpuSphFluid>();
+        playerFluids_[i]->Initialize(DirectXCommon::GetInstance(),
+                                     SrvManager::GetInstance(), settings);
+        playerFluids_[i]->SetLiquidated(false);
+        if (i == 0) sceneManager->SetScreenSpaceFluid(playerFluids_[i].get());
+        else sceneManager->AddExtraScreenSpaceFluid(playerFluids_[i].get());
+    }
+}
+void OnlineGamePlayScene::UpdatePlayerFluids(float deltaTime) {
+    if (!loaded_) return;
+    const auto gimmicks = stage_.GetGimmicks();
+    const bool slowMotion = std::any_of(
+        players_.begin(), players_.begin() + playerCount_,
+        [](const MapChipPlayer& player) { return player.IsShapingSelfDestruct(); });
+    const auto obstacles = BuildFluidObstacles(
+        stage_, gimmicks, TimeManager::GetInstance()->GetUnscaledDeltaTime());
+    for (int i = 0; i < playerCount_; ++i) {
+        auto& fluid = playerFluids_[i];
+        auto& player = players_[i];
+        if (!fluid) continue;
+        if (relayActive_[i]) {
+            if (EffectManager::GetInstance()->IsEffectAlive(walkingDustEffect_[i])) {
+                EffectManager::GetInstance()->StopEffect(walkingDustEffect_[i]);
+                walkingDustEffect_[i] = kInvalidEffectHandle;
+            }
+            continue;
+        }
+        Vector3 core = FluidCorePosition(player);
+        Vector3 velocity{player.GetVelocity().x, player.GetVelocity().y, 0};
+        const Vector3 scale = player.GetVisualScale();
+        Vector3 radii{scale.x * (2.4f * NeoWorldScale),
+                      scale.y * (1.7f * NeoWorldScale),
+                      scale.z * (2.4f * NeoWorldScale)};
+        if (clearCelebrationActive_) {
+            const float phase = clearCelebrationTimer_ + i * 0.18f;
+            const float bounce = std::abs(std::sin(phase * 11.0f));
+            radii.x *= 1.34f - bounce * 0.18f;
+            radii.y *= 1.48f + bounce * 0.52f;
+            radii.z *= 1.26f;
+            core.x += std::sin(phase * 7.0f) * 1.10f;
+            core.y += bounce * 0.72f;
+            velocity = {std::cos(phase * 7.0f) * 7.7f,
+                        std::cos(phase * 11.0f) * 2.4f, 0};
+            fluid->SetGrounded(false);
+        } else {
+            fluid->SetGrounded(player.IsGrounded());
+        }
+        if (fluidReset_[i]) {
+            auto settings = fluid->GetSettings();
+            settings.corePosition = core;
+            settings.floorHeight = player.GetFluidFloorHeight();
+            settings.targetVelocity = {};
+            settings.blobRadii = radii;
+            fluid->Reset(settings);
+            fluidReset_[i] = false;
+        }
+        fluid->SetObstacles(obstacles);
+        fluid->SetFloorHeight(player.GetFluidFloorHeight());
+        fluid->SetBlobRadii(radii);
+        float minX = -1000, maxX = 1000, maxY = 1000;
+        player.GetWallBoundaries(minX, maxX, maxY, gimmicks);
+        const float zEnvelope = radii.z * 1.2f;
+        fluid->SetWallBoundaries(minX, maxX, core.z - zEnvelope,
+                                 core.z + zEnvelope, -1000, maxY);
+        fluid->SetLiquidated(false);
+        fluid->SetDeathEyes(slowMotion);
+        const float desiredEye = std::clamp(player.GetVelocity().x / 5.0f,
+                                            -1.0f, 1.0f) * 0.075f;
+        eyeOffsetX_[i] += std::clamp(desiredEye - eyeOffsetX_[i],
+                                    -0.90f * deltaTime, 0.90f * deltaTime);
+        const auto shapeEye = player.GetEyeOffset();
+        fluid->SetEyeOffsetX(eyeOffsetX_[i] + shapeEye.x);
+        fluid->SetEyeOffsetY(shapeEye.y);
+        fluid->SetControlState(core, velocity, SlimeRenderForward);
+        fluid->SetEmitter(false, core, {});
+        fluid->Update(deltaTime);
+
+        const float horizontalSpeed = clearCelebrationActive_
+            ? 0.0f : std::abs(player.GetVelocity().x);
+        const bool emitDust = player.IsGrounded() && horizontalSpeed > 0.45f;
+        auto* effects = EffectManager::GetInstance();
+        if (emitDust) {
+            const float direction = player.GetVelocity().x >= 0 ? 1.0f : -1.0f;
+            Vector3 dust = FluidCorePosition(player);
+            dust.x -= direction * radii.x * 0.92f;
+            dust.y = player.GetFluidFloorHeight() + 0.14f;
+            if (!effects->IsEffectAlive(walkingDustEffect_[i]))
+                walkingDustEffect_[i] = effects->PlayLoopEffect("WalkDust", dust);
+            effects->SetEffectPosition(walkingDustEffect_[i], dust);
+            effects->SetEffectVelocity(walkingDustEffect_[i],
+                {-direction * (0.30f + horizontalSpeed * 0.08f), 0.16f, 0});
+        } else if (effects->IsEffectAlive(walkingDustEffect_[i])) {
+            effects->StopEffect(walkingDustEffect_[i]);
+            walkingDustEffect_[i] = kInvalidEffectHandle;
+        }
+    }
+    for (auto& corpse : visualCorpses_) corpse->Update();
+    RebuildFluidRenderList();
+}
+void OnlineGamePlayScene::UpdateDeathVisuals(float deltaTime) {
+    constexpr float relayDuration = 1.5f;
+    for (int i = 0; i < playerCount_; ++i) {
+        if (corpsePending_[i] && playerFluids_[i]) {
+            auto corpse = std::make_unique<HardenedFluidSlimeCorpse>();
+            if (corpse->InitializeFromParticles(
+                    DirectXCommon::GetInstance(), SrvManager::GetInstance(),
+                    playerFluids_[i]->GetParticlesCPU(),
+                    playerFluids_[i]->GetSettings())) {
+                visualCorpses_.push_back(std::move(corpse));
+                if (visualCorpses_.size() > 10) visualCorpses_.erase(visualCorpses_.begin());
+            }
+            corpsePending_[i] = false;
+        }
+
+        if (relayActive_[i] && !relayVisualActive_[i]) {
+            relayVisualActive_[i] = true;
+            relayVisualTimer_[i] = 0;
+            relayPosition_[i] = relayStart_[i];
+            relayEffect_[i] = EffectManager::GetInstance()->PlayLoopEffect(
+                "FlameCore", relayStart_[i]);
+        }
+        if (relayActive_[i]) {
+            relayVisualTimer_[i] += deltaTime;
+            const float t = std::clamp(relayVisualTimer_[i] / relayDuration,
+                                       0.0f, 1.0f);
+            const float smooth = t * t * (3.0f - 2.0f * t);
+            const Vector3 position = Lerp(relayStart_[i], spawn_[i], smooth);
+            relayPosition_[i] = position;
+            auto* effects = EffectManager::GetInstance();
+            if (effects->IsEffectAlive(relayEffect_[i]))
+                effects->SetEffectPosition(relayEffect_[i], position);
+            else
+                relayEffect_[i] = effects->PlayLoopEffect("FlameCore", position);
+        } else if (relayVisualActive_[i]) {
+            auto* effects = EffectManager::GetInstance();
+            if (effects->IsEffectAlive(relayEffect_[i]))
+                effects->StopEffect(relayEffect_[i]);
+            relayEffect_[i] = kInvalidEffectHandle;
+            relayVisualActive_[i] = false;
+            effects->PlayEffect("BlueFireworkSparks", spawn_[i]);
+        }
+    }
+}
+void OnlineGamePlayScene::RebuildFluidRenderList() {
+    auto* sceneManager = SceneManager::GetInstance();
+    sceneManager->SetScreenSpaceFluid(nullptr);
+    bool first = true;
+    const auto add = [sceneManager, &first](GpuSphFluid* fluid) {
+        if (!fluid) return;
+        if (first) {
+            sceneManager->SetScreenSpaceFluid(fluid);
+            first = false;
+        } else {
+            sceneManager->AddExtraScreenSpaceFluid(fluid);
+        }
+    };
+    for (int i = 0; i < playerCount_; ++i)
+        if (!relayActive_[i]) add(playerFluids_[i].get());
+    for (const auto& corpse : visualCorpses_) add(corpse->GetFluid());
+}
+Vector3 OnlineGamePlayScene::ClampCameraTarget(const Vector3& target) const {
+    if (!camera_) return target;
+    const float halfHeight = std::tan(camera_->GetFovY() * 0.5f) * CameraDistance;
+    const float halfWidth = halfHeight * camera_->GetAspectRatio();
+    const float mapWidth = static_cast<float>(stage_.GetField().GetBlockWidth());
+    const float mapHeight = static_cast<float>(stage_.GetField().GetBlockHeight());
+    const float minX = (std::min)(halfWidth, mapWidth * 0.5f);
+    const float maxX = (std::max)(halfWidth, mapWidth - halfWidth);
+    const float minY = (std::min)(halfHeight, mapHeight * 0.5f);
+    const float maxY = (std::max)(halfHeight, mapHeight - halfHeight);
+    Vector3 result = target;
+    result.x = std::clamp(result.x, minX, maxX);
+    result.y = std::clamp(result.y, minY, maxY);
+    return result;
+}
+void OnlineGamePlayScene::UpdateFollowCamera() {
+    if (!loaded_ || localSlot_ < 0) return;
+    Vector3 target = relayVisualActive_[localSlot_]
+        ? relayPosition_[localSlot_] : players_[localSlot_].GetPosition();
+    target.z = 0;
+    target = ClampCameraTarget(target);
+    camera_->LookAt({target.x, target.y, target.z - CameraDistance}, target);
+}
+void OnlineGamePlayScene::UpdateLocalSlowMotion() {
+    if (!loaded_ || localSlot_ < 0) return;
+    const bool shouldSlow = !cleared_ && std::any_of(
+        players_.begin(), players_.begin() + playerCount_,
+        [](const MapChipPlayer& player) { return player.IsShapingSelfDestruct(); });
+    auto* time = TimeManager::GetInstance();
+    if (shouldSlow && !selfDestructSlowActive_) {
+        timeScaleBeforeSelfDestruct_ = time->GetTimeScale();
+        time->SetTimeScale(0.08f);
+        selfDestructSlowActive_ = true;
+    } else if (!shouldSlow && selfDestructSlowActive_) {
+        time->SetTimeScale(timeScaleBeforeSelfDestruct_);
+        selfDestructSlowActive_ = false;
+    }
+
+    auto* audio = SoundManager::GetInstance();
+    if (shouldSlow) {
+        if (!slowWaterSoundHandle_.IsValid())
+            slowWaterSoundHandle_ = audio->Play(SlowWaterSoundName, true, 0.6f);
+    } else if (slowWaterSoundHandle_.IsValid()) {
+        audio->Stop(slowWaterSoundHandle_); slowWaterSoundHandle_ = {};
+    }
+    const bool moving = !relayActive_[localSlot_] && !cleared_ &&
+        players_[localSlot_].IsGrounded() &&
+        std::abs(players_[localSlot_].GetVelocity().x) > 0.25f;
+    if (moving) {
+        if (!slimeMoveSoundHandle_.IsValid())
+            slimeMoveSoundHandle_ = audio->Play(SlimeMoveSoundName, true, 0.5f);
+    } else if (slimeMoveSoundHandle_.IsValid()) {
+        audio->Stop(slimeMoveSoundHandle_); slimeMoveSoundHandle_ = {};
+    }
+}
+void OnlineGamePlayScene::UpdateLivesDisplay() {
+    if (!livesNumberText_ || localSlot_ < 0 ||
+        displayedLives_ == lives_[localSlot_]) return;
+    displayedLives_ = lives_[localSlot_];
+    lifeSprites_.clear();
+    const float width = static_cast<float>(WinApp::GetInstance()->GetRenderWidth());
+    const float height = static_cast<float>(WinApp::GetInstance()->GetRenderHeight());
+    constexpr float icon = 46, gap = 8;
+    const float rowWidth = icon * maximumLives_ +
+                           gap * (std::max)(maximumLives_ - 1, 0);
+    const float left = (width - rowWidth) * 0.5f;
+    const float top = height - icon - 18;
+    livesNumberText_->SetPosition({left - 18, top + icon * 0.5f});
+    livesNumberText_->SetText(std::to_string(displayedLives_));
+    livesNumberText_->SetColor(displayedLives_ <= 2
+        ? Vector4{1, 0.35f, 0.25f, 1} : Vector4{1, 1, 1, 1});
+    livesNumberText_->Update();
+    for (int index = 0; index < maximumLives_; ++index) {
+        const bool alive = index < displayedLives_;
+        auto sprite = std::make_unique<Sprite>();
+        sprite->Initialize(SpriteManager::GetInstance(),
+                           alive ? LifeSlimeTexture : DeadSlimeTexture);
+        sprite->SetSize({icon, icon}); sprite->SetMaterial(LifeSlimeMaterial);
+        sprite->SetEffectAmplitude(alive ? 0.10f : 0);
+        sprite->SetEffectPhase(index * 0.62f);
+        sprite->SetPosition({left + (icon + gap) * index, top});
+        sprite->Update(); lifeSprites_.push_back(std::move(sprite));
+    }
+}
+void OnlineGamePlayScene::UpdateStage1Tutorial() {
+    if (stageFile_ != "stage1.json" || !tutorialText_ || localSlot_ < 0) return;
+    auto& player = players_[localSlot_];
+    if (!stage1ShapeTutorialShown_ && player.IsShapingSelfDestruct()) {
+        tutorialText_->SetText(ShapeTutorialMessage);
+        tutorialPanelSprite_->SetColor({0.02f, 0.05f, 0.12f, 0.82f});
+        tutorialText_->SetColor({1, 1, 1, 1});
+        stage1ShapeTutorialShown_ = true;
+        return;
+    }
+    if (nextStage1TutorialIndex_ >= TutorialSteps.size()) return;
+    const auto& step = TutorialSteps[nextStage1TutorialIndex_];
+    if (player.GetPosition().x < step.triggerX) return;
+    if (nextStage1TutorialIndex_ == 7 &&
+        !IsOnGasPressurePlate(stage_, player)) return;
+    tutorialText_->SetText(step.message);
+    tutorialPanelSprite_->SetColor({0.02f, 0.05f, 0.12f, 0.82f});
+    tutorialText_->SetColor({1, 1, 1, 1});
+    ++nextStage1TutorialIndex_;
+}
+void OnlineGamePlayScene::StartClearCelebration() {
+    if (clearCelebrationActive_) return;
+    clearCelebrationActive_ = true;
+    clearCelebrationTimer_ = 0;
+    if (selfDestructSlowActive_) {
+        TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
+        selfDestructSlowActive_ = false;
+    }
+    auto* sceneManager = SceneManager::GetInstance();
+    sceneManager->SetSlimeScreenProgress(0);
+    sceneManager->AddPostEffect(PostEffectType::ClearSlimeRise,
+                                PostEffectStage::AfterParticle);
+    for (int i = 0; i < playerCount_; ++i)
+        EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks",
+                                                 players_[i].GetPosition());
+}
+void OnlineGamePlayScene::UpdateClearCelebration(float deltaTime) {
+    clearCelebrationTimer_ += deltaTime;
+    constexpr float danceDuration = 2.0f, riseDuration = 1.1f;
+    const float progress = std::clamp(
+        (clearCelebrationTimer_ - danceDuration) / riseDuration, 0.0f, 1.0f);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(
+        progress * progress * (3.0f - 2.0f * progress));
+    if (progress >= 1.0f)
+        SceneManager::GetInstance()->SetNextScene(
+            std::make_unique<ClearScene>(true));
+}
 void OnlineGamePlayScene::Simulate(const std::array<OnlineProtocol::Input, 3>& inputs) {
     if (cleared_ || failed_) return;
-    TimeManager::SimulationStep step(OnlineProtocol::Step);
+    // The single-player self-destruct mode slows the entire world. Deriving
+    // the same scale from synchronized player state keeps every peer on the
+    // same deterministic step while preserving that behavior online.
+    const bool slowMotion = std::any_of(
+        players_.begin(), players_.begin() + playerCount_,
+        [](const MapChipPlayer& player) { return player.IsShapingSelfDestruct(); });
+    TimeManager::SimulationStep step(
+        OnlineProtocol::Step * (slowMotion ? 0.08f : 1.0f),
+        OnlineProtocol::Step);
     stage_.Update();
     const auto gimmicks = stage_.GetGimmicks();
     std::vector<AABB> bodies;
     bool goal = false;
     for (int i = 0; i < playerCount_; ++i) {
         auto& player = players_[i];
-        // Shaping is local to each player and does not slow other participants.
+        if (relayActive_[i]) {
+            ++relayTicks_[i];
+            if (relayTicks_[i] >= 45) {
+                relayActive_[i] = false;
+                relayTicks_[i] = 0;
+                player.Initialize(&stage_.GetField(), spawn_[i]);
+                fluidReset_[i] = true;
+            }
+            continue;
+        }
+        // Each player controls only their own shape; the synchronized simulation
+        // applies the shared slow-motion scale above while anyone is shaping.
         player.SetInvincible(player.IsShapingSelfDestruct());
         player.Update(gimmicks, inputs[i]);
         goal |= player.ConsumeGoalReached();
         for (auto* gimmick : gimmicks) {
-            if (gimmick->IsCheckpoint() && gimmick->TryActivateCheckpoint(player.GetAABB()))
+            if (gimmick->IsCheckpoint() && gimmick->TryActivateCheckpoint(player.GetAABB())) {
                 for (auto& spawn : spawn_) spawn = gimmick->GetAABB().center;
+                EffectManager::GetInstance()->PlayEffect("BlueFireworkSparks",
+                                                         gimmick->GetAABB().center);
+            }
         }
         AABB body{};
         const bool hardened = player.ConsumeHardenedBody(body);
@@ -178,7 +708,10 @@ void OnlineGamePlayScene::Simulate(const std::array<OnlineProtocol::Input, 3>& i
             if (hardened) bodies.push_back(body);
             --lives_[i];
             if (lives_[i] <= 0) { Fail("残機がなくなりました。ロビーを作り直して再挑戦できます"); return; }
-            player.Initialize(&stage_.GetField(), spawn_[i]);
+            relayActive_[i] = true;
+            relayTicks_[i] = 0;
+            relayStart_[i] = FluidCorePosition(player);
+            corpsePending_[i] = hardened;
         }
     }
     for (const auto& box : bodies) {
@@ -199,6 +732,8 @@ uint64_t OnlineGamePlayScene::StateHash() const {
         const auto& p = players_[i].GetPosition(); const auto& v = players_[i].GetVelocity();
         add(p.x); add(p.y); add(v.x); add(v.y); add(static_cast<float>(lives_[i]));
         const auto box = players_[i].GetAABB(); add(box.size.x); add(box.size.y);
+        add(static_cast<float>(relayTicks_[i]));
+        HashByte(hash, relayActive_[i]);
     }
     for (auto* g : stage_.GetGimmicks()) {
         const auto box = g->GetAABB(); add(box.center.x); add(box.center.y); add(box.size.x); add(box.size.y);
@@ -211,7 +746,7 @@ void OnlineGamePlayScene::Update() {
     auto& online = EosMultiplayer::Get();
     const auto dt = TimeManager::GetInstance()->GetUnscaledDeltaTime();
     if (LeaveHovered() && Input::GetInstance()->IsMouseTrigger(0)) {
-        online.EndMatch();
+        online.Leave();
         SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>(true)); return;
     }
     leaveButton_->SetColor(LeaveHovered() ? Vector4{0.3f, 0.4f, 0.35f, 1} : Vector4{0.15f, 0.23f, 0.25f, 1}); leaveButton_->Update();
@@ -263,9 +798,27 @@ void OnlineGamePlayScene::Update() {
         }
     }
     if (loaded_) {
-        const auto p = players_[localSlot_].GetPosition();
-        camera_->LookAt({p.x, p.y + 3, -17}, {p.x, p.y + 1, 0}); camera_->Update();
-        background_.Update(); slimes_.Update(dt); EffectManager::GetInstance()->Update();
+        UpdateLocalSlowMotion();
+        if (cleared_ && !clearCelebrationActive_) StartClearCelebration();
+        if (clearCelebrationActive_) UpdateClearCelebration(dt);
+        background_.Update(); UpdateDeathVisuals(dt);
+        UpdatePlayerFluids(TimeManager::GetInstance()->GetDeltaTime());
+        UpdateFollowCamera(); camera_->Update();
+        EffectManager::GetInstance()->Update(); skyBox_->Update(camera_.get());
+        UpdateLivesDisplay(); UpdateStage1Tutorial();
+        tutorialPanelSprite_->Update(); tutorialText_->Update();
+        if (tutorialKeyWSprite_) {
+            auto* input = Input::GetInstance();
+            const Vector4 normal{1, 1, 1, 0.35f}, pressed{1, 1, 1, 1};
+            tutorialKeyWSprite_->SetColor(input->IsKeyPressed(DIK_W) ? pressed : normal);
+            tutorialKeyASprite_->SetColor(input->IsKeyPressed(DIK_A) ? pressed : normal);
+            tutorialKeySSprite_->SetColor(input->IsKeyPressed(DIK_S) ? pressed : normal);
+            tutorialKeyDSprite_->SetColor(input->IsKeyPressed(DIK_D) ? pressed : normal);
+            tutorialMouseSprite_->SetColor(input->IsMousePressed(0) ? pressed : normal);
+            tutorialKeyWSprite_->Update(); tutorialKeyASprite_->Update();
+            tutorialKeySSprite_->Update(); tutorialKeyDSprite_->Update();
+            tutorialMouseSprite_->Update();
+        }
     }
     std::string text;
     if (failed_) text = error_;
@@ -276,23 +829,32 @@ void OnlineGamePlayScene::Update() {
         for (int i = 0; i < playerCount_; ++i)
             text += "    P" + std::to_string(i + 1) + ": " + std::to_string(lives_[i]) + "命";
     }
-    text += "\nA / D : 移動   SPACE : ジャンプ   右クリック : 形を作る / 確定   左ドラッグ : 伸ばす";
     hud_->SetText(text); hud_->Update();
 }
 void OnlineGamePlayScene::Draw2D() {
-    SpriteManager::GetInstance()->PreDraw(); hudBackground_->Draw(); leaveButton_->Draw();
-    TextRenderer::GetInstance()->PreDraw(); hud_->Draw(); leaveText_->Draw();
+    SpriteManager::GetInstance()->PreDraw();
+    if (loaded_) {
+        tutorialPanelSprite_->Draw();
+        for (const auto& life : lifeSprites_) life->Draw();
+        if (tutorialKeyWSprite_) {
+            tutorialKeyWSprite_->Draw(); tutorialKeyASprite_->Draw();
+            tutorialKeySSprite_->Draw(); tutorialKeyDSprite_->Draw();
+            tutorialMouseSprite_->Draw();
+        }
+    }
+    hudBackground_->Draw(); leaveButton_->Draw();
+    TextRenderer::GetInstance()->PreDraw();
+    if (loaded_) {
+        tutorialText_->Draw(); livesNumberText_->Draw();
+        if (controlsText_) controlsText_->Draw();
+    }
+    hud_->Draw(); leaveText_->Draw();
 }
 void OnlineGamePlayScene::Draw3D() {
     if (!loaded_) return;
-    Object3dManager::GetInstance()->PreDraw();
-    background_.Draw(stageFile_ == "stage2.json");
-    stage_.Draw();
-    slimes_.PreDraw();
-    for (int i = 0; i < playerCount_; ++i) {
-        const auto box = players_[i].GetAABB();
-        slimes_.Draw(box.center, players_[i].GetVisualScale(), players_[i].GetForward(), std::abs(players_[i].GetVelocity().x), Colors[i]);
-    }
+    SkyBoxManager::GetInstance()->PreDraw();
+    skyBox_->Draw(DirectXCommon::GetInstance()->GetCommandList());
+    Object3dManager::GetInstance()->PreDraw(); background_.Draw(true); stage_.Draw();
 }
 void OnlineGamePlayScene::DrawParticle() {
     if (loaded_) {

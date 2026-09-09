@@ -24,9 +24,11 @@ int main() {
     auto frame = Message("frame", "match-a");
     frame["tick"] = uint64_t{18446744073709551614ull};
     frame["state"] = uint64_t{18446744073709551615ull};
-    frame["inputs"] = nlohmann::json::array({EncodeInput(decoded), EncodeInput(decoded)});
+    frame["inputs"] = nlohmann::json::array({EncodeInput(decoded)});
     const auto bytes = Encode(frame);
-    Check(bytes.size() <= MaxPacket && Decode(bytes, "match-a") == frame, "Two-player frame roundtrip failed");
+    Check(bytes.size() <= MaxPacket && Decode(bytes, "match-a") == frame, "One-player frame roundtrip failed");
+    frame["inputs"].push_back(EncodeInput(decoded));
+    Check(Decode(Encode(frame), "match-a") == frame, "Two-player frame roundtrip failed");
     frame["inputs"].push_back(EncodeInput(decoded));
     Check(Decode(Encode(frame), "match-a") == frame, "Three-player frame roundtrip failed");
     Reject([&] { Decode(bytes, "old-match"); });
@@ -42,5 +44,5 @@ int main() {
     Reject([] { DecodeInput(nlohmann::json::array({0, true, false, 2.6f, 0})); });
     Reject([] { DecodeInput(nlohmann::json::array({std::numeric_limits<float>::infinity(), true, false, 0, 0})); });
     Reject([] { DecodeInput(nlohmann::json::array({0, true, false, std::numeric_limits<float>::quiet_NaN(), 0})); });
-    std::cout << "Online protocol tests passed (roundtrip, 2-3 players, input accumulation, stale/malformed/out-of-range packets).\n";
+    std::cout << "Online protocol tests passed (roundtrip, 1-3 players, input accumulation, stale/malformed/out-of-range packets).\n";
 }

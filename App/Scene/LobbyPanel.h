@@ -19,9 +19,11 @@ private:
         bool visible = true, enabled = true;
     };
     void AddButton(float x, float y, float width, float height);
+    void PlaceButton(size_t index, float x, float y, float width, float height);
     void SetButton(size_t index, const std::string& text, bool enabled, bool visible = true);
     std::unique_ptr<Sprite> panel_;
     std::unique_ptr<Text> title_, status_, members_;
     std::vector<Button> buttons_;
     size_t page_ = 0;
+    bool expanded_ = false;
 };
