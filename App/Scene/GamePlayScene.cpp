@@ -56,6 +56,9 @@ constexpr float kMenuRestartY = 380.0f;
 constexpr float kMenuStageSelectY = 460.0f;
 constexpr float kStageSelectFadeDuration = 0.45f;
 constexpr float kFantasyMenuBlendDuration = 0.20f;
+constexpr const char *kConfirmSoundName = "StageSelect.Confirm";
+constexpr const char *kConfirmSoundPath =
+    "resources/Audio/StageSelect/confirm.wav";
 struct Stage1TutorialStep {
   float triggerX;
   const char *message;
@@ -328,6 +331,7 @@ bool GamePlayScene::InitializeNextStep() {
   remainingLives_ = maximumLives_;
 
   SoundManager* audio = SoundManager::GetInstance();
+  audio->Load(kConfirmSoundName, kConfirmSoundPath, AudioCategory::SE);
   audio->Load(kSlowWaterSoundName, kSlowWaterSoundPath, AudioCategory::SE);
   audio->Load(kSlimeMoveSoundName, kSlimeMoveSoundPath, AudioCategory::SE);
   audio->Load(kGasExplosionSoundName, kGasExplosionSoundPath, AudioCategory::SE);
@@ -722,14 +726,17 @@ void GamePlayScene::Update() {
                            : Vector4{0.17f, 0.21f, 0.30f, 1.0f});
 
     if (clicked && resumeHovered) {
+      SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.65f);
       isMenuOpen_ = false;
       return;
     }
     if (input->IsKeyTrigger(DIK_R) || (clicked && restartHovered)) {
+      SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.65f);
       StartHardResetTransition();
       return;
     }
     if (input->IsKeyTrigger(DIK_BACKSPACE) || (clicked && stageSelectHovered)) {
+      SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.65f);
       StartStageSelectTransition();
       return;
     }

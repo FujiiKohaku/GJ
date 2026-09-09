@@ -40,6 +40,8 @@ constexpr const char* SlowWaterSoundName = "SlowWater";
 constexpr const char* SlowWaterSoundPath = "resources/Audio/Scene/player/水中.mp3";
 constexpr const char* SlimeMoveSoundName = "SlimeMove";
 constexpr const char* SlimeMoveSoundPath = "resources/Audio/Scene/player/ゾンビの食事.mp3";
+constexpr const char* ConfirmSoundName = "StageSelect.Confirm";
+constexpr const char* ConfirmSoundPath = "resources/Audio/StageSelect/confirm.wav";
 struct TutorialStep { float triggerX; const char* message; };
 constexpr std::array<TutorialStep, 10> TutorialSteps{{
     {0.0f, "A / D で移動　SPACE でジャンプ"},
@@ -156,6 +158,8 @@ void OnlineGamePlayScene::Initialize() {
     SoundManager::GetInstance()->Load(SlowWaterSoundName, SlowWaterSoundPath,
                                       AudioCategory::SE);
     SoundManager::GetInstance()->Load(SlimeMoveSoundName, SlimeMoveSoundPath,
+                                      AudioCategory::SE);
+    SoundManager::GetInstance()->Load(ConfirmSoundName, ConfirmSoundPath,
                                       AudioCategory::SE);
     hud_ = std::make_unique<Text>(); hud_->Initialize(Font); hud_->SetFontSize(18); hud_->SetPosition({28, 132}); hud_->SetMaxWidth(950);
     leaveText_ = std::make_unique<Text>(); leaveText_->Initialize(Font); leaveText_->SetFontSize(18);
@@ -746,6 +750,7 @@ void OnlineGamePlayScene::Update() {
     auto& online = EosMultiplayer::Get();
     const auto dt = TimeManager::GetInstance()->GetUnscaledDeltaTime();
     if (LeaveHovered() && Input::GetInstance()->IsMouseTrigger(0)) {
+        SoundManager::GetInstance()->PlaySE(ConfirmSoundName, 0.65f);
         online.Leave();
         SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>(true)); return;
     }
