@@ -317,9 +317,6 @@ bool GamePlayScene::InitializeNextStep() {
   Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
   SkinningObject3dManager::GetInstance()->SetDefaultCamera(camera_.get());
 
-  debugCameraController_.SetTargetCamera(camera_.get());
-  debugCameraController_.SetDebugMode(false);
-
   LevelDataLoader loader;
   initializationLevelData_ = loader.Load(levelPath_);
   maximumLives_ = kInitialLives;
@@ -650,7 +647,6 @@ void GamePlayScene::Finalize() {
   SceneManager::GetInstance()->RemovePostEffect(PostEffectType::FantasyMenu);
   SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
   SceneManager::GetInstance()->SetFantasyMenuStrength(0.0f);
-  debugCameraController_.SetTargetCamera(nullptr);
   SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
   SceneManager::GetInstance()->ClearExtraScreenSpaceFluids();
   EffectManager::GetInstance()->StopAllEffects();
@@ -750,9 +746,6 @@ void GamePlayScene::Update() {
     return;
   }
 
-  debugCameraController_.Update();
-  const bool isFreeCameraMode = debugCameraController_.GetDebugMode();
-
   // 形状作成中のスローは、レーザーなどのトラップ判定より先に無敵を
   // 設定する。これにより、形状を作っている最中にトラップ死から
   // リスポーン処理へ入ることを防ぐ。
@@ -773,8 +766,7 @@ void GamePlayScene::Update() {
 
   // player_->Update(mapChipStage_.GetGimmicks());
     if (!isClearCelebrationActive_ && !hardenedThisFrame &&
-      (!isFreeCameraMode || player_->IsShapingSelfDestruct()) &&
-      !isLifeRelayActive_ && !isCannonTravelActive_) {
+        !isLifeRelayActive_ && !isCannonTravelActive_) {
         player_->Update(activeStage.GetGimmicks());
 
         if (player_->ConsumeGoalReached()) {
@@ -988,9 +980,7 @@ void GamePlayScene::Update() {
       }
     }
   }
-  if (!isFreeCameraMode) {
-    UpdateFollowCamera();
-  }
+  UpdateFollowCamera();
   camera_->Update();
   EffectManager::GetInstance()->SetCamera(camera_.get());
   EffectManager::GetInstance()->Update();
@@ -1482,7 +1472,6 @@ void GamePlayScene::StartDeathTransition() {
   }
 
   // Keep the player camera still while the actual body breaks into liquid.
-  debugCameraController_.SetDebugMode(false);
   UpdateFollowCamera();
   camera_->Update();
   skyBox_->Update(camera_.get());

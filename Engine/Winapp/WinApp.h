@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 class WinApp {
 public:
@@ -34,6 +35,8 @@ public:
     int32_t GetRenderWidth() const { return kClientWidth; }
     int32_t GetRenderHeight() const { return kClientHeight; }
     bool ToggleFullscreen();
+    std::string ConsumeTextInput();
+    void ClearTextInput() { textInput_.clear(); }
 
     static LRESULT CALLBACK WindowProc(
         HWND hwnd,
@@ -56,4 +59,5 @@ private:
     DWORD windowedStyle_ = 0;
     DWORD windowedExStyle_ = 0;
     bool isFullscreen_ = false;
+    std::wstring textInput_;
 };
