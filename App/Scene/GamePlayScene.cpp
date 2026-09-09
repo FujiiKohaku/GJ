@@ -328,12 +328,7 @@ bool GamePlayScene::InitializeNextStep() {
 
   LevelDataLoader loader;
   initializationLevelData_ = loader.Load(levelPath_);
-  maximumLives_ = kInitialLives;
-  if (levelPath_.find("stage2.json") != std::string::npos) {
-    maximumLives_ = 20;
-  } else if (levelPath_.find("stage1.json") != std::string::npos) {
-    maximumLives_ = kStage1Lives;
-  }
+  maximumLives_ = initializationLevelData_.maximumLives;
   remainingLives_ = maximumLives_;
 
   SoundManager* audio = SoundManager::GetInstance();
