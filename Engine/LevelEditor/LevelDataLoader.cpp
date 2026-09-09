@@ -20,6 +20,13 @@ LevelData LevelDataLoader::Load(const std::string& filePath)
 
     LevelData levelData;
 
+    if (jsonData.contains("maximumLives")) {
+        levelData.maximumLives = jsonData["maximumLives"].get<int>();
+        if (levelData.maximumLives < 1) {
+            levelData.maximumLives = 1;
+        }
+    }
+
     if (jsonData.contains("scene")) {
         for (const nlohmann::json& objectJson : jsonData["scene"]) {
             LoadObject(objectJson, levelData);
@@ -365,6 +372,7 @@ void LevelDataLoader::LoadObject(const nlohmann::json& objectJson, LevelData& le
 void LevelDataLoader::Save(const std::string& filePath, const LevelData& levelData)
 {
     nlohmann::json root;
+    root["maximumLives"] = levelData.maximumLives;
     
     if (!levelData.tileMaps.empty()) {
         nlohmann::json tileMapsArray = nlohmann::json::array();

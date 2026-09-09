@@ -176,11 +176,10 @@ void OnlineGamePlayScene::Initialize() {
             throw std::runtime_error("Invalid stage or roster");
         const auto path = std::filesystem::path("resources/Maps") / stageFile_;
         mapHash_ = HashFile(path);
-        maximumLives_ = stageFile_ == "stage2.json" ? 20
-                      : stageFile_ == "stage1.json" ? 10 : 5;
-        lives_.fill(maximumLives_);
         LevelDataLoader loader;
         const auto level = loader.Load(path.string());
+        maximumLives_ = level.maximumLives;
+        lives_.fill(maximumLives_);
         stage_.Initialize(level); stage_.ApplyMaterialProperties();
         std::vector<MapChipPlayer*> activePlayers;
         for (int i = 0; i < playerCount_; ++i) {

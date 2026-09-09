@@ -7,6 +7,8 @@
 
 struct LevelData {
 
+    int maximumLives = 5;
+
     struct ObjectData {
 
         std::string name;
