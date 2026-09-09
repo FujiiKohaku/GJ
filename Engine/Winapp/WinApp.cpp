@@ -45,6 +45,12 @@ void WinApp::FinalizeInstance()
 //==================================================================
 LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
+    // WM_CHAR reflects the active keyboard layout and IME, so runtime text
+    // fields can receive Japanese as UTF-16 before it is converted to UTF-8.
+    if (msg == WM_CHAR && wparam >= 0x20 && wparam != 0x7f && instance_) {
+        instance_->textInput_.push_back(static_cast<wchar_t>(wparam));
+    }
+
     // ImGui用メッセージ処理（優先）
     if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) {
         return true;
@@ -59,6 +65,22 @@ LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
 
     // 標準のメッセージ処理を実行
     return DefWindowProc(hwnd, msg, wparam, lparam);
+}
+
+std::string WinApp::ConsumeTextInput()
+{
+    if (textInput_.empty()) return {};
+    std::wstring input;
+    input.swap(textInput_);
+    const int length = WideCharToMultiByte(
+        CP_UTF8, WC_ERR_INVALID_CHARS, input.data(), static_cast<int>(input.size()),
+        nullptr, 0, nullptr, nullptr);
+    if (length <= 0) return {};
+    std::string result(static_cast<size_t>(length), '\0');
+    WideCharToMultiByte(
+        CP_UTF8, WC_ERR_INVALID_CHARS, input.data(), static_cast<int>(input.size()),
+        result.data(), length, nullptr, nullptr);
+    return result;
 }
 
 //==================================================================

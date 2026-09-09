@@ -597,6 +597,9 @@ void ArchiveScene::Update()
 bool ArchiveScene::HandleInput()
 {
     Input* input = Input::GetInstance();
+
+    // ロビー名の入力中は、文字キーをページ操作として扱わない。
+    if (lobbyPanel_.IsTypingName()) return false;
     
     // 開発用：F12でエディタへ遷移
 #ifndef NDEBUG

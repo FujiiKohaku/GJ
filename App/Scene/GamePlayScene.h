@@ -14,7 +14,6 @@
 #include "Engine/2D/Text/Text.h"
 #include "Engine/3D/SkyBox/SkyBox.h"
 #include "Engine/Camera/Camera.h"
-#include "Engine/debugcamera/DebugCameraController.h"
 #include "Engine/PostEffect/PostEffectType.h"
 #include "PageTransition.h"
 #include <cstddef>
@@ -89,7 +88,6 @@ private:
     void UpdateStage1Tutorial();
 
     std::unique_ptr<Camera> camera_;
-    DebugCameraController debugCameraController_;
     std::unique_ptr<SkyBox> skyBox_;
     std::unique_ptr<Sprite> tutorialPanelSprite_;
     std::unique_ptr<Text> tutorialText_;
