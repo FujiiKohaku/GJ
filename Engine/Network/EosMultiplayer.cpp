@@ -47,7 +47,7 @@ std::filesystem::path FindEosConfig() {
 }
 
 struct EosMultiplayer::Impl {
-    bool connected = false, busy = false, playing = false;
+    bool connected = false, busy = false, playing = false, endingMatch = false;
     std::string status = "オンラインに接続するとロビーを作成・検索できます";
     std::string lobbyId, localId, ownerId, stage, match;
     std::vector<Room> rooms;
@@ -96,7 +96,7 @@ struct EosMultiplayer::Impl {
             EOS_P2P_CloseConnections(p2p, &options);
         }
         lobbyId.clear(); ownerId.clear(); members.clear(); incoming.clear();
-        playing = false; stage.clear(); match.clear();
+        playing = false; endingMatch = false; stage.clear(); match.clear();
     }
     std::string Attribute(EOS_HLobbyDetails details, const char* key) {
         EOS_LobbyDetails_CopyAttributeByKeyOptions options{};
@@ -158,7 +158,16 @@ struct EosMultiplayer::Impl {
         members = std::move(next);
         stage = Attribute(details, "stage");
         match = Attribute(details, "match");
-        playing = Attribute(details, "mode") == "playing";
+        const bool lobbyPlaying = Attribute(details, "mode") == "playing";
+        if (endingMatch && lobbyPlaying) {
+            // Keep this client in the stage-select flow while the host's lobby
+            // update is propagating. Otherwise ArchiveScene would immediately
+            // open the just-finished match again.
+            playing = false;
+        } else {
+            playing = lobbyPlaying;
+            if (!lobbyPlaying) endingMatch = false;
+        }
         EOS_LobbyDetails_Release(details);
         if (rosterChanged) {
             EosMultiplayer::Get().Leave();
@@ -509,7 +518,56 @@ void EosMultiplayer::Start(const std::string& stageFile) {
     (void)stageFile;
 #endif
 }
-void EosMultiplayer::EndMatch() { Leave(); }
+void EosMultiplayer::EndMatch() {
+#ifdef GJ_WITH_EOS
+    auto& s = *impl_;
+    if (!InLobby() || Busy() || s.endingMatch) return;
+
+    // Every participant clears their own ready flag. The host additionally
+    // reopens the same lobby and changes it back to the searchable waiting
+    // state. No member leaves, so the group can select and play another stage.
+    s.endingMatch = true;
+    s.playing = false;
+    s.incoming.clear();
+    auto mod = s.Modify();
+    if (!mod) {
+        s.endingMatch = false;
+        return;
+    }
+
+    EOS_Lobby_AttributeData ready{};
+    ready.ApiVersion = EOS_LOBBY_ATTRIBUTEDATA_API_LATEST;
+    ready.Key = "ready";
+    ready.ValueType = EOS_EAttributeType::EOS_AT_BOOLEAN;
+    ready.Value.AsBool = EOS_FALSE;
+    EOS_LobbyModification_AddMemberAttributeOptions member{};
+    member.ApiVersion = EOS_LOBBYMODIFICATION_ADDMEMBERATTRIBUTE_API_LATEST;
+    member.Attribute = &ready;
+    member.Visibility = EOS_ELobbyAttributeVisibility::EOS_LAT_PUBLIC;
+    bool valid = EOS_LobbyModification_AddMemberAttribute(mod, &member) ==
+                 EOS_EResult::EOS_Success;
+
+    if (IsHost()) {
+        EOS_LobbyModification_SetPermissionLevelOptions permission{};
+        permission.ApiVersion =
+            EOS_LOBBYMODIFICATION_SETPERMISSIONLEVEL_API_LATEST;
+        permission.PermissionLevel =
+            EOS_ELobbyPermissionLevel::EOS_LPL_PUBLICADVERTISED;
+        valid = valid && s.AddString(mod, "mode", "waiting") &&
+                EOS_LobbyModification_SetPermissionLevel(mod, &permission) ==
+                    EOS_EResult::EOS_Success;
+    }
+
+    if (!valid) {
+        EOS_LobbyModification_Release(mod);
+        s.endingMatch = false;
+        s.status = "ロビーの待機状態への復帰に失敗しました";
+        return;
+    }
+    s.Commit(mod);
+    s.status = "同じロビーで次のステージを選べます";
+#endif
+}
 
 void EosMultiplayer::Tick() {
 #ifdef GJ_WITH_EOS

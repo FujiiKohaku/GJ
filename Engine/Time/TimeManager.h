@@ -28,6 +28,11 @@ public:
             delta_(time_.deltaTime_), unscaled_(time_.unscaledDeltaTime_) {
             time_.deltaTime_ = time_.unscaledDeltaTime_ = seconds;
         }
+        SimulationStep(float scaledSeconds, float unscaledSeconds) : time_(*GetInstance()),
+            delta_(time_.deltaTime_), unscaled_(time_.unscaledDeltaTime_) {
+            time_.deltaTime_ = scaledSeconds;
+            time_.unscaledDeltaTime_ = unscaledSeconds;
+        }
         ~SimulationStep() { time_.deltaTime_ = delta_; time_.unscaledDeltaTime_ = unscaled_; }
         SimulationStep(const SimulationStep&) = delete;
         SimulationStep& operator=(const SimulationStep&) = delete;
