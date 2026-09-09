@@ -166,6 +166,8 @@ private:
     bool manualMouseCursorVisible_ = false;
     bool showDebugUI_ = true;
 
+    std::unique_ptr<Sprite> customCursorSprite_;
+
 #if defined(_DEBUG) || defined(ENABLE_PERFORMANCE_LOG)
     std::chrono::steady_clock::time_point performanceLogStartTime_;
     std::chrono::steady_clock::time_point performanceFrameStartTime_;

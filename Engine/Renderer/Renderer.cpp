@@ -14,6 +14,8 @@
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/input/Input.h"
 #include "Engine/3D/LaserBeamRenderer.h"
+#include "Engine/2D/Sprite.h"
+#include "Engine/2D/SpriteManager.h"
 
 Renderer::Renderer() = default;
 
@@ -46,7 +48,7 @@ void Renderer::DrawImGui()
     postEffectManager_->DrawImGui();
 }
 
-void Renderer::Draw(SceneManager* sceneManager)
+void Renderer::Draw(SceneManager* sceneManager, Sprite* globalCursor)
 {
     FontManager::GetInstance()->FlushAtlasUpdates();
     // シーンやモデルが予約したテクスチャ転送を、描画前に一度だけまとめて実行する。
@@ -100,6 +102,11 @@ void Renderer::Draw(SceneManager* sceneManager)
 
     // 2D draw
     sceneManager->Draw2D();
+
+    if (globalCursor) {
+        SpriteManager::GetInstance()->PreDraw();
+        globalCursor->Draw();
+    }
 
     // ImGui is not initialized in the Release configuration.
 #ifdef USE_IMGUI

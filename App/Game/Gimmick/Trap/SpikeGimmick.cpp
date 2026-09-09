@@ -4,10 +4,11 @@
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/3D/Object3d.h"
+#include "Engine/CollisionManager/CollisionManager.h"
 #include "Engine/Logger/Logger.h"
 #include "Engine/DirectXCommon/DirectXCommon.h"
-#include "Engine/DirectXCommon/DirectXCommon.h"
 #include "Engine/LevelEditor/GimmickMetaDataManager.h"
+#include "Engine/Audio/SoundManager.h"
 #include <format>
 
 // 初期AABB設定: 横1、高さ0.7、底面(Y=-0.5)にくっつくようにY=-0.15オフセット
@@ -81,6 +82,7 @@ void SpikeGimmick::Update()
         if (!wasPlayerColliding_) {
             Logger::Log(std::format("[SpikeGimmick] Player touched the spike at ({:.2f}, {:.2f}, {:.2f})\n",
                                     position_.x, position_.y, position_.z));
+            SoundManager::GetInstance()->PlaySE("SpikeHitSlime", 0.3f);
         }
         player->Kill();
         anyColliding = true;

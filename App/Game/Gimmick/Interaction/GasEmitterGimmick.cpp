@@ -116,6 +116,17 @@ void GasEmitterGimmick::Update()
         stateTimer_ += TimeManager::GetInstance()->GetDeltaTime();
         UpdateParticles();
 
+        if (gasFlowAudioHandle_.IsValid()) {
+            float volume = 1.0f - (stateTimer_ / kFillDelay);
+            if (volume <= 0.0f) {
+                volume = 0.0f;
+                SoundManager::GetInstance()->Stop(gasFlowAudioHandle_);
+                gasFlowAudioHandle_ = {};
+            } else {
+                SoundManager::GetInstance()->SetVolume(gasFlowAudioHandle_, volume);
+            }
+        }
+
         // 充満中(Filling)、充満完了(Active)、着火済み(Ignited)の間はプレイヤーを死亡させる
         if (stage_) for (MapChipPlayer* player : stage_->GetPlayers()) {
             AABB playerBox = player->GetAABB();
@@ -216,6 +227,7 @@ void GasEmitterGimmick::ChangeState(State nextState)
     case State::Filling:
         StartBurstParticles();
         StartCloudParticles(); // 充満開始時に両方同時に出し始めることで隙間を無くす
+        gasFlowAudioHandle_ = SoundManager::GetInstance()->PlaySE("GasFlow");
         break;
     case State::Active:
         // 充満完了、着火待ち（勢いのある噴き出しだけを停止し、滞留用はそのまま維持）
@@ -223,9 +235,19 @@ void GasEmitterGimmick::ChangeState(State nextState)
         break;
     case State::Ignited:
         // 引火演出を追加する場合はここに記述
+        if (gasFlowAudioHandle_.IsValid()) {
+            SoundManager::GetInstance()->Stop(gasFlowAudioHandle_);
+            gasFlowAudioHandle_ = {};
+        }
+        SoundManager::GetInstance()->PlaySE("GasIgnite");
         break;
     case State::Finished:
         // 爆発を発生させる
+        if (gasFlowAudioHandle_.IsValid()) {
+            SoundManager::GetInstance()->Stop(gasFlowAudioHandle_);
+            gasFlowAudioHandle_ = {};
+        }
+        SoundManager::GetInstance()->PlaySE("GasExplosion");
         if (param_) {
             stage_->CreateExplosionGrid(position_, param_->leftBlocks_, param_->rightBlocks_, param_->upBlocks_, param_->downBlocks_);
         } else {
@@ -351,6 +373,10 @@ void GasEmitterGimmick::StopAllParticles()
 {
     StopBurstParticles();
     StopCloudParticles();
+    if (gasFlowAudioHandle_.IsValid()) {
+        SoundManager::GetInstance()->Stop(gasFlowAudioHandle_);
+        gasFlowAudioHandle_ = {};
+    }
 }
 
 void GasEmitterGimmick::UpdateParticles()

@@ -10,6 +10,7 @@
 #include "Engine/3D/Object3d.h"
 #include "Engine/Logger/Logger.h"
 #include "Engine/Time/TimeManager.h"
+#include "Engine/Audio/SoundManager.h"
 #include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include "Engine/CollisionManager/CollisionManager.h"
 #include <format>
@@ -120,6 +121,7 @@ void GearGimmick::Update()
         if (!wasPlayerColliding_) {
             Logger::Log(std::format("[GearGimmick] Player touched the gear at ({:.2f}, {:.2f}, {:.2f})\n",
                                     position_.x, position_.y, position_.z));
+            SoundManager::GetInstance()->PlaySE("GearHitSlime");
         }
         player->Kill();
         anyColliding = true;

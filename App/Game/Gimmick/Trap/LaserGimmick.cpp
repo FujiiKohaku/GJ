@@ -9,6 +9,7 @@
 #include "Engine/Time/TimeManager.h"
 #include "Engine/Time/TimeManager.h"
 #include "Engine/3D/LaserBeamRenderer.h"
+#include "Engine/Audio/SoundManager.h"
 #include <algorithm>
 #include <cmath>
 #include <format>
@@ -283,6 +284,7 @@ void LaserGimmick::Update()
         if (!wasPlayerColliding_) {
             Logger::Log(std::format("[LaserGimmick] Player hit by laser at ({}, {}, {})\n",
                                     position_.x, position_.y, position_.z));
+            SoundManager::GetInstance()->PlaySE("LaserHitSlime");
         }
         playerHitTime_ += TimeManager::GetInstance()->GetUnscaledDeltaTime();
         if (playerHitTime_ >= kPlayerDeathDelay) {

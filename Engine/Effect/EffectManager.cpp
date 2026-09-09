@@ -1136,7 +1136,7 @@ void EffectManager::StopAllEffects()
         ReleaseEffectLight(activeEffect);
     }
 
-    if (activeResources_.empty() && retiredResources_.empty()) {
+    if (activeResources_.empty() && retiredResources_.empty() && pooledResources_.empty()) {
         activeEffects_.clear();
         return;
     }
@@ -1148,16 +1148,21 @@ void EffectManager::StopAllEffects()
     }
 
     for (ActiveEffectResource& resource : activeResources_) {
-        ReturnActiveEffectResourceToPool(std::move(resource));
+        ReleaseActiveEffectResource(resource);
     }
+    activeResources_.clear();
 
     for (ActiveEffectResource& resource : retiredResources_) {
-        ReturnActiveEffectResourceToPool(std::move(resource));
+        ReleaseActiveEffectResource(resource);
     }
+    retiredResources_.clear();
+
+    for (ActiveEffectResource& resource : pooledResources_) {
+        ReleaseActiveEffectResource(resource);
+    }
+    pooledResources_.clear();
 
     activeEffects_.clear();
-    activeResources_.clear();
-    retiredResources_.clear();
 }
 
 bool EffectManager::IsEffectAlive(EffectHandle handle) const

@@ -246,6 +246,33 @@ constexpr const char *kSlowWaterSoundPath = "resources/Audio/Scene/player/水中
 constexpr const char *kSlimeMoveSoundName = "SlimeMove";
 constexpr const char *kSlimeMoveSoundPath = "resources/Audio/Scene/player/ゾンビの食事.mp3";
 
+constexpr const char *kGasExplosionSoundName = "GasExplosion";
+constexpr const char *kGasExplosionSoundPath = "resources/Audio/Gimmik/mixkit-fuel-explosion-1705.wav";
+constexpr const char *kGasFlowSoundName = "GasFlow";
+constexpr const char *kGasFlowSoundPath = "resources/Audio/Gimmik/spinopel-gas-flow-411772.mp3";
+constexpr const char *kGasIgniteSoundName = "GasIgnite";
+constexpr const char *kGasIgniteSoundPath = "resources/Audio/Gimmik/biww-fire-ignite-whoosh-sound-effect-561960.mp3";
+constexpr const char *kLaserHitSlimeSoundName = "LaserHitSlime";
+constexpr const char *kLaserHitSlimeSoundPath = "resources/Audio/Gimmik/dragon-studio-steam-hissing-386157.mp3";
+
+constexpr const char *kSwitchPressSoundName = "SwitchPress";
+constexpr const char *kSwitchPressSoundPath = "resources/Audio/Gimmik/soundreality-switch-150130.mp3";
+constexpr const char *kSwitchReleaseSoundName = "SwitchRelease";
+constexpr const char *kSwitchReleaseSoundPath = "resources/Audio/Gimmik/freesounds-4u-light-switch-1-401152.mp3";
+
+constexpr const char *kDoorOpenSoundName = "DoorOpen";
+constexpr const char *kDoorOpenSoundPath = "resources/Audio/Gimmik/590949__rudmer_rotteveel__creaky-door-fast-01.wav";
+constexpr const char *kDoorCloseSoundName = "DoorClose";
+constexpr const char *kDoorCloseSoundPath = "resources/Audio/Gimmik/DOORWood_Door slamming 3 (ID 1339)_BigSoundBank.com.wav";
+
+constexpr const char *kGearHitSlimeSoundName = "GearHitSlime";
+constexpr const char *kGearHitSlimeSoundPath = "resources/Audio/Gimmik/433839__archos__slime-28.wav";
+constexpr const char *kSpikeHitSlimeSoundName = "SpikeHitSlime";
+constexpr const char *kSpikeHitSlimeSoundPath = "resources/Audio/Gimmik/751338__qubodup__slime-attack-1.flac";
+
+constexpr const char *kWallDestroySoundName = "WallDestroy";
+constexpr const char *kWallDestroySoundPath = "resources/Audio/Gimmik/569497__sheyvan__stone-impact-rubble-debris-1.wav";
+
 constexpr const char *kKeyWTexture = "resources/Textures/W.png";
 constexpr const char *kKeyATexture = "resources/Textures/A.png";
 constexpr const char *kKeySTexture = "resources/Textures/S.png";
@@ -306,6 +333,17 @@ bool GamePlayScene::InitializeNextStep() {
   SoundManager* audio = SoundManager::GetInstance();
   audio->Load(kSlowWaterSoundName, kSlowWaterSoundPath, AudioCategory::SE);
   audio->Load(kSlimeMoveSoundName, kSlimeMoveSoundPath, AudioCategory::SE);
+  audio->Load(kGasExplosionSoundName, kGasExplosionSoundPath, AudioCategory::SE);
+  audio->Load(kGasFlowSoundName, kGasFlowSoundPath, AudioCategory::SE);
+  audio->Load(kGasIgniteSoundName, kGasIgniteSoundPath, AudioCategory::SE);
+  audio->Load(kLaserHitSlimeSoundName, kLaserHitSlimeSoundPath, AudioCategory::SE);
+  audio->Load(kSwitchPressSoundName, kSwitchPressSoundPath, AudioCategory::SE);
+  audio->Load(kSwitchReleaseSoundName, kSwitchReleaseSoundPath, AudioCategory::SE);
+  audio->Load(kDoorOpenSoundName, kDoorOpenSoundPath, AudioCategory::SE);
+  audio->Load(kDoorCloseSoundName, kDoorCloseSoundPath, AudioCategory::SE);
+  audio->Load(kGearHitSlimeSoundName, kGearHitSlimeSoundPath, AudioCategory::SE);
+  audio->Load(kSpikeHitSlimeSoundName, kSpikeHitSlimeSoundPath, AudioCategory::SE);
+  audio->Load(kWallDestroySoundName, kWallDestroySoundPath, AudioCategory::SE);
   }
 
   if (initializationStep_ == 1) {
