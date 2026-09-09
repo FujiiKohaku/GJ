@@ -115,6 +115,8 @@ public:
     bool HasDeathEyes() const { return deathEyes_; }
     void SetHideEyes(bool hidden) { hideEyes_ = hidden; }
     bool IsEyeHidden() const { return hideEyes_; }
+    void SetHueShift(float shift) { hueShift_ = shift; }
+    float GetHueShift() const { return hueShift_; }
     void SetWallBoundaries(float wallMinX, float wallMaxX, float wallMinZ = -0.3f, float wallMaxZ = 0.3f, float wallMinY = -1000.0f, float wallMaxY = 1000.0f);
     void TriggerLiquidationBurst(float strength = 8.0f);
     void SetLiquidated(bool liquidated) { isLiquidated_ = liquidated; }
@@ -249,6 +251,7 @@ private:
     float idleDuration_ = 0.0f;
     float idleStillDuration_ = 0.0f;
     float idleExpressionBlend_ = 0.0f;
+    float hueShift_ = 0.0f;
     bool deathEyes_ = false;
     float liquidationBurstStrength_ = 0.0f;
     float emitAccumulator_ = 0.0f;

@@ -1,6 +1,7 @@
 #include "OnlineGamePlayScene.h"
 #include "ArchiveScene.h"
 #include "ClearScene.h"
+#include "GameOverScene.h"
 #include "SceneManager.h"
 #include "Engine/Network/EosMultiplayer.h"
 #include "Engine/Time/TimeManager.h"
@@ -42,6 +43,10 @@ constexpr const char* SlimeMoveSoundName = "SlimeMove";
 constexpr const char* SlimeMoveSoundPath = "resources/Audio/Scene/player/ゾンビの食事.mp3";
 constexpr const char* ConfirmSoundName = "StageSelect.Confirm";
 constexpr const char* ConfirmSoundPath = "resources/Audio/StageSelect/confirm.wav";
+constexpr const char *kClearPourSoundName = "Scene.Transition.ClearPour";
+constexpr const char *kClearPourSoundPath = "resources/Audio/Scene/clear_transition_pour.wav";
+constexpr const char *kDeathSplatSoundName = "Scene.Transition.DeathSplat";
+constexpr const char *kDeathSplatSoundPath = "resources/Audio/Scene/game_over_transition_splat.wav";
 struct TutorialStep { float triggerX; const char* message; };
 constexpr std::array<TutorialStep, 10> TutorialSteps{{
     {0.0f, "A / D で移動　SPACE でジャンプ"},
@@ -161,6 +166,8 @@ void OnlineGamePlayScene::Initialize() {
                                       AudioCategory::SE);
     SoundManager::GetInstance()->Load(ConfirmSoundName, ConfirmSoundPath,
                                       AudioCategory::SE);
+    SoundManager::GetInstance()->Load(kClearPourSoundName, kClearPourSoundPath, AudioCategory::SE);
+    SoundManager::GetInstance()->Load(kDeathSplatSoundName, kDeathSplatSoundPath, AudioCategory::SE);
     hud_ = std::make_unique<Text>(); hud_->Initialize(Font); hud_->SetFontSize(18); hud_->SetPosition({28, 132}); hud_->SetMaxWidth(950);
     leaveText_ = std::make_unique<Text>(); leaveText_->Initialize(Font); leaveText_->SetFontSize(18);
     leaveText_->SetPosition({1130, 145}); leaveText_->SetAnchorPoint({0.5f, 0.5f}); leaveText_->SetText("ロビーへ戻る"); leaveText_->Update();
@@ -379,6 +386,12 @@ void OnlineGamePlayScene::InitializePlayerFluids() {
         playerFluids_[i]->Initialize(DirectXCommon::GetInstance(),
                                      SrvManager::GetInstance(), settings);
         playerFluids_[i]->SetLiquidated(false);
+        
+        float hueShift = 0.0f;
+        if (i == 1) hueShift = 2.0944f;
+        else if (i == 2) hueShift = -2.0944f;
+        playerFluids_[i]->SetHueShift(hueShift);
+
         if (i == 0) sceneManager->SetScreenSpaceFluid(playerFluids_[i].get());
         else sceneManager->AddExtraScreenSpaceFluid(playerFluids_[i].get());
     }
@@ -395,6 +408,9 @@ void OnlineGamePlayScene::UpdatePlayerFluids(float deltaTime) {
         auto& fluid = playerFluids_[i];
         auto& player = players_[i];
         if (!fluid) continue;
+        if (isDeathTransitionActive_ && i == (localSlot_ >= 0 ? localSlot_ : 0)) {
+            continue; // Handled by UpdateDeathTransition
+        }
         if (relayActive_[i]) {
             if (EffectManager::GetInstance()->IsEffectAlive(walkingDustEffect_[i])) {
                 EffectManager::GetInstance()->StopEffect(walkingDustEffect_[i]);
@@ -560,9 +576,7 @@ void OnlineGamePlayScene::UpdateFollowCamera() {
 }
 void OnlineGamePlayScene::UpdateLocalSlowMotion() {
     if (!loaded_ || localSlot_ < 0) return;
-    const bool shouldSlow = !cleared_ && std::any_of(
-        players_.begin(), players_.begin() + playerCount_,
-        [](const MapChipPlayer& player) { return player.IsShapingSelfDestruct(); });
+    const bool shouldSlow = !cleared_ && players_[localSlot_].IsShapingSelfDestruct();
     auto* time = TimeManager::GetInstance();
     if (shouldSlow && !selfDestructSlowActive_) {
         timeScaleBeforeSelfDestruct_ = time->GetTimeScale();
@@ -643,6 +657,7 @@ void OnlineGamePlayScene::StartClearCelebration() {
     if (clearCelebrationActive_) return;
     clearCelebrationActive_ = true;
     clearCelebrationTimer_ = 0;
+    SoundManager::GetInstance()->PlaySE(kClearPourSoundName, 0.7f);
     if (selfDestructSlowActive_) {
         TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
         selfDestructSlowActive_ = false;
@@ -666,16 +681,84 @@ void OnlineGamePlayScene::UpdateClearCelebration(float deltaTime) {
         SceneManager::GetInstance()->SetNextScene(
             std::make_unique<ClearScene>(true));
 }
+void OnlineGamePlayScene::StartDeathTransition() {
+    if (isDeathTransitionActive_) return;
+    isDeathTransitionActive_ = true;
+    deathTransitionTime_ = 0.0f;
+    EffectManager::GetInstance()->StopAllEffects();
+    if (selfDestructSlowActive_) {
+        TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
+        selfDestructSlowActive_ = false;
+    }
+    UpdateFollowCamera();
+    if (camera_) camera_->Update();
+    
+    // Animate the local player's fluid (or the one who died, but local is fine)
+    int targetSlot = (localSlot_ >= 0) ? localSlot_ : 0;
+    if (playerFluids_[targetSlot]) {
+        auto particles = playerFluids_[targetSlot]->GetParticlesCPU();
+        auto settings = playerFluids_[targetSlot]->GetSettings();
+        const Vector3 center = settings.corePosition;
+        settings.gravity = {0.0f, -2.0f, 0.0f};
+        settings.liquidGravityScale = 1.0f;
+        settings.liquidShapeAttraction = 0.0f;
+        settings.liquidVelocityAttraction = 0.0f;
+        settings.liquidViscosity = 0.0f;
+        settings.liquidSurfaceTension = 0.0f;
+        settings.liquidDamping = 0.0f;
+        settings.floorHeight = center.y - 30.0f;
+        settings.boundsMin = {center.x - 40.0f, center.y - 40.0f, -40.0f};
+        settings.boundsMax = {center.x + 40.0f, center.y + 40.0f, 40.0f};
+        playerFluids_[targetSlot]->SetLiquidated(true);
+        playerFluids_[targetSlot]->SetDeathEyes(true);
+        playerFluids_[targetSlot]->Reset(settings);
+        playerFluids_[targetSlot]->SetWallBoundaries(center.x - 40.0f, center.x + 40.0f, -40.0f,
+                                        40.0f, center.y - 40.0f, center.y + 40.0f);
+        playerFluids_[targetSlot]->SetGrounded(false);
+        playerFluids_[targetSlot]->SetEmitter(false, center, {0.0f, 0.0f, 0.0f});
+        for (size_t i = 0; i < particles.size(); ++i) {
+            auto &particle = particles[i];
+            const float angle = static_cast<float>(i) * 2.39996323f;
+            const float spread = 1.5f + static_cast<float>(i % 17) * 0.24f;
+            particle.velocity = {std::cos(angle) * spread,
+                                 std::sin(angle) * spread + 1.0f,
+                                 i % 3 == 0 ? -18.0f - static_cast<float>(i % 7)
+                                            : 2.0f * std::sin(angle)};
+            particle.padding = 5.0f;
+        }
+        playerFluids_[targetSlot]->SetParticlesCPU(particles);
+    }
+    
+    SceneManager *sceneManager = SceneManager::GetInstance();
+    const Vector3 position = (localSlot_ >= 0) ? players_[localSlot_].GetPosition() : Vector3{0,0,0};
+    sceneManager->SetPaintSeed(position.x * 17.31f + position.y * 7.13f);
+    sceneManager->SetSlimeScreenProgress(0.0f);
+    sceneManager->AddPostEffect(PostEffectType::SlimeScreen,
+                                PostEffectStage::AfterParticle);
+}
+void OnlineGamePlayScene::UpdateDeathTransition(float deltaTime) {
+    constexpr float kCoverDuration = 2.1f;
+    constexpr float kFlightDuration = 0.55f;
+    const float previousTime = deathTransitionTime_;
+    deathTransitionTime_ += deltaTime;
+    if (previousTime < kFlightDuration && deathTransitionTime_ >= kFlightDuration) {
+        SoundManager::GetInstance()->PlaySE(kDeathSplatSoundName, 0.75f);
+    }
+    int targetSlot = (localSlot_ >= 0) ? localSlot_ : 0;
+    if (playerFluids_[targetSlot]) {
+        playerFluids_[targetSlot]->Update(deltaTime);
+    }
+    const float progress = std::clamp(
+        (deathTransitionTime_ - kFlightDuration) / kCoverDuration, 0.0f, 1.0f);
+    SceneManager::GetInstance()->SetSlimeScreenProgress(progress);
+    if (progress >= 1.0f) {
+        SceneManager::GetInstance()->SetNextScene(std::make_unique<GameOverScene>());
+    }
+}
 void OnlineGamePlayScene::Simulate(const std::array<OnlineProtocol::Input, 3>& inputs) {
-    if (cleared_ || failed_) return;
-    // The single-player self-destruct mode slows the entire world. Deriving
-    // the same scale from synchronized player state keeps every peer on the
-    // same deterministic step while preserving that behavior online.
-    const bool slowMotion = std::any_of(
-        players_.begin(), players_.begin() + playerCount_,
-        [](const MapChipPlayer& player) { return player.IsShapingSelfDestruct(); });
+    if (cleared_ || failed_ || isDeathTransitionActive_) return;
     TimeManager::SimulationStep step(
-        OnlineProtocol::Step * (slowMotion ? 0.08f : 1.0f),
+        OnlineProtocol::Step,
         OnlineProtocol::Step);
     stage_.Update();
     const auto gimmicks = stage_.GetGimmicks();
@@ -710,7 +793,18 @@ void OnlineGamePlayScene::Simulate(const std::array<OnlineProtocol::Input, 3>& i
         if (hardened || player.ConsumeJustDied()) {
             if (hardened) bodies.push_back(body);
             --lives_[i];
-            if (lives_[i] <= 0) { Fail("残機がなくなりました。ロビーを作り直して再挑戦できます"); return; }
+            if (lives_[i] <= 0) {
+                if (i == localSlot_) {
+                    StartDeathTransition();
+                } else {
+                    // Start death transition for other player?
+                    // Currently we just trigger game over for the local player to transition to game over scene.
+                    // Or if anyone dies, we can just transition. But for now, we do it if localSlot_ dies or anyone.
+                    // In a co-op game, if anyone's lives hit 0, the team loses. Let's start the transition.
+                    StartDeathTransition();
+                }
+                return;
+            }
             relayActive_[i] = true;
             relayTicks_[i] = 0;
             relayStart_[i] = FluidCorePosition(player);
@@ -805,9 +899,13 @@ void OnlineGamePlayScene::Update() {
         UpdateLocalSlowMotion();
         if (cleared_ && !clearCelebrationActive_) StartClearCelebration();
         if (clearCelebrationActive_) UpdateClearCelebration(dt);
+        if (isDeathTransitionActive_) UpdateDeathTransition(dt);
         background_.Update(); UpdateDeathVisuals(dt);
         UpdatePlayerFluids(TimeManager::GetInstance()->GetDeltaTime());
-        UpdateFollowCamera(); camera_->Update();
+        if (!isDeathTransitionActive_) {
+            UpdateFollowCamera(); camera_->Update();
+            if (skyBox_) skyBox_->Update(camera_.get());
+        }
         EffectManager::GetInstance()->Update(); skyBox_->Update(camera_.get());
         UpdateLivesDisplay(); UpdateStage1Tutorial();
         tutorialPanelSprite_->Update(); tutorialText_->Update();

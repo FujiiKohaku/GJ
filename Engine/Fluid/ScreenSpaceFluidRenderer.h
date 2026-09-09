@@ -142,6 +142,12 @@ private:
         Vector4 extraEyeCenterUvs[kMaxExtraEyes];
         uint32_t extraEyeCount;
         Vector3 paddingExtraEyes;
+
+        static constexpr uint32_t kMaxPlayers = 4;
+        Vector4 playerColors[kMaxPlayers];
+        Vector4 playerCoreUvs[kMaxPlayers];
+        uint32_t playerCount;
+        Vector3 paddingPlayers;
     };
 
     static constexpr uint32_t kDefaultFirstRtvIndex = 8;
