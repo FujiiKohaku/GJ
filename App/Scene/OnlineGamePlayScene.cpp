@@ -399,9 +399,6 @@ void OnlineGamePlayScene::InitializePlayerFluids() {
 void OnlineGamePlayScene::UpdatePlayerFluids(float deltaTime) {
     if (!loaded_) return;
     const auto gimmicks = stage_.GetGimmicks();
-    const bool slowMotion = std::any_of(
-        players_.begin(), players_.begin() + playerCount_,
-        [](const MapChipPlayer& player) { return player.IsShapingSelfDestruct(); });
     const auto obstacles = BuildFluidObstacles(
         stage_, gimmicks, TimeManager::GetInstance()->GetUnscaledDeltaTime());
     for (int i = 0; i < playerCount_; ++i) {
@@ -456,7 +453,7 @@ void OnlineGamePlayScene::UpdatePlayerFluids(float deltaTime) {
         fluid->SetWallBoundaries(minX, maxX, core.z - zEnvelope,
                                  core.z + zEnvelope, -1000, maxY);
         fluid->SetLiquidated(false);
-        fluid->SetDeathEyes(slowMotion);
+        fluid->SetDeathEyes(player.IsShapingSelfDestruct());
         const float desiredEye = std::clamp(player.GetVelocity().x / 5.0f,
                                             -1.0f, 1.0f) * 0.075f;
         eyeOffsetX_[i] += std::clamp(desiredEye - eyeOffsetX_[i],
