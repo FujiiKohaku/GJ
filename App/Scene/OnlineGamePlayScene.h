@@ -43,6 +43,8 @@ private:
     void UpdateStage1Tutorial();
     void StartClearCelebration();
     void UpdateClearCelebration(float deltaTime);
+    void StartDeathTransition();
+    void UpdateDeathTransition(float deltaTime);
     uint64_t StateHash() const;
     std::string stageFile_, match_, error_;
     uint64_t mapHash_ = 0, tick_ = 0, inputSequence_ = 0;
@@ -74,6 +76,8 @@ private:
         kInvalidEffectHandle, kInvalidEffectHandle, kInvalidEffectHandle};
     bool selfDestructSlowActive_ = false;
     float timeScaleBeforeSelfDestruct_ = 1.0f;
+    bool isDeathTransitionActive_ = false;
+    float deathTransitionTime_ = 0.0f;
     AudioHandle slowWaterSoundHandle_{};
     AudioHandle slimeMoveSoundHandle_{};
     std::array<Vector3, 3> spawn_{};

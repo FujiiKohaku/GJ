@@ -5,6 +5,7 @@
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/Audio/SoundManager.h"
 #include "Engine/Input/Input.h"
+#include "Engine/Network/EosMultiplayer.h"
 #include "Engine/PostEffect/PostEffectType.h"
 #include "Engine/Time/TimeManager.h"
 #include "SceneManager.h"
@@ -288,7 +289,7 @@ bool GameOverScene::UpdateTitleTransition(float deltaTime)
 
     PageTransition::RequestReveal(
         { 0.0f, 0.0f, 0.0f, 1.0f }, kTitleTransitionDuration);
-    SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
+    SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>(EosMultiplayer::Get().InLobby()));
     return true;
 }
 

@@ -190,28 +190,62 @@ void ScreenSpaceFluidRenderer::Composite(
     // its own face position. Pass every corpse eye to the composite shader so
     // they are not lost behind the live player's single face parameter.
     compositeData_->extraEyeCount = 0;
-    for (size_t i = 0;
-         i < fluids.size() &&
-         compositeData_->extraEyeCount < CompositeParameter::kMaxExtraEyes;
-         ++i) {
+    compositeData_->playerCount = 0;
+    
+    for (size_t i = 0; i < fluids.size(); ++i) {
         const GpuSphFluid* fluid = fluids[i];
-        if (fluid == nullptr || fluid->IsEyeHidden() || !fluid->HasDeathEyes()) {
+        if (fluid == nullptr) {
             continue;
         }
+        
+        if (compositeData_->playerCount < CompositeParameter::kMaxPlayers) {
+            compositeData_->playerColors[compositeData_->playerCount] = {
+                fluid->GetHueShift(),
+                0.0f,
+                0.0f,
+                1.0f
+            };
+            
+            Vector3 corePos = fluid->GetSettings().corePosition;
+            Vector2 coreScreenPos = camera.WorldToScreen(corePos);
+            compositeData_->playerCoreUvs[compositeData_->playerCount] = {
+                coreScreenPos.x / static_cast<float>(WinApp::kClientWidth),
+                coreScreenPos.y / static_cast<float>(WinApp::kClientHeight),
+                0.0f,
+                0.0f
+            };
+            
+            compositeData_->playerCount++;
+        }
 
-        Vector3 eyeWorldPosition = fluid->GetSettings().corePosition;
-        eyeWorldPosition.x += fluid->GetEyeOffsetX();
-        eyeWorldPosition.y += fluid->GetEyeOffsetY() + 0.015f;
-        eyeWorldPosition.z = 0.0f;
-        const Vector2 eyeScreenPosition = camera.WorldToScreen(eyeWorldPosition);
-        compositeData_->extraEyeCenterUvs[compositeData_->extraEyeCount++] = {
-            eyeScreenPosition.x / static_cast<float>(WinApp::kClientWidth),
-            eyeScreenPosition.y / static_cast<float>(WinApp::kClientHeight),
-            0.0f,
-            0.0f
-        };
+        if (fluid->IsEyeHidden()) {
+            continue;
+        }
+        
+        bool isLocalAlive = (i == 0 && !fluid->HasDeathEyes());
+        if (isLocalAlive) {
+            continue;
+        }
+        
+        if (compositeData_->extraEyeCount < CompositeParameter::kMaxExtraEyes) {
+            Vector3 eyeWorldPosition = fluid->GetSettings().corePosition;
+            eyeWorldPosition.x += fluid->GetEyeOffsetX();
+            eyeWorldPosition.y += fluid->GetEyeOffsetY() + 0.015f;
+            eyeWorldPosition.z = 0.0f;
+            const Vector2 eyeScreenPosition = camera.WorldToScreen(eyeWorldPosition);
+            
+            float eyeType = fluid->HasDeathEyes() ? 0.0f : 1.0f; // 0 for death eyes (X), 1 for alive eyes
+            
+            compositeData_->extraEyeCenterUvs[compositeData_->extraEyeCount++] = {
+                eyeScreenPosition.x / static_cast<float>(WinApp::kClientWidth),
+                eyeScreenPosition.y / static_cast<float>(WinApp::kClientHeight),
+                eyeType,
+                0.0f
+            };
+        }
     }
     compositeData_->paddingExtraEyes = { 0.0f, 0.0f, 0.0f };
+    compositeData_->paddingPlayers = { 0.0f, 0.0f, 0.0f };
     DrawFullScreen(
         fullScreenRootSignature_.Get(),
         compositePipelineState_.Get(),

@@ -37,7 +37,18 @@ cbuffer SlimeFluidCompositeParameter : register(b0)
     float32_t4 extraEyeCenterUvs[15];
     uint extraEyeCount;
     float32_t3 paddingExtraEyes;
+    float32_t4 playerColors[4];
+    float32_t4 playerCoreUvs[4];
+    uint playerCount;
+    float32_t3 paddingPlayers;
 };
+
+float32_t3 HueShift(float32_t3 color, float32_t shift)
+{
+    float32_t3 k = float32_t3(0.57735f, 0.57735f, 0.57735f);
+    float32_t cosAngle = cos(shift);
+    return color * cosAngle + cross(k, color) * sin(shift) + k * dot(k, color) * (1.0f - cosAngle);
+}
 
 float32_t Hash31(float32_t3 value)
 {
@@ -178,12 +189,25 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
     float32_t nebulaBlend = lerp(nebulaWide, nebulaAccent, 0.30f);
     float32_t violetBand = smoothstep(0.28f, 0.78f, nebulaBlend);
     float32_t cyanBand = smoothstep(0.34f, 0.82f, 1.0f - nebulaWide * 0.55f + nebulaAccent * 0.45f);
-    float32_t3 deepSpace = lerp(
+    float32_t hueShift = 0.0f;
+    if (playerCount > 0) {
+        float32_t minSqDist = 99999.0f;
+        for (uint i = 0; i < playerCount; ++i) {
+            float32_t2 diff = input.texcoord - playerCoreUvs[i].xy;
+            float32_t sqDist = dot(diff, diff);
+            if (sqDist < minSqDist) {
+                minSqDist = sqDist;
+                hueShift = playerColors[i].x;
+            }
+        }
+    }
+
+    float32_t3 deepSpace = HueShift(lerp(
         float32_t3(0.008f, 0.010f, 0.070f),
         float32_t3(0.018f, 0.105f, 0.205f),
-        thickness);
-    float32_t3 violetNebula = float32_t3(0.24f, 0.055f, 0.52f) * violetBand;
-    float32_t3 cyanNebula = float32_t3(0.025f, 0.44f, 0.62f) * cyanBand;
+        thickness), hueShift);
+    float32_t3 violetNebula = HueShift(float32_t3(0.24f, 0.055f, 0.52f), hueShift) * violetBand;
+    float32_t3 cyanNebula = HueShift(float32_t3(0.025f, 0.44f, 0.62f), hueShift) * cyanBand;
     float32_t3 jellyColor = deepSpace + violetNebula * 0.46f + cyanNebula * 0.42f;
 
     float32_t3 halfVec = normalize(lightDir + viewDir);
@@ -316,6 +340,7 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
     // Death marks are rendered through one shared path, including the first
     // fluid when it is a corpse. This keeps every hardened slime's × identical.
     float32_t extraEyeMask = 0.0f;
+    float32_t extraNormalEyeHighlight = 0.0f;
     [loop]
     for (uint eyeIndex = 0; eyeIndex < extraEyeCount; ++eyeIndex)
     {
@@ -323,26 +348,61 @@ float32_t4 main(VertexShaderOutput input) : SV_TARGET
             (input.texcoord - extraEyeCenterUvs[eyeIndex].xy) / texelSize;
         float32_t2 extraLeftEye = extraEyeBase + float32_t2(kEyeSeparationPixels, 0.0f);
         float32_t2 extraRightEye = extraEyeBase - float32_t2(kEyeSeparationPixels, 0.0f);
-        float32_t extraLeftBand = min(abs(extraLeftEye.x - extraLeftEye.y),
-            abs(extraLeftEye.x + extraLeftEye.y));
-        float32_t extraRightBand = min(abs(extraRightEye.x - extraRightEye.y),
-            abs(extraRightEye.x + extraRightEye.y));
-        float32_t extraLeftExtent = max(abs(extraLeftEye.x), abs(extraLeftEye.y));
-        float32_t extraRightExtent = max(abs(extraRightEye.x), abs(extraRightEye.y));
-        float32_t extraLeftMask =
-            (1.0f - smoothstep(2.2f, 3.7f, extraLeftBand)) *
-            (1.0f - smoothstep(10.0f, 12.0f, extraLeftExtent));
-        float32_t extraRightMask =
-            (1.0f - smoothstep(2.2f, 3.7f, extraRightBand)) *
-            (1.0f - smoothstep(10.0f, 12.0f, extraRightExtent));
-        // A transformed corpse can have a core position that is no longer at
-        // the visible particle surface. Keep its × eyes strictly inside the
-        // actual fluid silhouette, so no marks remain on the terrain.
-        float32_t corpseSurfaceMask = smoothstep(0.03f, 0.10f, density);
-        float32_t corpseEyeMask =
-            max(extraLeftMask, extraRightMask) * corpseSurfaceMask;
-        extraEyeMask = max(extraEyeMask, corpseEyeMask);
-        finalColor = lerp(finalColor, eyeCoreColor, corpseEyeMask * 0.98f);
+        
+        float32_t eyeType = extraEyeCenterUvs[eyeIndex].z;
+        if (eyeType > 0.5f) {
+            // Alive extra eye
+            float32_t leftEyeDistance = length(extraLeftEye) - eyeHalfWidthPixels;
+            float32_t rightEyeDistance = length(extraRightEye) - eyeHalfWidthPixels;
+            float32_t leftEyeMask = 1.0f - smoothstep(-1.0f, 1.0f, leftEyeDistance);
+            float32_t rightEyeMask = 1.0f - smoothstep(-1.0f, 1.0f, rightEyeDistance);
+            float32_t currentEyeMask = max(leftEyeMask, rightEyeMask);
+            
+            float32_t closestEyeDistance = min(leftEyeDistance, rightEyeDistance);
+            float32_t currentEyeInnerMask = 1.0f - smoothstep(-3.2f, -1.2f, closestEyeDistance);
+            float32_t currentEyeRimMask = saturate(currentEyeMask - currentEyeInnerMask);
+            
+            float32_t corpseSurfaceMask = smoothstep(threshold + 0.10f, threshold + 0.24f, density);
+            currentEyeMask *= corpseSurfaceMask;
+            currentEyeRimMask *= corpseSurfaceMask;
+            
+            extraEyeMask = max(extraEyeMask, currentEyeMask);
+            
+            finalColor = lerp(finalColor, eyeCoreColor, currentEyeMask * 0.98f);
+            finalColor = lerp(finalColor, float32_t3(0.20f, 0.78f, 1.0f), currentEyeRimMask * 0.76f);
+            
+            float32_t2 highlightCenter = float32_t2(-eyeHalfWidthPixels * 0.28f, -eyeHalfHeightPixels * 0.36f);
+            float32_t leftHighlight = 1.0f - smoothstep(eyeHalfWidthPixels * 0.10f, eyeHalfWidthPixels * 0.34f,
+                length(extraLeftEye - highlightCenter));
+            float32_t rightHighlight = 1.0f - smoothstep(eyeHalfWidthPixels * 0.10f, eyeHalfWidthPixels * 0.34f,
+                length(extraRightEye - highlightCenter));
+            float32_t currentHighlight = max(leftHighlight, rightHighlight) * currentEyeMask;
+            extraNormalEyeHighlight = max(extraNormalEyeHighlight, currentHighlight);
+        } else {
+            // Death eye (X)
+            float32_t extraLeftBand = min(abs(extraLeftEye.x - extraLeftEye.y),
+                abs(extraLeftEye.x + extraLeftEye.y));
+            float32_t extraRightBand = min(abs(extraRightEye.x - extraRightEye.y),
+                abs(extraRightEye.x + extraRightEye.y));
+            float32_t extraLeftExtent = max(abs(extraLeftEye.x), abs(extraLeftEye.y));
+            float32_t extraRightExtent = max(abs(extraRightEye.x), abs(extraRightEye.y));
+            float32_t extraLeftMask =
+                (1.0f - smoothstep(2.2f, 3.7f, extraLeftBand)) *
+                (1.0f - smoothstep(10.0f, 12.0f, extraLeftExtent));
+            float32_t extraRightMask =
+                (1.0f - smoothstep(2.2f, 3.7f, extraRightBand)) *
+                (1.0f - smoothstep(10.0f, 12.0f, extraRightExtent));
+            
+            float32_t corpseSurfaceMask = smoothstep(0.03f, 0.10f, density);
+            float32_t corpseEyeMask =
+                max(extraLeftMask, extraRightMask) * corpseSurfaceMask;
+            extraEyeMask = max(extraEyeMask, corpseEyeMask);
+            finalColor = lerp(finalColor, eyeCoreColor, corpseEyeMask * 0.98f);
+        }
+    }
+    
+    if (extraNormalEyeHighlight > 0.0f) {
+        finalColor += float32_t3(0.72f, 0.93f, 1.0f) * extraNormalEyeHighlight * 0.72f;
     }
 
     float32_t3 background = gSceneColor.SampleLevel(gSampler, input.texcoord, 0).rgb;
