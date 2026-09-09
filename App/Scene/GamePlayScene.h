@@ -96,7 +96,6 @@ private:
     std::vector<std::unique_ptr<Sprite>> lifeSprites_;
     int displayedLives_ = -1;
     static constexpr int kInitialLives = 5;
-    static constexpr int kStage1Lives = 10;
     int remainingLives_ = kInitialLives;
     int maximumLives_ = kInitialLives;
     MapChipStage mapChipStage_;

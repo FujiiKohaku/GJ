@@ -1,6 +1,7 @@
 #include "LobbyPanel.h"
 #include "Engine/2D/SpriteManager.h"
 #include "Engine/2D/Text/TextRenderer.h"
+#include "Engine/Audio/SoundManager.h"
 #include "Engine/Input/Input.h"
 #include "Engine/Network/EosMultiplayer.h"
 #include "Engine/Time/TimeManager.h"
@@ -10,6 +11,8 @@
 
 namespace {
 constexpr const char* Font = "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
+constexpr const char* ConfirmSoundName = "StageSelect.Confirm";
+constexpr const char* ConfirmSoundPath = "resources/Audio/StageSelect/confirm.wav";
 constexpr size_t MaxLobbyNameCharacters = 12;
 constexpr size_t MaxLobbyNameBytes = 48;
 std::unique_ptr<Text> Label(float x, float y, float size) {
@@ -58,6 +61,8 @@ void LobbyPanel::PlaceButton(size_t index, float x, float y, float width, float 
 }
 void LobbyPanel::Initialize() {
     EosMultiplayer::Get().Initialize();
+    SoundManager::GetInstance()->Load(
+        ConfirmSoundName, ConfirmSoundPath, AudioCategory::SE);
     panel_ = std::make_unique<Sprite>();
     panel_->Initialize(SpriteManager::GetInstance(), "resources/Textures/white.png");
     panel_->SetPosition({64, 502}); panel_->SetSize({1152, 208});
@@ -192,6 +197,10 @@ LobbyPanel::Action LobbyPanel::Update(bool canSelectStage) {
     for (size_t i = 0; i < buttons_.size(); ++i) {
         const auto& b = buttons_[i];
         if (!b.visible || !b.enabled || mouse.x < b.x || mouse.x >= b.x + b.width || mouse.y < b.y || mouse.y >= b.y + b.height) continue;
+        // The actions returned to ArchiveScene play their sound at the point where
+        // the action is accepted. All actions handled inside this panel play here.
+        if (i != 0 && i != 1 && i != 2 && i != 6)
+            SoundManager::GetInstance()->PlaySE(ConfirmSoundName, 0.65f);
         switch (i) {
         case 0: return Action::PreviousStage;
         case 1: return Action::NextStage;

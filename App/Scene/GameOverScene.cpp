@@ -24,7 +24,7 @@ constexpr const char* kGameOverSoundPath = "resources/Audio/Scene/game_over_trum
 constexpr const char* kImpactSoundName = "Scene.GameOver.Impact";
 constexpr const char* kImpactSoundPath = "resources/Audio/Scene/game_over_impact.wav";
 constexpr const char* kSceneConfirmSoundName = "Scene.Confirm";
-constexpr const char* kSceneConfirmSoundPath = "resources/Audio/Scene/scene_confirm.wav";
+constexpr const char* kSceneConfirmSoundPath = "resources/Audio/StageSelect/confirm.wav";
 constexpr float kTitleTransitionDuration = 0.55f;
 }
 

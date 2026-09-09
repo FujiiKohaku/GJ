@@ -4,6 +4,7 @@
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
 #include "Engine/Input/Input.h"
+#include "Engine/Audio/SoundManager.h"
 #include "Engine/PostEffect/PostEffectType.h"
 #include "Engine/Time/TimeManager.h"
 #include "GamePlayScene.h"
@@ -24,6 +25,9 @@ constexpr const char* kPageBlockModel =
     "StageSelectBook/PageBlock.obj";
 constexpr const char* kStageCardModel =
     "StageSelectBook/StageCard.obj";
+constexpr const char* kConfirmSoundName = "StageSelect.Confirm";
+constexpr const char* kConfirmSoundPath =
+    "resources/Audio/StageSelect/confirm.wav";
 
 constexpr float kCardOpenDuration = 0.42f;
 constexpr float kCardCloseDuration = 0.22f;
@@ -39,6 +43,8 @@ constexpr float kTurningPageBaseZ = -0.19f;
 void StageSelectScene::Initialize()
 {
     SceneManager::GetInstance()->SetPostEffectType(PostEffectType::Copy);
+    SoundManager::GetInstance()->Load(
+        kConfirmSoundName, kConfirmSoundPath, AudioCategory::SE);
 
     camera_ = std::make_unique<Camera>();
     camera_->Initialize();
@@ -459,6 +465,7 @@ void StageSelectScene::RefreshStageText()
 void StageSelectScene::ConfirmStage()
 {
     state_ = BookSelectState::StageConfirmed;
+    SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.75f);
     const StageData& stage = stages_[currentStageIndex_];
     if (stage.opensTestScene) {
         SceneManager::GetInstance()->SetNextScene(std::make_unique<TestScene>());

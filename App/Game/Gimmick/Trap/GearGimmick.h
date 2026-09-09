@@ -7,7 +7,8 @@
 #include "GearParam.h"
 #include <memory>
 #include <string>
-
+#include <vector>
+#include "Engine/Effect/EffectManager.h"
 class Object3d;
 class MapChipStage;
 
@@ -31,8 +32,8 @@ public:
     AABB GetAABB() const override;
     void SetStage(MapChipStage* stage) override;
     
-    // 歯車は地形（壁）ではなく障害物として扱う
-    bool IsSolid() const override { return false; }
+    // 歯車は通常は障害物として扱わないが、スタック中（死体が挟まっている時）は足場になる
+    bool IsSolid() const override { return isJammed_; }
 
 private:
     std::unique_ptr<Object3d> object3d_;
@@ -42,4 +43,12 @@ private:
     Vector3 position_;
     float currentRotationZ_ = 0.0f;
     bool wasPlayerColliding_ = false;
+    
+    // スタックギミック用
+    bool isJammed_ = false;
+    float jamShakeTimer_ = 0.0f;
+    std::vector<EffectHandle> smokeEffectHandles_;
+    
+    void UpdateJammedEffects();
+    void StopJammedEffects();
 };
