@@ -56,6 +56,10 @@ constexpr float kMenuRestartY = 380.0f;
 constexpr float kMenuStageSelectY = 460.0f;
 constexpr float kStageSelectFadeDuration = 0.45f;
 constexpr float kFantasyMenuBlendDuration = 0.20f;
+constexpr const char *kClearPourSoundName = "Scene.Transition.ClearPour";
+constexpr const char *kClearPourSoundPath = "resources/Audio/Scene/clear_transition_pour.wav";
+constexpr const char *kDeathSplatSoundName = "Scene.Transition.DeathSplat";
+constexpr const char *kDeathSplatSoundPath = "resources/Audio/Scene/game_over_transition_splat.wav";
 struct Stage1TutorialStep {
   float triggerX;
   const char *message;
@@ -317,9 +321,6 @@ bool GamePlayScene::InitializeNextStep() {
   Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
   SkinningObject3dManager::GetInstance()->SetDefaultCamera(camera_.get());
 
-  debugCameraController_.SetTargetCamera(camera_.get());
-  debugCameraController_.SetDebugMode(false);
-
   LevelDataLoader loader;
   initializationLevelData_ = loader.Load(levelPath_);
   maximumLives_ = kInitialLives;
@@ -331,6 +332,8 @@ bool GamePlayScene::InitializeNextStep() {
   remainingLives_ = maximumLives_;
 
   SoundManager* audio = SoundManager::GetInstance();
+  audio->Load(kClearPourSoundName, kClearPourSoundPath, AudioCategory::SE);
+  audio->Load(kDeathSplatSoundName, kDeathSplatSoundPath, AudioCategory::SE);
   audio->Load(kSlowWaterSoundName, kSlowWaterSoundPath, AudioCategory::SE);
   audio->Load(kSlimeMoveSoundName, kSlimeMoveSoundPath, AudioCategory::SE);
   audio->Load(kGasExplosionSoundName, kGasExplosionSoundPath, AudioCategory::SE);
@@ -641,6 +644,7 @@ void GamePlayScene::InitializeRevealOverlay() {
 }
 
 void GamePlayScene::Finalize() {
+  StopPlayerLoopSounds();
   if (selfDestructSlowActive_) {
     TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
     selfDestructSlowActive_ = false;
@@ -650,7 +654,6 @@ void GamePlayScene::Finalize() {
   SceneManager::GetInstance()->RemovePostEffect(PostEffectType::FantasyMenu);
   SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
   SceneManager::GetInstance()->SetFantasyMenuStrength(0.0f);
-  debugCameraController_.SetTargetCamera(nullptr);
   SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
   SceneManager::GetInstance()->ClearExtraScreenSpaceFluids();
   EffectManager::GetInstance()->StopAllEffects();
@@ -750,9 +753,6 @@ void GamePlayScene::Update() {
     return;
   }
 
-  debugCameraController_.Update();
-  const bool isFreeCameraMode = debugCameraController_.GetDebugMode();
-
   // 形状作成中のスローは、レーザーなどのトラップ判定より先に無敵を
   // 設定する。これにより、形状を作っている最中にトラップ死から
   // リスポーン処理へ入ることを防ぐ。
@@ -773,8 +773,7 @@ void GamePlayScene::Update() {
 
   // player_->Update(mapChipStage_.GetGimmicks());
     if (!isClearCelebrationActive_ && !hardenedThisFrame &&
-      (!isFreeCameraMode || player_->IsShapingSelfDestruct()) &&
-      !isLifeRelayActive_ && !isCannonTravelActive_) {
+        !isLifeRelayActive_ && !isCannonTravelActive_) {
         player_->Update(activeStage.GetGimmicks());
 
         if (player_->ConsumeGoalReached()) {
@@ -988,9 +987,7 @@ void GamePlayScene::Update() {
       }
     }
   }
-  if (!isFreeCameraMode) {
-    UpdateFollowCamera();
-  }
+  UpdateFollowCamera();
   camera_->Update();
   EffectManager::GetInstance()->SetCamera(camera_.get());
   EffectManager::GetInstance()->Update();
@@ -1392,7 +1389,11 @@ void GamePlayScene::StartClearCelebration() {
 void GamePlayScene::UpdateClearCelebration(float unscaledDeltaTime) {
   constexpr float kDanceDuration = 2.0f;
   constexpr float kSlimeRiseDuration = 1.1f;
+  const float previousTime = clearCelebrationTimer_;
   clearCelebrationTimer_ += unscaledDeltaTime;
+  if (previousTime < kDanceDuration && clearCelebrationTimer_ >= kDanceDuration) {
+    SoundManager::GetInstance()->PlaySE(kClearPourSoundName, 0.72f);
+  }
   const float riseProgress = std::clamp(
       (clearCelebrationTimer_ - kDanceDuration) / kSlimeRiseDuration,
       0.0f, 1.0f);
@@ -1465,11 +1466,24 @@ void GamePlayScene::LoseLife(bool leaveCorpse) {
   }
 }
 
+void GamePlayScene::StopPlayerLoopSounds() {
+  SoundManager* audio = SoundManager::GetInstance();
+  if (slowWaterSoundHandle_.IsValid()) {
+    audio->Stop(slowWaterSoundHandle_);
+    slowWaterSoundHandle_ = {};
+  }
+  if (slimeMoveSoundHandle_.IsValid()) {
+    audio->Stop(slimeMoveSoundHandle_);
+    slimeMoveSoundHandle_ = {};
+  }
+}
+
 void GamePlayScene::StartDeathTransition() {
   if (isDeathTransitionActive_) {
     return;
   }
   isDeathTransitionActive_ = true;
+  StopPlayerLoopSounds();
   deathTransitionTime_ = 0.0f;
   isMenuOpen_ = false;
   remainingLives_ = 0;
@@ -1482,7 +1496,6 @@ void GamePlayScene::StartDeathTransition() {
   }
 
   // Keep the player camera still while the actual body breaks into liquid.
-  debugCameraController_.SetDebugMode(false);
   UpdateFollowCamera();
   camera_->Update();
   skyBox_->Update(camera_.get());
@@ -1529,7 +1542,11 @@ void GamePlayScene::StartDeathTransition() {
 void GamePlayScene::UpdateDeathTransition(float deltaTime) {
   constexpr float kCoverDuration = 2.1f;
   constexpr float kFlightDuration = 0.55f;
+  const float previousTime = deathTransitionTime_;
   deathTransitionTime_ += deltaTime;
+  if (previousTime < kFlightDuration && deathTransitionTime_ >= kFlightDuration) {
+    SoundManager::GetInstance()->PlaySE(kDeathSplatSoundName, 0.75f);
+  }
   gpuSphFluid_->Update(deltaTime);
   const float progress = std::clamp(
       (deathTransitionTime_ - kFlightDuration) / kCoverDuration, 0.0f, 1.0f);

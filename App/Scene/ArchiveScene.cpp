@@ -388,11 +388,13 @@ void ArchiveScene::InitializeInterface()
     creditsBodyText_->Initialize(kDefaultFont);
     creditsBodyText_->SetText(
         "DOWNLOADED SOUND EFFECTS\n"
-        "UI Sound Effects - Robin Lamb / CC0 1.0\n"
-        "Book Flip Sounds - Voltiment555 / CC0 1.0\n"
+        "UI Sound Effects (UI / Checkpoint) - Robin Lamb / CC0 1.0\n"
+        "Book Flip Sounds (Book Opening) - Voltiment555 / CC0 1.0\n"
         "Victory - Umplix / CC0 1.0\n"
         "Game Over Trumpet SFX - 0new4y / CC0 1.0\n"
         "25 CC0 Bang / Firework SFX - rubberduck / CC0 1.0\n"
+        "40 CC0 Water / Splash / Slime SFX - rubberduck / CC0 1.0\n"
+        "Various Sound Effects (Spring) - Spring Spring / CC0 1.0\n"
         "Metal Impact Sounds - BMacZero / CC0 1.0\n"
         "8bit Menu Select - Fupi / CC0 1.0\n\n"
         "FONT\n"
@@ -597,6 +599,9 @@ void ArchiveScene::Update()
 bool ArchiveScene::HandleInput()
 {
     Input* input = Input::GetInstance();
+
+    // ロビー名の入力中は、文字キーをページ操作として扱わない。
+    if (lobbyPanel_.IsTypingName()) return false;
     
     // 開発用：F12でエディタへ遷移
 #ifndef NDEBUG
