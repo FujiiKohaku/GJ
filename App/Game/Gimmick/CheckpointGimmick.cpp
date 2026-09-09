@@ -2,6 +2,7 @@
 
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
+#include "Engine/Audio/SoundManager.h"
 #include "Engine/Time/TimeManager.h"
 #include <cmath>
 
@@ -12,6 +13,8 @@ constexpr float kFlagSegmentWidth = 1.0f / 12.0f;
 constexpr float kFlagHeight = 1.0f;
 constexpr float kFlagWaveSpeed = 5.4f;
 constexpr float kFlagPhaseStep = 0.58f;
+constexpr const char* kCheckpointSoundName = "Gimmick.Checkpoint.Activate";
+constexpr const char* kCheckpointSoundPath = "resources/Audio/Scene/checkpoint_activate.wav";
 }
 
 bool CheckpointGimmick::Initialize(const Vector3& position, const std::string&, const BaseGimmickParam*)
@@ -22,6 +25,8 @@ bool CheckpointGimmick::Initialize(const Vector3& position, const std::string&, 
     if (!standModel || !segmentModel) {
         return false;
     }
+    SoundManager::GetInstance()->Load(
+        kCheckpointSoundName, kCheckpointSoundPath, AudioCategory::SE);
 
     standObject_ = std::make_unique<Object3d>();
     standObject_->Initialize(Object3dManager::GetInstance());
@@ -113,6 +118,7 @@ bool CheckpointGimmick::TryActivateCheckpoint(const AABB& playerAABB)
 {
     if (isActivated_ || !CollisionManager::Intersect(playerAABB, GetAABB()).isHit) return false;
     isActivated_ = true;
+    SoundManager::GetInstance()->PlaySE(kCheckpointSoundName, 0.65f);
     return true;
 }
 

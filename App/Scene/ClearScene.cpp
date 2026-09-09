@@ -36,8 +36,10 @@ constexpr const char* kDefaultFont =
     "resources/Fonts/NotoSansJP/NotoSansJP-Variable.ttf";
 constexpr const char* kClearSoundName = "Scene.Clear.Victory";
 constexpr const char* kClearSoundPath = "resources/Audio/Scene/clear_victory.wav";
+constexpr const char* kBookOpeningSoundName = "Scene.Clear.BookOpen";
+constexpr const char* kBookOpeningSoundPath = "resources/Audio/Scene/book_open.wav";
 constexpr const char* kFireworkSoundName = "Scene.Clear.Firework";
-constexpr const char* kFireworkSoundPath = "resources/Audio/Scene/clear_firework.ogg";
+constexpr const char* kFireworkSoundPath = "resources/Audio/Scene/clear_firework.wav";
 constexpr const char* kSceneConfirmSoundName = "Scene.Confirm";
 constexpr const char* kSceneConfirmSoundPath = "resources/Audio/StageSelect/confirm.wav";
 constexpr uint32_t kOpeningPageCount = 24;
@@ -71,9 +73,11 @@ void ClearScene::Initialize()
 {
     SoundManager* audio = SoundManager::GetInstance();
     audio->Load(kClearSoundName, kClearSoundPath, AudioCategory::SE);
+    audio->Load(kBookOpeningSoundName, kBookOpeningSoundPath, AudioCategory::SE);
+    bookOpeningSoundPlayed_ = false;
     audio->Load(kFireworkSoundName, kFireworkSoundPath, AudioCategory::SE);
     audio->Load(kSceneConfirmSoundName, kSceneConfirmSoundPath, AudioCategory::SE);
-    audio->PlaySE(kClearSoundName, 0.72f);
+    audio->PlaySE(kClearSoundName, 0.36f);
 
     SceneManager* sceneManager = SceneManager::GetInstance();
     sceneManager->SetPostEffectType(PostEffectType::Copy);
@@ -280,6 +284,10 @@ void ClearScene::Update()
             { 0.0f, 1.0f + meadowMove * 0.6f, 16.0f });
     }
 
+    if (!bookOpeningSoundPlayed_ && sceneTime_ >= 1.75f) {
+        SoundManager::GetInstance()->PlaySE(kBookOpeningSoundName, 0.65f);
+        bookOpeningSoundPlayed_ = true;
+    }
     UpdateArchiveBook((sceneTime_ - 1.75f) / 1.55f);
 
     float lightAlpha = 0.0f;

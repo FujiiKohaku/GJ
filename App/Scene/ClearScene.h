@@ -57,6 +57,7 @@ private:
     float fireworkTimer_ = 0.0f;
     int fireworkIndex_ = 0;
     bool meadowRevealed_ = false;
+    bool bookOpeningSoundPlayed_ = false;
     float archiveTransitionTime_ = 0.0f;
     bool archiveTransitionActive_ = false;
     bool returnToOnlineLobby_ = false;

@@ -25,6 +25,7 @@ GearGimmick::GearGimmick()
 
 GearGimmick::~GearGimmick()
 {
+    StopJammedEffects();
 }
 
 bool GearGimmick::Initialize(
@@ -77,17 +78,48 @@ void GearGimmick::Update()
 {
     float deltaTime = TimeManager::GetInstance()->GetDeltaTime();
     
-    // 回転の更新
+    // プレイヤーの死体との当たり判定（スタック判定）
+    bool isCurrentlyJammed = false;
+    if (stage_) {
+        AABB gearAABB = GetAABB();
+        for (BaseMapChipGimmick* gimmick : stage_->GetGimmicks()) {
+            if (gimmick->IsHardenedSlime()) {
+                for (const AABB& slimeBox : gimmick->GetCollisionBoxes()) {
+                    if (CollisionManager::Intersect(gearAABB, slimeBox).isHit) {
+                        isCurrentlyJammed = true;
+                        break;
+                    }
+                }
+            }
+            if (isCurrentlyJammed) break;
+        }
+    }
+    
+    isJammed_ = isCurrentlyJammed;
+    
+    // モデルの中心を常に維持
+    Vector3 centerPos = position_;
+
+    // 回転と微振動の更新
     if (param_) {
-        // 回転速度(度/秒)をラジアンに変換して加算
-        float radPerSec = param_->rotationSpeed_ * (3.14159265358979323846f / 180.0f);
-        currentRotationZ_ += radPerSec * deltaTime;
-        
-        // オーバーフロー防止
-        if (currentRotationZ_ > 3.1415926535f * 2.0f) {
-            currentRotationZ_ -= 3.1415926535f * 2.0f;
-        } else if (currentRotationZ_ < -3.1415926535f * 2.0f) {
-            currentRotationZ_ += 3.1415926535f * 2.0f;
+        if (isJammed_) {
+            jamShakeTimer_ += deltaTime;
+            float shakeX = std::sin(jamShakeTimer_ * 50.0f) * 0.05f;
+            float shakeY = std::cos(jamShakeTimer_ * 45.0f) * 0.05f;
+            centerPos.x += shakeX;
+            centerPos.y += shakeY;
+        } else {
+            jamShakeTimer_ = 0.0f;
+            // 回転速度(度/秒)をラジアンに変換して加算
+            float radPerSec = param_->rotationSpeed_ * (3.14159265358979323846f / 180.0f);
+            currentRotationZ_ += radPerSec * deltaTime;
+            
+            // オーバーフロー防止
+            if (currentRotationZ_ > 3.1415926535f * 2.0f) {
+                currentRotationZ_ -= 3.1415926535f * 2.0f;
+            } else if (currentRotationZ_ < -3.1415926535f * 2.0f) {
+                currentRotationZ_ += 3.1415926535f * 2.0f;
+            }
         }
         
         object3d_->SetRotate({0.0f, 0.0f, currentRotationZ_});
@@ -96,11 +128,10 @@ void GearGimmick::Update()
         object3d_->SetScale({param_->scale_, param_->scale_, param_->scale_});
     }
     
-    // モデルの中心を常に維持
-    Vector3 centerPos = position_;
     object3d_->SetTranslate(centerPos);
-    
     object3d_->Update();
+    
+    UpdateJammedEffects();
 
     // プレイヤーとの当たり判定
     if (!stage_) return;
@@ -108,24 +139,29 @@ void GearGimmick::Update()
     bool anyColliding = false;
     for (MapChipPlayer* player : stage_->GetPlayers()) {
 
-    AABB playerAABB = player->GetAABB();
-    
-    // 球体(Sphere)とAABBの交差判定
-    Sphere gearSphere;
-    gearSphere.center = centerPos;
-    gearSphere.radius = param_ ? param_->collisionRadius_ : 0.4f;
+        AABB playerAABB = player->GetAABB();
+        
+        // 球体(Sphere)とAABBの交差判定
+        Sphere gearSphere;
+        gearSphere.center = centerPos;
+        gearSphere.radius = param_ ? param_->collisionRadius_ : 0.4f;
 
-    CollisionHit hit = CollisionManager::Intersect(gearSphere, playerAABB);
+        CollisionHit hit = CollisionManager::Intersect(gearSphere, playerAABB);
 
-    if (hit.isHit) {
-        if (!wasPlayerColliding_) {
-            Logger::Log(std::format("[GearGimmick] Player touched the gear at ({:.2f}, {:.2f}, {:.2f})\n",
-                                    position_.x, position_.y, position_.z));
-            SoundManager::GetInstance()->PlaySE("GearHitSlime");
+        if (hit.isHit) {
+            // スタック中（isJammed_がtrue）なら足場となるので、即死やSE再生を行わない
+            if (!isJammed_) {
+                // プレイヤーがまだ生きていて（死体形成中ではなく）、かつ今回初めて接触した場合のみSEを鳴らす
+                if (!player->IsShapingSelfDestruct() && !wasPlayerColliding_) {
+                    Logger::Log(std::format("[GearGimmick] Player touched the gear at ({:.2f}, {:.2f}, {:.2f})\n",
+                                            position_.x, position_.y, position_.z));
+                    SoundManager::GetInstance()->PlaySE("GearHitSlime");
+                }
+                player->Kill();
+            }
+            
+            anyColliding = true;
         }
-        player->Kill();
-        anyColliding = true;
-    }
     }
     wasPlayerColliding_ = anyColliding;
 }
@@ -139,10 +175,55 @@ void GearGimmick::Draw()
 
 AABB GearGimmick::GetAABB() const
 {
-    // ISolid() が false なので地形の衝突には使われないが、とりあえずAABBも返す
     AABB aabb;
     aabb.center = position_;
     float r = param_ ? param_->collisionRadius_ : 0.4f;
     aabb.size = {r * 2.0f, r * 2.0f, r * 2.0f};
     return aabb;
+}
+
+void GearGimmick::UpdateJammedEffects()
+{
+    EffectManager* effects = EffectManager::GetInstance();
+    
+    // スケールに応じてエフェクトの位置（Z座標）を手前にオフセットする
+    // Zマイナス方向が画面手前であることを前提に、モデルの厚み分だけ前に出す
+    float zOffset = param_ ? (param_->scale_ * 0.6f) : 0.6f;
+    Vector3 effectPos = position_;
+    effectPos.z -= zOffset;
+
+    if (isJammed_) {
+        if (smokeEffectHandles_.empty()) {
+            EffectHandle handle = effects->PlayLoopEffect("GearJamSmoke", effectPos);
+            if (handle != kInvalidEffectHandle) {
+                smokeEffectHandles_.push_back(handle);
+                // 歯車のスケールに合わせてエフェクトの大きさも広げる
+                if (param_) {
+                    effects->SetEffectScale(handle, param_->scale_);
+                }
+            }
+        }
+        // 位置とスケールの更新
+        for (EffectHandle handle : smokeEffectHandles_) {
+            if (effects->IsEffectAlive(handle)) {
+                effects->SetEffectPosition(handle, effectPos);
+                if (param_) {
+                    effects->SetEffectScale(handle, param_->scale_);
+                }
+            }
+        }
+    } else {
+        StopJammedEffects();
+    }
+}
+
+void GearGimmick::StopJammedEffects()
+{
+    if (!smokeEffectHandles_.empty()) {
+        EffectManager* effects = EffectManager::GetInstance();
+        for (EffectHandle handle : smokeEffectHandles_) {
+            effects->StopEffect(handle);
+        }
+        smokeEffectHandles_.clear();
+    }
 }

@@ -4,6 +4,7 @@
 #include "App/Game/Player/MapChipPlayer.h"
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
+#include "Engine/Audio/SoundManager.h"
 #include "Engine/LevelEditor/GimmickMetaDataManager.h"
 #include "Engine/Time/TimeManager.h"
 #include <algorithm>
@@ -16,6 +17,8 @@ constexpr float kReboundDuration = 0.24f;
 constexpr float kCompressedScale = 0.62f;
 constexpr float kOvershootScale = 1.14f;
 constexpr float kLaunchSpeed = 13.5f;
+constexpr const char* kSpringSoundName = "Gimmick.Spring.Launch";
+constexpr const char* kSpringSoundPath = "resources/Audio/Scene/spring_launch.wav";
 }
 
 bool SpringGimmick::Initialize(
@@ -35,6 +38,8 @@ bool SpringGimmick::Initialize(
     if (model == nullptr) {
         return false;
     }
+    SoundManager::GetInstance()->Load(
+        kSpringSoundName, kSpringSoundPath, AudioCategory::SE);
 
     object_ = std::make_unique<Object3d>();
     object_->Initialize(Object3dManager::GetInstance());
@@ -67,13 +72,18 @@ void SpringGimmick::Update()
             scaleY = 1.0f - (1.0f - kCompressedScale) * progress;
         } else {
             if (!hasLaunchedPlayer_ && stage_ != nullptr) {
+                bool launchedPlayer = false;
                 for (MapChipPlayer* player : stage_->GetPlayers()) {
                     const auto box = player->GetAABB();
                     // Launch only players standing on this spring.
                     if (std::abs(box.center.x - position_.x) < 0.5f + box.size.x * 0.5f &&
                         std::abs(box.center.y - box.size.y * 0.5f - (position_.y + 0.5f)) < 0.3f) {
                         player->LaunchUpward(kLaunchSpeed);
+                        launchedPlayer = true;
                     }
+                }
+                if (launchedPlayer) {
+                    SoundManager::GetInstance()->PlaySE(kSpringSoundName, 0.55f);
                 }
                 hasLaunchedPlayer_ = true;
             }
