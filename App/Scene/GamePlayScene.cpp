@@ -56,6 +56,10 @@ constexpr float kMenuRestartY = 380.0f;
 constexpr float kMenuStageSelectY = 460.0f;
 constexpr float kStageSelectFadeDuration = 0.45f;
 constexpr float kFantasyMenuBlendDuration = 0.20f;
+constexpr const char *kClearPourSoundName = "Scene.Transition.ClearPour";
+constexpr const char *kClearPourSoundPath = "resources/Audio/Scene/clear_transition_pour.wav";
+constexpr const char *kDeathSplatSoundName = "Scene.Transition.DeathSplat";
+constexpr const char *kDeathSplatSoundPath = "resources/Audio/Scene/game_over_transition_splat.wav";
 struct Stage1TutorialStep {
   float triggerX;
   const char *message;
@@ -330,6 +334,8 @@ bool GamePlayScene::InitializeNextStep() {
   remainingLives_ = maximumLives_;
 
   SoundManager* audio = SoundManager::GetInstance();
+  audio->Load(kClearPourSoundName, kClearPourSoundPath, AudioCategory::SE);
+  audio->Load(kDeathSplatSoundName, kDeathSplatSoundPath, AudioCategory::SE);
   audio->Load(kSlowWaterSoundName, kSlowWaterSoundPath, AudioCategory::SE);
   audio->Load(kSlimeMoveSoundName, kSlimeMoveSoundPath, AudioCategory::SE);
   audio->Load(kGasExplosionSoundName, kGasExplosionSoundPath, AudioCategory::SE);
@@ -637,6 +643,7 @@ void GamePlayScene::InitializeRevealOverlay() {
 }
 
 void GamePlayScene::Finalize() {
+  StopPlayerLoopSounds();
   if (selfDestructSlowActive_) {
     TimeManager::GetInstance()->SetTimeScale(timeScaleBeforeSelfDestruct_);
     selfDestructSlowActive_ = false;
@@ -1399,7 +1406,11 @@ void GamePlayScene::StartClearCelebration() {
 void GamePlayScene::UpdateClearCelebration(float unscaledDeltaTime) {
   constexpr float kDanceDuration = 2.0f;
   constexpr float kSlimeRiseDuration = 1.1f;
+  const float previousTime = clearCelebrationTimer_;
   clearCelebrationTimer_ += unscaledDeltaTime;
+  if (previousTime < kDanceDuration && clearCelebrationTimer_ >= kDanceDuration) {
+    SoundManager::GetInstance()->PlaySE(kClearPourSoundName, 0.72f);
+  }
   const float riseProgress = std::clamp(
       (clearCelebrationTimer_ - kDanceDuration) / kSlimeRiseDuration,
       0.0f, 1.0f);
@@ -1472,11 +1483,24 @@ void GamePlayScene::LoseLife(bool leaveCorpse) {
   }
 }
 
+void GamePlayScene::StopPlayerLoopSounds() {
+  SoundManager* audio = SoundManager::GetInstance();
+  if (slowWaterSoundHandle_.IsValid()) {
+    audio->Stop(slowWaterSoundHandle_);
+    slowWaterSoundHandle_ = {};
+  }
+  if (slimeMoveSoundHandle_.IsValid()) {
+    audio->Stop(slimeMoveSoundHandle_);
+    slimeMoveSoundHandle_ = {};
+  }
+}
+
 void GamePlayScene::StartDeathTransition() {
   if (isDeathTransitionActive_) {
     return;
   }
   isDeathTransitionActive_ = true;
+  StopPlayerLoopSounds();
   deathTransitionTime_ = 0.0f;
   isMenuOpen_ = false;
   remainingLives_ = 0;
@@ -1536,7 +1560,11 @@ void GamePlayScene::StartDeathTransition() {
 void GamePlayScene::UpdateDeathTransition(float deltaTime) {
   constexpr float kCoverDuration = 2.1f;
   constexpr float kFlightDuration = 0.55f;
+  const float previousTime = deathTransitionTime_;
   deathTransitionTime_ += deltaTime;
+  if (previousTime < kFlightDuration && deathTransitionTime_ >= kFlightDuration) {
+    SoundManager::GetInstance()->PlaySE(kDeathSplatSoundName, 0.75f);
+  }
   gpuSphFluid_->Update(deltaTime);
   const float progress = std::clamp(
       (deathTransitionTime_ - kFlightDuration) / kCoverDuration, 0.0f, 1.0f);

@@ -70,6 +70,7 @@ private:
     std::vector<GamePlaySavePoint> savePointHistory_;
 
     void UpdateLivesText();
+    void StopPlayerLoopSounds();
     void LoseLife(bool leaveCorpse = true);
     void StartDeathTransition();
     void UpdateDeathTransition(float deltaTime);
