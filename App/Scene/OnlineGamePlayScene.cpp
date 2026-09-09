@@ -285,7 +285,9 @@ void OnlineGamePlayScene::Draw2D() {
 }
 void OnlineGamePlayScene::Draw3D() {
     if (!loaded_) return;
-    Object3dManager::GetInstance()->PreDraw(); background_.Draw(false); stage_.Draw();
+    Object3dManager::GetInstance()->PreDraw();
+    background_.Draw(stageFile_ == "stage2.json");
+    stage_.Draw();
     slimes_.PreDraw();
     for (int i = 0; i < playerCount_; ++i) {
         const auto box = players_[i].GetAABB();

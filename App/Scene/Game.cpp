@@ -76,13 +76,18 @@ void Game::Initialize()
     WinApp::GetInstance()->initialize();
     GetBootProfilerForGame()->End("Window");
 
-    LockCursorToWindow();
-
     CheckInitializeTime("WinApp", prevTime);
 
     GetBootProfilerForGame()->Begin("DirectX");
     DirectXCommon::GetInstance()->Initialize(WinApp::GetInstance());
     WinApp::GetInstance()->Show();
+    WinApp* winApp = WinApp::GetInstance();
+    if (winApp->ToggleFullscreen()) {
+        DirectXCommon::GetInstance()->ResizeSwapChain(
+            static_cast<uint32_t>((std::max)(winApp->GetClientWidth(), 1)),
+            static_cast<uint32_t>((std::max)(winApp->GetClientHeight(), 1)));
+    }
+    LockCursorToWindow();
     GetBootProfilerForGame()->End("DirectX");
     CheckInitializeTime("DirectXCommon", prevTime);
 
