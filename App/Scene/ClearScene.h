@@ -13,6 +13,8 @@
 
 class ClearScene : public BaseScene {
 public:
+    explicit ClearScene(bool returnToOnlineLobby = false)
+        : returnToOnlineLobby_(returnToOnlineLobby) {}
     void Initialize() override;
     void Finalize() override;
     void Update() override;
@@ -58,4 +60,5 @@ private:
     bool bookOpeningSoundPlayed_ = false;
     float archiveTransitionTime_ = 0.0f;
     bool archiveTransitionActive_ = false;
+    bool returnToOnlineLobby_ = false;
 };

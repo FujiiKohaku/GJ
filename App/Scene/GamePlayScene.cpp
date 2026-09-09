@@ -281,7 +281,8 @@ constexpr const char *kKeyWTexture = "resources/Textures/W.png";
 constexpr const char *kKeyATexture = "resources/Textures/A.png";
 constexpr const char *kKeySTexture = "resources/Textures/S.png";
 constexpr const char *kKeyDTexture = "resources/Textures/D.png";
-constexpr const char *kMouseTexture = "resources/Textures/mouse.png";
+constexpr const char *kMouseLeftTexture = "resources/Textures/mouse01.png";
+constexpr const char *kMouseRightTexture = "resources/Textures/mouse02.png";
 
 } // namespace
 
@@ -319,9 +320,6 @@ bool GamePlayScene::InitializeNextStep() {
   camera_->Initialize();
   Object3dManager::GetInstance()->SetDefaultCamera(camera_.get());
   SkinningObject3dManager::GetInstance()->SetDefaultCamera(camera_.get());
-
-  debugCameraController_.SetTargetCamera(camera_.get());
-  debugCameraController_.SetDebugMode(false);
 
   LevelDataLoader loader;
   initializationLevelData_ = loader.Load(levelPath_);
@@ -442,9 +440,6 @@ bool GamePlayScene::InitializeNextStep() {
   walkingDustEffectHandle_ = kInvalidEffectHandle;
   EffectManager::GetInstance()->SetCamera(camera_.get());
 
-  fluidForceRenderer_ = std::make_unique<FluidForceRenderer>();
-  fluidForceRenderer_->Initialize(DirectXCommon::GetInstance());
-
   gpuSphFluidRenderer_ = std::make_unique<GpuSphFluidRenderer>();
   gpuSphFluidRenderer_->Initialize(DirectXCommon::GetInstance());
 
@@ -522,7 +517,8 @@ bool GamePlayScene::InitializeNextStep() {
     TextureManager::GetInstance()->LoadTexture(kKeyATexture);
     TextureManager::GetInstance()->LoadTexture(kKeySTexture);
     TextureManager::GetInstance()->LoadTexture(kKeyDTexture);
-    TextureManager::GetInstance()->LoadTexture(kMouseTexture);
+    TextureManager::GetInstance()->LoadTexture(kMouseLeftTexture);
+    TextureManager::GetInstance()->LoadTexture(kMouseRightTexture);
 
     tutorialKeyWSprite_ = std::make_unique<Sprite>();
     tutorialKeyWSprite_->Initialize(SpriteManager::GetInstance(), kKeyWTexture);
@@ -540,9 +536,13 @@ bool GamePlayScene::InitializeNextStep() {
     tutorialKeyDSprite_->Initialize(SpriteManager::GetInstance(), kKeyDTexture);
     tutorialKeyDSprite_->SetSize({48.0f, 48.0f});
 
-    tutorialMouseSprite_ = std::make_unique<Sprite>();
-    tutorialMouseSprite_->Initialize(SpriteManager::GetInstance(), kMouseTexture);
-    tutorialMouseSprite_->SetSize({72.0f, 96.0f});
+    tutorialMouseLeftSprite_ = std::make_unique<Sprite>();
+    tutorialMouseLeftSprite_->Initialize(SpriteManager::GetInstance(), kMouseLeftTexture);
+    tutorialMouseLeftSprite_->SetSize({72.0f, 96.0f});
+
+    tutorialMouseRightSprite_ = std::make_unique<Sprite>();
+    tutorialMouseRightSprite_->Initialize(SpriteManager::GetInstance(), kMouseRightTexture);
+    tutorialMouseRightSprite_->SetSize({72.0f, 96.0f});
 
     const float width = static_cast<float>(WinApp::GetInstance()->GetRenderWidth());
     const float height = static_cast<float>(WinApp::GetInstance()->GetRenderHeight());
@@ -553,7 +553,8 @@ bool GamePlayScene::InitializeNextStep() {
     tutorialKeyASprite_->SetPosition({centerX - 100.0f, baseY});
     tutorialKeySSprite_->SetPosition({centerX - 50.0f, baseY});
     tutorialKeyDSprite_->SetPosition({centerX, baseY});
-    tutorialMouseSprite_->SetPosition({centerX + 90.0f, baseY - 32.0f});
+    tutorialMouseLeftSprite_->SetPosition({centerX + 90.0f, baseY - 32.0f});
+    tutorialMouseRightSprite_->SetPosition({centerX + 180.0f, baseY - 32.0f});
 
     controlsText_ = std::make_unique<Text>();
     controlsText_->Initialize(kDefaultFont);
@@ -653,7 +654,6 @@ void GamePlayScene::Finalize() {
   SceneManager::GetInstance()->RemovePostEffect(PostEffectType::FantasyMenu);
   SceneManager::GetInstance()->SetSlimeScreenProgress(0.0f);
   SceneManager::GetInstance()->SetFantasyMenuStrength(0.0f);
-  debugCameraController_.SetTargetCamera(nullptr);
   SceneManager::GetInstance()->SetScreenSpaceFluid(nullptr);
   SceneManager::GetInstance()->ClearExtraScreenSpaceFluids();
   EffectManager::GetInstance()->StopAllEffects();
@@ -753,13 +753,6 @@ void GamePlayScene::Update() {
     return;
   }
 
-  if (input->IsKeyTrigger(DIK_Y)) {
-    showForces_ = !showForces_;
-  }
-
-  debugCameraController_.Update();
-  const bool isFreeCameraMode = debugCameraController_.GetDebugMode();
-
   // 形状作成中のスローは、レーザーなどのトラップ判定より先に無敵を
   // 設定する。これにより、形状を作っている最中にトラップ死から
   // リスポーン処理へ入ることを防ぐ。
@@ -780,8 +773,7 @@ void GamePlayScene::Update() {
 
   // player_->Update(mapChipStage_.GetGimmicks());
     if (!isClearCelebrationActive_ && !hardenedThisFrame &&
-      (!isFreeCameraMode || player_->IsShapingSelfDestruct()) &&
-      !isLifeRelayActive_ && !isCannonTravelActive_) {
+        !isLifeRelayActive_ && !isCannonTravelActive_) {
         player_->Update(activeStage.GetGimmicks());
 
         if (player_->ConsumeGoalReached()) {
@@ -995,9 +987,7 @@ void GamePlayScene::Update() {
       }
     }
   }
-  if (!isFreeCameraMode) {
-    UpdateFollowCamera();
-  }
+  UpdateFollowCamera();
   camera_->Update();
   EffectManager::GetInstance()->SetCamera(camera_.get());
   EffectManager::GetInstance()->Update();
@@ -1015,16 +1005,15 @@ void GamePlayScene::Update() {
     tutorialKeyASprite_->SetColor(input->IsKeyPressed(DIK_A) ? pressColor : normalColor);
     tutorialKeySSprite_->SetColor(input->IsKeyPressed(DIK_S) ? pressColor : normalColor);
     tutorialKeyDSprite_->SetColor(input->IsKeyPressed(DIK_D) ? pressColor : normalColor);
-    // 右クリック（スライム変形）を想定してIsMousePress(1)の可能性もあるが、画像が左クリックか右クリックか不明。
-    // スライム変形は通常右クリックなので(1)、両方で反応するようにするか、あるいは左クリック(0)と右クリック(1)の両方で押された感を出す。
-    // 元のコードを見ると「左クリック長押しで…」というメッセージがあるので、左クリック=0。
-    tutorialMouseSprite_->SetColor(input->IsMousePressed(0) ? pressColor : normalColor);
+    tutorialMouseLeftSprite_->SetColor(input->IsMousePressed(0) ? pressColor : normalColor);
+    tutorialMouseRightSprite_->SetColor(input->IsMousePressed(1) ? pressColor : normalColor);
 
     tutorialKeyWSprite_->Update();
     tutorialKeyASprite_->Update();
     tutorialKeySSprite_->Update();
     tutorialKeyDSprite_->Update();
-    tutorialMouseSprite_->Update();
+    tutorialMouseLeftSprite_->Update();
+    tutorialMouseRightSprite_->Update();
   }
 }
 
@@ -1073,10 +1062,6 @@ void GamePlayScene::Draw2D() {
     livesNumberText_->Draw();
     return;
   }
-  if (showForces_) {
-    fluidForceRenderer_->Draw(*gpuSphFluid_, *camera_);
-  }
-
   SpriteManager::GetInstance()->PreDraw();
   tutorialPanelSprite_->Draw();
   for (const auto& lifeSprite : lifeSprites_) {
@@ -1088,7 +1073,8 @@ void GamePlayScene::Draw2D() {
     tutorialKeyASprite_->Draw();
     tutorialKeySSprite_->Draw();
     tutorialKeyDSprite_->Draw();
-    tutorialMouseSprite_->Draw();
+    tutorialMouseLeftSprite_->Draw();
+    tutorialMouseRightSprite_->Draw();
   }
 
   TextRenderer::GetInstance()->PreDraw();
@@ -1162,9 +1148,6 @@ void GamePlayScene::RestoreSavePoint() {
 void GamePlayScene::DrawParticle() {
   EffectManager::GetInstance()->PreDraw();
   EffectManager::GetInstance()->Draw();
-  if (showForces_ && gpuSphFluid_) {
-    fluidForceRenderer_->Draw(*gpuSphFluid_, *camera_);
-  }
 }
 
 void GamePlayScene::DrawImGui() {}
@@ -1513,7 +1496,6 @@ void GamePlayScene::StartDeathTransition() {
   }
 
   // Keep the player camera still while the actual body breaks into liquid.
-  debugCameraController_.SetDebugMode(false);
   UpdateFollowCamera();
   camera_->Update();
   skyBox_->Update(camera_.get());

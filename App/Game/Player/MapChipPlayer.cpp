@@ -456,9 +456,22 @@ bool MapChipPlayer::ResolveHorizontalCollision(Vector3& nextPosition)
                 continue;
             }
 
-            if (std::abs(hit.normal.x) > 0.0f) {
-                nextPosition.x -= hit.normal.x * hit.penetration;
-                resolved = true;
+            const float halfSizeX = playerBox.size.x * 0.5f + blockBox.size.x * 0.5f;
+            const float diffX = playerBox.center.x - blockBox.center.x;
+            const float overlapX = halfSizeX - std::abs(diffX);
+
+            const float halfSizeY = playerBox.size.y * 0.5f + blockBox.size.y * 0.5f;
+            const float diffY = playerBox.center.y - blockBox.center.y;
+            const float overlapY = halfSizeY - std::abs(diffY);
+
+            if (overlapX > 0.0f && overlapY > 0.0f) {
+                // 上下からの浅い衝突（上から降ってきた等）はY軸に任せるため無視し、
+                // 横からの衝突（Xめり込みが浅い、またはYに深くめり込んでいる壁）の場合はX方向に弾く
+                if (overlapX < overlapY || overlapY > 0.05f) {
+                    const float sign = diffX < 0.0f ? -1.0f : 1.0f;
+                    nextPosition.x += sign * overlapX;
+                    resolved = true;
+                }
             }
             // 連続する衝突のため更新
             playerBox.center = nextPosition;
@@ -545,9 +558,21 @@ bool MapChipPlayer::ResolveDynamicCollision(Vector3& nextPosition, const std::ve
             }
 
             if (isHorizontal) {
-                if (std::abs(hit.normal.x) > 0.0f) {
-                    nextPosition.x -= hit.normal.x * hit.penetration;
-                    resolved = true;
+                const float halfSizeX = playerBox.size.x * 0.5f + blockBox.size.x * 0.5f;
+                const float diffX = playerBox.center.x - blockBox.center.x;
+                const float overlapX = halfSizeX - std::abs(diffX);
+
+                const float halfSizeY = playerBox.size.y * 0.5f + blockBox.size.y * 0.5f;
+                const float diffY = playerBox.center.y - blockBox.center.y;
+                const float overlapY = halfSizeY - std::abs(diffY);
+
+                if (overlapX > 0.0f && overlapY > 0.0f) {
+                    // 動的ギミックでも同様に、上から降ってきた場合はXに弾かず、横からの侵入のみXに弾く
+                    if (overlapX < overlapY || overlapY > 0.05f) {
+                        const float sign = diffX < 0.0f ? -1.0f : 1.0f;
+                        nextPosition.x += sign * overlapX;
+                        resolved = true;
+                    }
                 }
             } else if (std::abs(hit.normal.y) > 0.0f) {
                 nextPosition.y -= hit.normal.y * hit.penetration;
@@ -729,7 +754,8 @@ void MapChipPlayer::UpdateVerticalConfinement(const std::vector<BaseMapChipGimmi
         verticalCompression01_ = Saturate((kPlayerSize - gap) / kPlayerSize);
         // A hardened slime corpse can be used as a platform or ceiling, but
         // must never turn a narrow gap into an instant player death.
-        if (gap <= kPlayerSize - kCollisionEpsilon &&
+        // わずかなめり込みでの不条理死を防ぐため、10%程度の明確な圧迫(0.1f)を死亡条件とする
+        if (gap <= kPlayerSize - 0.1f &&
             !floorIsHardenedSlime && !ceilingIsHardenedSlime) {
             isCrushed_ = true;
         }

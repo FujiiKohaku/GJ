@@ -7,9 +7,9 @@
 // All methods, including EOS callbacks, run on the game's main thread.
 class EosMultiplayer {
 public:
-    static constexpr int MinPlayers = 2;
+    static constexpr int MinPlayers = 1;
     static constexpr int MaxPlayers = 3;
-    struct Room { std::string id; int members = 0; };
+    struct Room { std::string id; std::string name; int members = 0; };
     struct Member { std::string id; bool ready = false; };
     struct Packet { int sender = -1; std::vector<uint8_t> data; };
     static EosMultiplayer& Get();
@@ -18,7 +18,7 @@ public:
     void Tick();
     void Connect();
     void Search();
-    void Create();
+    void Create(const std::string& name);
     void Join(size_t index);
     void Leave();
     void SetReady(bool ready);
@@ -36,6 +36,7 @@ public:
     int LocalSlot() const;
     const std::string& StageFile() const;
     const std::string& MatchId() const;
+    const std::string& LobbyName() const;
     const std::string& Status() const;
     const std::vector<Room>& Rooms() const;
     const std::vector<Member>& Members() const;

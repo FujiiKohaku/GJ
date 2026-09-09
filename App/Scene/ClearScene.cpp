@@ -10,6 +10,7 @@
 #include "Engine/DirectXCommon/DirectXCommon.h"
 #include "Engine/Effect/EffectManager.h"
 #include "Engine/Input/Input.h"
+#include "Engine/Network/EosMultiplayer.h"
 #include "Engine/PostEffect/PostEffectType.h"
 #include "Engine/TextureManager/TextureManager.h"
 #include "Engine/Time/TimeManager.h"
@@ -231,7 +232,9 @@ void ClearScene::Initialize()
 
     instructionText_ = std::make_unique<Text>();
     instructionText_->Initialize(kDefaultFont);
-    instructionText_->SetText("ENTER / SPACE : TITLE");
+    instructionText_->SetText(returnToOnlineLobby_
+        ? "ENTER / SPACE : ONLINE LOBBY"
+        : "ENTER / SPACE : TITLE");
     instructionText_->SetPosition({ 640.0f, 610.0f });
     instructionText_->SetAnchorPoint({ 0.5f, 0.5f });
     instructionText_->SetFontSize(26.0f);
@@ -416,7 +419,11 @@ bool ClearScene::UpdateArchiveTransition(float deltaTime)
 
     PageTransition::RequestReveal(
         { 0.0f, 0.0f, 0.0f, 1.0f }, kArchiveTransitionDuration);
-    SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>());
+    if (returnToOnlineLobby_) {
+        EosMultiplayer::Get().EndMatch();
+    }
+    SceneManager::GetInstance()->SetNextScene(
+        std::make_unique<ArchiveScene>(returnToOnlineLobby_));
     return true;
 }
 
