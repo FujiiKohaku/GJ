@@ -3,6 +3,14 @@
 The audio files in this directory are released under CC0 1.0. Attribution is
 not required. Source details are retained here for traceability.
 
+## ../Gimmik/569497__sheyvan__stone-impact-rubble-debris-1.wav
+
+- Title: Stone Impact Rubble Debris 1
+- Creator: Sheyvan
+- Source: https://freesound.org/people/Sheyvan/sounds/569497/
+- License: CC0 1.0 — https://creativecommons.org/publicdomain/zero/1.0/
+- Use: Destructible walls and the moment a crumbling floor starts to fall.
+
 ## spring_launch.wav
 
 - Title: Various Sound Effects

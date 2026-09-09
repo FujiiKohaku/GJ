@@ -395,6 +395,7 @@ void ArchiveScene::InitializeInterface()
         "25 CC0 Bang / Firework SFX - rubberduck / CC0 1.0\n"
         "40 CC0 Water / Splash / Slime SFX - rubberduck / CC0 1.0\n"
         "Various Sound Effects (Spring) - Spring Spring / CC0 1.0\n"
+        "Stone Impact Rubble Debris 1 - Sheyvan / CC0 1.0\n"
         "Metal Impact Sounds - BMacZero / CC0 1.0\n"
         "8bit Menu Select - Fupi / CC0 1.0\n\n"
         "FONT\n"
