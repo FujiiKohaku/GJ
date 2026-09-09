@@ -2,6 +2,7 @@
 
 #include "Engine/3D/ModelManager.h"
 #include "Engine/3D/Object3dManager.h"
+#include "Engine/Audio/SoundManager.h"
 #include "Engine/Time/TimeManager.h"
 #include <algorithm>
 #include <cmath>
@@ -13,6 +14,9 @@ constexpr float kShakeDuration = 0.95f;
 constexpr float kFallDuration = 1.25f;
 constexpr float kPieceWidth = 0.32f;
 constexpr float kPieceHeight = 0.48f;
+constexpr const char* kCrumbleSoundName = "Gimmick.CrumblingFloor.Collapse";
+constexpr const char* kCrumbleSoundPath =
+    "resources/Audio/Gimmik/569497__sheyvan__stone-impact-rubble-debris-1.wav";
 }
 
 bool CrumblingFloorGimmick::Initialize(
@@ -25,6 +29,8 @@ bool CrumblingFloorGimmick::Initialize(
     if (!model) {
         return false;
     }
+    SoundManager::GetInstance()->Load(
+        kCrumbleSoundName, kCrumbleSoundPath, AudioCategory::SE);
 
     for (size_t index = 0; index < kPieceCount; ++index) {
         pieces_[index] = std::make_unique<Object3d>();
@@ -108,6 +114,7 @@ void CrumblingFloorGimmick::Update()
         if (stateTime_ >= kShakeDuration) {
             state_ = State::Falling;
             stateTime_ = 0.0f;
+            SoundManager::GetInstance()->PlaySE(kCrumbleSoundName, 0.55f);
         }
         return;
     }

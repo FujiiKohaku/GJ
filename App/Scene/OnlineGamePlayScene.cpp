@@ -40,6 +40,8 @@ constexpr const char* SlowWaterSoundName = "SlowWater";
 constexpr const char* SlowWaterSoundPath = "resources/Audio/Scene/player/水中.mp3";
 constexpr const char* SlimeMoveSoundName = "SlimeMove";
 constexpr const char* SlimeMoveSoundPath = "resources/Audio/Scene/player/ゾンビの食事.mp3";
+constexpr const char* ConfirmSoundName = "StageSelect.Confirm";
+constexpr const char* ConfirmSoundPath = "resources/Audio/StageSelect/confirm.wav";
 struct TutorialStep { float triggerX; const char* message; };
 constexpr std::array<TutorialStep, 10> TutorialSteps{{
     {0.0f, "A / D で移動　SPACE でジャンプ"},
@@ -157,6 +159,8 @@ void OnlineGamePlayScene::Initialize() {
                                       AudioCategory::SE);
     SoundManager::GetInstance()->Load(SlimeMoveSoundName, SlimeMoveSoundPath,
                                       AudioCategory::SE);
+    SoundManager::GetInstance()->Load(ConfirmSoundName, ConfirmSoundPath,
+                                      AudioCategory::SE);
     hud_ = std::make_unique<Text>(); hud_->Initialize(Font); hud_->SetFontSize(18); hud_->SetPosition({28, 132}); hud_->SetMaxWidth(950);
     leaveText_ = std::make_unique<Text>(); leaveText_->Initialize(Font); leaveText_->SetFontSize(18);
     leaveText_->SetPosition({1130, 145}); leaveText_->SetAnchorPoint({0.5f, 0.5f}); leaveText_->SetText("ロビーへ戻る"); leaveText_->Update();
@@ -172,11 +176,10 @@ void OnlineGamePlayScene::Initialize() {
             throw std::runtime_error("Invalid stage or roster");
         const auto path = std::filesystem::path("resources/Maps") / stageFile_;
         mapHash_ = HashFile(path);
-        maximumLives_ = stageFile_ == "stage2.json" ? 20
-                      : stageFile_ == "stage1.json" ? 10 : 5;
-        lives_.fill(maximumLives_);
         LevelDataLoader loader;
         const auto level = loader.Load(path.string());
+        maximumLives_ = level.maximumLives;
+        lives_.fill(maximumLives_);
         stage_.Initialize(level); stage_.ApplyMaterialProperties();
         std::vector<MapChipPlayer*> activePlayers;
         for (int i = 0; i < playerCount_; ++i) {
@@ -746,6 +749,7 @@ void OnlineGamePlayScene::Update() {
     auto& online = EosMultiplayer::Get();
     const auto dt = TimeManager::GetInstance()->GetUnscaledDeltaTime();
     if (LeaveHovered() && Input::GetInstance()->IsMouseTrigger(0)) {
+        SoundManager::GetInstance()->PlaySE(ConfirmSoundName, 0.65f);
         online.Leave();
         SceneManager::GetInstance()->SetNextScene(std::make_unique<ArchiveScene>(true)); return;
     }

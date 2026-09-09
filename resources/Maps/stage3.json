@@ -1,4 +1,5 @@
 {
+  "maximumLives": 5,
   "objects": [
     {
       "transform": {
