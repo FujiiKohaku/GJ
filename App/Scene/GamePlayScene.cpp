@@ -276,6 +276,8 @@ constexpr const char *kSpikeHitSlimeSoundPath = "resources/Audio/Gimmik/751338__
 
 constexpr const char *kWallDestroySoundName = "WallDestroy";
 constexpr const char *kWallDestroySoundPath = "resources/Audio/Gimmik/569497__sheyvan__stone-impact-rubble-debris-1.wav";
+constexpr const char* kGameBgmName = "BGM.Game";
+constexpr const char* kGameBgmPath = "resources/Audio/BGM/fairy_adventure_bpm140.mp3";
 
 constexpr const char *kKeyWTexture = "resources/Textures/W.png";
 constexpr const char *kKeyATexture = "resources/Textures/A.png";
@@ -347,6 +349,8 @@ bool GamePlayScene::InitializeNextStep() {
   audio->Load(kGearHitSlimeSoundName, kGearHitSlimeSoundPath, AudioCategory::SE);
   audio->Load(kSpikeHitSlimeSoundName, kSpikeHitSlimeSoundPath, AudioCategory::SE);
   audio->Load(kWallDestroySoundName, kWallDestroySoundPath, AudioCategory::SE);
+  audio->Load(kGameBgmName, kGameBgmPath, AudioCategory::BGM);
+  audio->PlayBGM(kGameBgmName, 0.5f);
   }
 
   if (initializationStep_ == 1) {

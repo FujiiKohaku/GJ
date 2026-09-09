@@ -24,6 +24,8 @@ constexpr const char* kGameOverSoundPath = "resources/Audio/Scene/game_over_trum
 constexpr const char* kImpactSoundName = "Scene.GameOver.Impact";
 constexpr const char* kImpactSoundPath = "resources/Audio/Scene/game_over_impact.wav";
 constexpr const char* kSceneConfirmSoundName = "Scene.Confirm";
+constexpr const char* kGameOverBgmName = "BGM.GameOver";
+constexpr const char* kGameOverBgmPath = "resources/Audio/BGM/The_Bards_Tale.mp3";
 constexpr const char* kSceneConfirmSoundPath = "resources/Audio/Scene/scene_confirm.wav";
 constexpr float kTitleTransitionDuration = 0.55f;
 }
@@ -34,6 +36,8 @@ void GameOverScene::Initialize()
     audio->Load(kGameOverSoundName, kGameOverSoundPath, AudioCategory::SE);
     audio->Load(kImpactSoundName, kImpactSoundPath, AudioCategory::SE);
     audio->Load(kSceneConfirmSoundName, kSceneConfirmSoundPath, AudioCategory::SE);
+    audio->Load(kGameOverBgmName, kGameOverBgmPath, AudioCategory::BGM);
+    audio->PlayBGM(kGameOverBgmName, 0.5f);
     audio->PlaySE(kGameOverSoundName, 0.68f);
 
     SceneManager::GetInstance()->SetPostEffectType(PostEffectType::ArchiveAtmosphere);

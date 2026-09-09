@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "Engine/Audio/SoundManager.h"
 
 class ClearScene : public BaseScene {
 public:
@@ -61,4 +62,6 @@ private:
     float archiveTransitionTime_ = 0.0f;
     bool archiveTransitionActive_ = false;
     bool returnToOnlineLobby_ = false;
+    AudioHandle fanfareAudioHandle_{};
+    bool clearBgmPlayed_ = false;
 };

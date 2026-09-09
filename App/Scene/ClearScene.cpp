@@ -41,6 +41,8 @@ constexpr const char* kBookOpeningSoundPath = "resources/Audio/Scene/book_open.w
 constexpr const char* kFireworkSoundName = "Scene.Clear.Firework";
 constexpr const char* kFireworkSoundPath = "resources/Audio/Scene/clear_firework.wav";
 constexpr const char* kSceneConfirmSoundName = "Scene.Confirm";
+constexpr const char* kClearBgmName = "BGM.Clear";
+constexpr const char* kClearBgmPath = "resources/Audio/BGM/storytrack_part1.mp3";
 constexpr const char* kSceneConfirmSoundPath = "resources/Audio/Scene/scene_confirm.wav";
 constexpr uint32_t kOpeningPageCount = 24;
 constexpr uint32_t kOpeningPageStripCount = 16;
@@ -77,7 +79,10 @@ void ClearScene::Initialize()
     bookOpeningSoundPlayed_ = false;
     audio->Load(kFireworkSoundName, kFireworkSoundPath, AudioCategory::SE);
     audio->Load(kSceneConfirmSoundName, kSceneConfirmSoundPath, AudioCategory::SE);
-    audio->PlaySE(kClearSoundName, 0.36f);
+    audio->Load(kClearBgmName, kClearBgmPath, AudioCategory::BGM);
+    audio->StopBGM();
+    fanfareAudioHandle_ = audio->PlaySE(kClearSoundName, 0.36f);
+    clearBgmPlayed_ = false;
 
     SceneManager* sceneManager = SceneManager::GetInstance();
     sceneManager->SetPostEffectType(PostEffectType::Copy);
@@ -259,6 +264,11 @@ void ClearScene::Finalize()
 
 void ClearScene::Update()
 {
+    if (!clearBgmPlayed_ && !SoundManager::GetInstance()->IsPlaying(fanfareAudioHandle_)) {
+        SoundManager::GetInstance()->PlayBGM(kClearBgmName, 0.5f);
+        clearBgmPlayed_ = true;
+    }
+
     const float dt = TimeManager::GetInstance()->GetDeltaTime();
     sceneTime_ += dt;
     if (UpdateArchiveTransition(dt)) {

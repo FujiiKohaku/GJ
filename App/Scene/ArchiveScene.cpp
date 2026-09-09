@@ -47,6 +47,8 @@ constexpr const char* kPageFlipSoundPath = "resources/Audio/StageSelect/page_fli
 constexpr const char* kPageRiffleSoundPath = "resources/Audio/StageSelect/page_riffle.wav";
 constexpr const char* kConfirmSoundPath = "resources/Audio/StageSelect/confirm.wav";
 constexpr const char* kBackSoundPath = "resources/Audio/StageSelect/back.wav";
+constexpr const char* kArchiveBgmName = "BGM.Archive";
+constexpr const char* kArchiveBgmPath = "resources/Audio/BGM/Rejoicing.mp3";
 
 constexpr const char* kArchiveRoomModel = "StageSelectBook/ArchiveRoom.obj";
 constexpr float kCameraApproachDuration = 2.4f;
@@ -122,6 +124,8 @@ void ArchiveScene::Initialize()
     audio->Load(kPageRiffleSoundName, kPageRiffleSoundPath, AudioCategory::SE);
     audio->Load(kConfirmSoundName, kConfirmSoundPath, AudioCategory::SE);
     audio->Load(kBackSoundName, kBackSoundPath, AudioCategory::SE);
+    audio->Load(kArchiveBgmName, kArchiveBgmPath, AudioCategory::BGM);
+    audio->PlayBGM(kArchiveBgmName, 0.5f);
 
     RefreshStageText();
     EnterTitleMode();
