@@ -574,10 +574,15 @@ void ArchiveScene::Update()
         state_ == BookSelectState::CardClosing || state_ == BookSelectState::PageTurning) {
         const auto action = lobbyPanel_.Update(state_ == BookSelectState::Idle);
         switch (action) {
-        case LobbyPanel::Action::PreviousStage: StartPageTurn(PageTurnDirection::Left); break;
-        case LobbyPanel::Action::NextStage: StartPageTurn(PageTurnDirection::Right); break;
+        case LobbyPanel::Action::PreviousStage:
+            SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.65f);
+            StartPageTurn(PageTurnDirection::Left); break;
+        case LobbyPanel::Action::NextStage:
+            SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.65f);
+            StartPageTurn(PageTurnDirection::Right); break;
         case LobbyPanel::Action::Solo: ConfirmStage(); break;
         case LobbyPanel::Action::Start:
+            SoundManager::GetInstance()->PlaySE(kConfirmSoundName, 0.65f);
             online.Start(std::filesystem::path(stages_[currentStageIndex_].levelPath).filename().string()); break;
         default: break;
         }
